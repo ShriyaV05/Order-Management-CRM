@@ -5,7 +5,7 @@ A full-stack **Order & Sales CRM** built for POPCONE to manage customer orders, 
 ## ✨ Features
 
 * 🔐 Secure authentication with **Admin / Member** roles
-* 🛒 Create, edit, view and delete orders
+* 🛒 Create, edit, view and delete orders 
 * 📦 Real-time inventory management
 * ➕ Stock additions and +/- inventory adjustments
 * 🔄 Automatic inventory deduction and restoration

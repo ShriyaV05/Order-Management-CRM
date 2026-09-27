@@ -1,0 +1,17 @@
+services:
+  popcone-crm:
+    build: .
+    container_name: popcone_orders_crm
+    restart: always
+    ports:
+      - "8000:8000"
+    environment:
+      - PORT=8000
+      - HOST=0.0.0.0
+      - ENV=production
+      - DB_PATH=/app/data/popcone.db
+    volumes:
+      - popcone_data:/app/data
+
+volumes:
+  popcone_data:

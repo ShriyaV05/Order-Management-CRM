@@ -125,11 +125,11 @@ def determine_zone(state: str, district: str) -> str:
     st = (state or "").strip().lower()
     dist = (district or "").strip().lower()
 
-    # Rule: Chennai Priority
-    if dist == "chennai":
+    # Rule: Chennai Priority (State = Tamil Nadu AND District = Chennai)
+    if st == "tamil nadu" and dist == "chennai":
         return "Chennai"
     
-    # Rule: Tamil Nadu
+    # Rule: Tamil Nadu (Non-Chennai)
     if st == "tamil nadu":
         return "Tamil Nadu"
     
@@ -141,18 +141,31 @@ def determine_zone(state: str, district: str) -> str:
     return "North/East/West"
 
 def calculate_delivery_fee(state: str, district: str, total_bottles: int) -> Dict[str, Any]:
+    st = (state or "").strip()
+    dist = (district or "").strip()
+
+    if not st or not dist:
+        return {
+            "weight_grams": total_bottles * 110 if total_bottles > 0 else 0,
+            "weight_display": f"{total_bottles * 110}g" if total_bottles > 0 else "0g",
+            "zone": "Unknown",
+            "slab": "None",
+            "fee": 0.0,
+            "notes": "Select state and district to calculate"
+        }
+
     if total_bottles <= 0:
         return {
             "weight_grams": 0,
             "weight_display": "0g",
-            "zone": "Tamil Nadu",
+            "zone": determine_zone(st, dist),
             "slab": "None",
             "fee": 0.0,
             "notes": "No bottles selected"
         }
     
     weight_grams = total_bottles * 110
-    zone = determine_zone(state, district)
+    zone = determine_zone(st, dist)
     rates = DELIVERY_RATES.get(zone, DELIVERY_RATES["North/East/West"])
 
     if weight_grams >= 1000:

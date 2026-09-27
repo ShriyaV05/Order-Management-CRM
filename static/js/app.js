@@ -24,8 +24,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         'Sour Cream': 0,
         'Peri Peri': 0
       },
-      deliveryFee: 40.0,
-      deliveryCalculated: 40.0,
+      deliveryFee: 0.0,
+      deliveryCalculated: 0.0,
       deliveryNotes: ''
     }
   };
@@ -390,6 +390,78 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   }
 
+  // ---------------- Delivery Fee Calculation Rules ----------------
+  const SOUTH_INDIA_STATES = new Set(['karnataka', 'kerala', 'andhra pradesh', 'telangana', 'puducherry']);
+  const DELIVERY_RATES = {
+    'Chennai': { tier1: 40.0, tier2: 42.0, tier3: 45.0, excess: 20.0 },
+    'Tamil Nadu': { tier1: 65.0, tier2: 65.0, tier3: 70.0, excess: 30.0 },
+    'South India': { tier1: 75.0, tier2: 78.0, tier3: 80.0, excess: 35.0 },
+    'North/East/West': { tier1: 100.0, tier2: 150.0, tier3: 230.0, excess: 80.0 }
+  };
+
+  function computeDeliveryFeeClient(stateVal, distVal, totalBottles) {
+    const st = (stateVal || '').trim().toLowerCase();
+    const dist = (distVal || '').trim().toLowerCase();
+
+    if (!st || !dist || totalBottles <= 0) {
+      return {
+        fee: 0,
+        weightGrams: totalBottles > 0 ? totalBottles * 110 : 0,
+        weightDisplay: totalBottles * 110 >= 1000 ? `${(totalBottles * 110 / 1000).toFixed(2)}kg` : `${totalBottles * 110}g`,
+        zone: 'Unknown',
+        slab: 'None',
+        notes: (!st || !dist) ? 'Select state and district to calculate' : 'Select at least 1 bottle to calculate'
+      };
+    }
+
+    const weightGrams = totalBottles * 110;
+    const weightDisplay = weightGrams >= 1000 ? `${(weightGrams / 1000).toFixed(2)}kg` : `${weightGrams}g`;
+
+    let zone = 'North/East/West';
+    if (st === 'tamil nadu' && dist === 'chennai') {
+      zone = 'Chennai';
+    } else if (st === 'tamil nadu') {
+      zone = 'Tamil Nadu';
+    } else if (SOUTH_INDIA_STATES.has(st)) {
+      zone = 'South India';
+    }
+
+    const rates = DELIVERY_RATES[zone] || DELIVERY_RATES['North/East/West'];
+    let fee = 0;
+    let slab = '';
+    let notes = '';
+
+    if (weightGrams <= 250) {
+      fee = rates.tier1;
+      slab = 'Up to 250g';
+      notes = `${zone} (<=250g)`;
+    } else if (weightGrams <= 500) {
+      fee = rates.tier2;
+      slab = '250g–500g';
+      notes = `${zone} (251g–500g)`;
+    } else if (weightGrams <= 1000) {
+      fee = rates.tier3;
+      slab = '500g–1kg';
+      notes = `${zone} (501g–1kg)`;
+    } else {
+      const excessGrams = weightGrams - 1000;
+      const excessUnits = Math.ceil(excessGrams / 500);
+      const surcharge = excessUnits * rates.excess;
+      fee = rates.tier3 + surcharge;
+      slab = `> 1kg (${weightDisplay})`;
+      notes = `${zone} 1kg base (₹${rates.tier3}) + ₹${surcharge} excess (${excessUnits} x 500g slab)`;
+    }
+
+    return {
+      fee,
+      weightGrams,
+      weightDisplay,
+      zone,
+      slab,
+      notes
+    };
+  }
+
   // Adjust flavour quantity button helper
   window.adjustFlavourQty = (flavourName, delta) => {
     const id = `qty-${flavourName.toLowerCase().replace(' ', '-')}`;
@@ -401,36 +473,39 @@ document.addEventListener('DOMContentLoaded', async () => {
     recalcNewOrderPricing();
   };
 
-  async function recalcNewOrderPricing() {
+  function recalcNewOrderPricing() {
     const stateVal = document.getElementById('new-order-state').value;
     const distVal = document.getElementById('new-order-district').value;
     const totalBottles = Object.values(state.newOrderState.flavours).reduce((a, b) => a + b, 0);
 
-    const weightGrams = totalBottles * 110;
-    const weightDisplay = weightGrams >= 1000 ? `${(weightGrams / 1000).toFixed(2)}kg` : `${weightGrams}g`;
+    const calc = computeDeliveryFeeClient(stateVal, distVal, totalBottles);
 
     document.getElementById('new-order-bottles-count').textContent = totalBottles;
-    document.getElementById('new-order-weight-display').textContent = weightDisplay;
+    document.getElementById('new-order-weight-display').textContent = calc.weightDisplay;
 
     const unitPrice = state.settings.bottle_price || 149;
     const productAmount = totalBottles * unitPrice;
     document.getElementById('new-order-product-amount').textContent = `₹${productAmount.toLocaleString('en-IN')}`;
 
-    if (totalBottles > 0 && stateVal && distVal) {
-      try {
-        const delRes = await api.calculateDelivery(stateVal, distVal, totalBottles);
-        state.newOrderState.deliveryCalculated = delRes.fee;
-        state.newOrderState.deliveryFee = delRes.fee;
-        state.newOrderState.deliveryNotes = delRes.notes;
+    const feeInput = document.getElementById('new-order-delivery-fee');
+    const noteEl = document.getElementById('new-order-delivery-note');
 
-        const feeInput = document.getElementById('new-order-delivery-fee');
-        feeInput.value = delRes.fee;
-        document.getElementById('new-order-delivery-note').textContent = `Zone: ${delRes.zone} | Slab: ${delRes.slab} (${delRes.notes})`;
-      } catch (err) {
-        console.error(err);
-      }
+    if (totalBottles > 0 && stateVal && distVal) {
+      feeInput.value = calc.fee;
+      state.newOrderState.deliveryCalculated = calc.fee;
+      state.newOrderState.deliveryFee = calc.fee;
+      state.newOrderState.deliveryNotes = calc.notes;
+      noteEl.textContent = `Zone: ${calc.zone} | Slab: ${calc.slab} (${calc.notes})`;
     } else {
-      document.getElementById('new-order-delivery-note').textContent = 'Select state, district and flavours to calculate';
+      feeInput.value = 0;
+      state.newOrderState.deliveryCalculated = 0;
+      state.newOrderState.deliveryFee = 0;
+      state.newOrderState.deliveryNotes = '';
+      if (!stateVal || !distVal) {
+        noteEl.textContent = 'Select state and district to calculate';
+      } else {
+        noteEl.textContent = 'Select at least 1 bottle to calculate';
+      }
     }
 
     updateFinalPricingDisplay();
@@ -440,7 +515,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     const totalBottles = Object.values(state.newOrderState.flavours).reduce((a, b) => a + b, 0);
     const unitPrice = state.settings.bottle_price || 149;
     const productAmount = totalBottles * unitPrice;
-    const deliveryFee = parseFloat(document.getElementById('new-order-delivery-fee').value) || 0;
+    const feeInput = document.getElementById('new-order-delivery-fee');
+    const deliveryFee = feeInput && feeInput.value !== '' ? (parseFloat(feeInput.value) || 0) : 0;
     const finalAmount = productAmount + deliveryFee;
 
     document.getElementById('new-order-final-amount').textContent = `₹${finalAmount.toLocaleString('en-IN')}`;
@@ -494,7 +570,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         const input = document.getElementById(id);
         if (input) input.value = 0;
       });
-      document.getElementById('new-order-delivery-fee').value = 40;
+      document.getElementById('new-order-delivery-fee').value = 0;
       populateDistricts('Tamil Nadu', 'Chennai');
       recalcNewOrderPricing();
 
@@ -507,6 +583,21 @@ document.addEventListener('DOMContentLoaded', async () => {
         showToast(err.message || 'Failed to create order', 'danger');
       }
     }
+  });
+
+  // Reset form handler
+  document.getElementById('form-new-order').addEventListener('reset', () => {
+    state.newOrderState.flavours = { 'Tomato': 0, 'Cheese': 0, 'Sour Cream': 0, 'Peri Peri': 0 };
+    ['Tomato', 'Cheese', 'Sour Cream', 'Peri Peri'].forEach(flv => {
+      const id = `qty-${flv.toLowerCase().replace(' ', '-')}`;
+      const input = document.getElementById(id);
+      if (input) input.value = 0;
+    });
+    document.getElementById('new-order-delivery-fee').value = 0;
+    setTimeout(() => {
+      populateDistricts('Tamil Nadu', 'Chennai');
+      recalcNewOrderPricing();
+    }, 20);
   });
 
   // ---------------- 3. ORDERS PAGE ----------------

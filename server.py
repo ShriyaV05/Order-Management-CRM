@@ -1207,9 +1207,13 @@ def serve_logo():
         return FileResponse(logo_path, media_type="image/jpeg")
     return FileResponse(os.path.join(STATIC_DIR, "assets", "logo.jpg"), media_type="image/jpeg")
 
-@app.get("/")
+@app.api_route("/", methods=["GET", "HEAD"])
 def serve_index():
     return FileResponse(os.path.join(STATIC_DIR, "index.html"))
+
+@app.api_route("/health", methods=["GET", "HEAD"])
+def health_check():
+    return {"status": "ok"}
 
 @app.on_event("startup")
 def startup_event():

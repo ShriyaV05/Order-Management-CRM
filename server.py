@@ -121,7 +121,13 @@ def login(req: LoginRequest):
     username = (req.username or "").strip().lower()
     conn = get_db()
     cursor = conn.cursor()
-    cursor.execute("SELECT id, username, display_name, role, password_hash FROM users WHERE LOWER(username) = ?;", (username,))
+    cursor.execute("""
+    SELECT id, username, display_name, role, password_hash 
+    FROM users 
+    WHERE LOWER(username) = ? 
+       OR LOWER(display_name) = ? 
+       OR LOWER(username) = ?;
+    """, (username, username, f"{username}@popcone" if "@" not in username else username))
     user = cursor.fetchone()
 
     if not user or not verify_password(req.password, user["password_hash"]):
@@ -301,7 +307,11 @@ def get_dashboard_stats(current_user: Dict[str, Any] = Depends(get_current_user)
             flavour_sales[r["flavour"]] = r["total_qty"]
 
     # Most purchased flavour
-    most_purchased = max(flavour_sales.items(), key=lambda x: x[1]) if flavour_sales else ("None", 0)
+    has_sales = any(qty > 0 for qty in flavour_sales.values())
+    if has_sales:
+        most_purchased = max(flavour_sales.items(), key=lambda x: x[1])
+    else:
+        most_purchased = ("None", 0)
 
     # Recent Orders (last 5)
     cursor.execute("""
@@ -371,6 +381,8 @@ def get_orders(
     dispatch: Optional[str] = "All",
     district: Optional[str] = "All",
     date_filter: Optional[str] = "All",
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
     sort_by: Optional[str] = "Newest",
     current_user: Dict[str, Any] = Depends(get_current_user)
 ):
@@ -405,12 +417,17 @@ def get_orders(
         query += " AND district = ?"
         params.append(district)
 
-    # Date filter: Today, This Week, This Month, This Year, All
+    # Date filter: Today, Yesterday, This Week, This Month, This Year, All
     now = datetime.now()
     if date_filter == "Today":
         today_str = now.strftime("%Y-%m-%d")
         query += " AND created_at >= ?"
         params.append(f"{today_str} 00:00:00")
+    elif date_filter == "Yesterday":
+        yest_str = (now - timedelta(days=1)).strftime("%Y-%m-%d")
+        query += " AND created_at >= ? AND created_at <= ?"
+        params.append(f"{yest_str} 00:00:00")
+        params.append(f"{yest_str} 23:59:59")
     elif date_filter == "This Week":
         # Monday of current week
         start_of_week = now - timedelta(days=now.weekday())
@@ -425,11 +442,21 @@ def get_orders(
         query += " AND created_at >= ?"
         params.append(f"{start_of_year} 00:00:00")
 
+    # Custom From/To Date Filter
+    if date_from and date_from.strip():
+        query += " AND created_at >= ?"
+        params.append(f"{date_from.strip()} 00:00:00")
+    if date_to and date_to.strip():
+        query += " AND created_at <= ?"
+        params.append(f"{date_to.strip()} 23:59:59")
+
     # Sorting
-    if sort_by == "Oldest":
+    if sort_by in ["Oldest", "oldest"]:
         query += " ORDER BY created_at ASC, id ASC"
-    elif sort_by == "Highest Amount":
+    elif sort_by in ["Highest Amount", "AmountHigh"]:
         query += " ORDER BY final_amount DESC, created_at DESC"
+    elif sort_by in ["Lowest Amount", "AmountLow"]:
+        query += " ORDER BY final_amount ASC, created_at DESC"
     elif sort_by == "Customer Name":
         query += " ORDER BY customer_name ASC, created_at DESC"
     elif sort_by == "District":
@@ -584,7 +611,7 @@ def create_order(req: CreateOrderRequest, current_user: Dict[str, Any] = Depends
             cursor.execute("""
             INSERT INTO inventory_movements (timestamp, flavour, movement_type, quantity, reference, created_by)
             VALUES (?, ?, ?, ?, ?, ?);
-            """, (now_str, it.flavour, "Sold", -it.quantity, new_order_id, current_user["display_name"]))
+            """, (now_str, it.flavour, "Sold", -it.quantity, new_order_id, "System"))
 
         # Audit log
         cursor.execute("""
@@ -750,7 +777,7 @@ def edit_order(order_id: str, req: EditOrderRequest, current_user: Dict[str, Any
                 cursor.execute("""
                 INSERT INTO inventory_movements (timestamp, flavour, movement_type, quantity, reference, created_by)
                 VALUES (?, ?, ?, ?, ?, ?);
-                """, (now_str, flv, movement_type, -diff, f"{order_id} Edit", current_user["display_name"]))
+                """, (now_str, flv, movement_type, -diff, f"{order_id} Edit", "System"))
 
         # Replace order items
         cursor.execute("DELETE FROM order_items WHERE order_id = ?;", (order_id,))
@@ -809,7 +836,7 @@ def delete_order(order_id: str, current_user: Dict[str, Any] = Depends(get_curre
             cursor.execute("""
             INSERT INTO inventory_movements (timestamp, flavour, movement_type, quantity, reference, created_by)
             VALUES (?, ?, ?, ?, ?, ?);
-            """, (now_str, it["flavour"], "Order Deletion Reversal", it["quantity"], order_id, current_user["display_name"]))
+            """, (now_str, it["flavour"], "Order Deletion Reversal", it["quantity"], order_id, "System"))
 
         # Delete order and order_items
         cursor.execute("DELETE FROM order_items WHERE order_id = ?;", (order_id,))
@@ -1011,7 +1038,7 @@ def reset_inventory(current_user: Dict[str, Any] = Depends(require_admin)):
 
 # ----------------- Analytics API -----------------
 @app.get("/api/analytics")
-def get_analytics(year: Optional[int] = None, current_user: Dict[str, Any] = Depends(get_current_user)):
+def get_analytics(year: Optional[int] = None, month: Optional[int] = None, current_user: Dict[str, Any] = Depends(get_current_user)):
     target_year = year or datetime.now().year
 
     conn = get_db()
@@ -1054,7 +1081,8 @@ def get_analytics(year: Optional[int] = None, current_user: Dict[str, Any] = Dep
             flavour_stats[r["flavour"]]["bottles"] = r["bottles"] or 0
             flavour_stats[r["flavour"]]["revenue"] = r["revenue"] or 0.0
 
-    most_purchased = max(flavour_stats.items(), key=lambda x: x[1]["bottles"]) if flavour_stats else ("None", {"bottles": 0, "revenue": 0.0})
+    has_sales = any(s["bottles"] > 0 for s in flavour_stats.values())
+    most_purchased = max(flavour_stats.items(), key=lambda x: x[1]["bottles"]) if has_sales else ("None", {"bottles": 0, "revenue": 0.0})
 
     # 3. Monthly Report (All 12 months: Jan to Dec)
     months_labels = [
@@ -1079,6 +1107,7 @@ def get_analytics(year: Optional[int] = None, current_user: Dict[str, Any] = Dep
         """, (str(target_year), m_str))
 
         month_flavour_map = {f: 0 for f in flavours}
+        month_rev_map = {f: 0.0 for f in flavours}
         month_revenue = 0.0
         month_total_bottles = 0
 
@@ -1086,23 +1115,44 @@ def get_analytics(year: Optional[int] = None, current_user: Dict[str, Any] = Dep
             flv = r["flavour"]
             if flv in month_flavour_map:
                 month_flavour_map[flv] = r["qty"]
+                month_rev_map[flv] = r["rev"]
             month_revenue += r["rev"]
             month_total_bottles += r["qty"]
 
+        # Count orders in this month
+        cursor.execute("""
+        SELECT COUNT(*) as month_orders
+        FROM orders
+        WHERE strftime('%Y', created_at) = ? AND strftime('%m', created_at) = ?;
+        """, (str(target_year), m_str))
+        m_orders_row = cursor.fetchone()
+        month_orders_count = m_orders_row["month_orders"] if m_orders_row else 0
+
         # Most purchased flavour of this month
-        m_most = max(month_flavour_map.items(), key=lambda x: x[1]) if any(month_flavour_map.values()) else ("-", 0)
+        has_m_sales = any(month_flavour_map.values())
+        m_most = max(month_flavour_map.items(), key=lambda x: x[1]) if has_m_sales else ("None", 0)
 
         monthly_data.append({
             "month_num": month_idx,
             "month_name": month_label,
+            "total_orders": month_orders_count,
             "tomato": month_flavour_map["Tomato"],
+            "tomato_revenue": month_rev_map["Tomato"],
             "cheese": month_flavour_map["Cheese"],
+            "cheese_revenue": month_rev_map["Cheese"],
             "sour_cream": month_flavour_map["Sour Cream"],
+            "sour_cream_revenue": month_rev_map["Sour Cream"],
             "peri_peri": month_flavour_map["Peri Peri"],
+            "peri_peri_revenue": month_rev_map["Peri Peri"],
             "total_bottles": month_total_bottles,
             "revenue": month_revenue,
             "most_purchased_flavour": m_most[0] if m_most[1] > 0 else "None"
         })
+
+    # Specific month overview if month is requested
+    selected_month_data = None
+    if month and 1 <= month <= 12:
+        selected_month_data = monthly_data[month - 1]
 
     # 4. Weekly Report for the selected year
     cursor.execute("""
@@ -1127,10 +1177,10 @@ def get_analytics(year: Optional[int] = None, current_user: Dict[str, Any] = Dep
             weekly_dict[wn] = {
                 "week_num": wn,
                 "week_label": f"Week {wn + 1} ({r['week_start']})",
-                "tomato": 0,
-                "cheese": 0,
-                "sour_cream": 0,
-                "peri_peri": 0,
+                "tomato": 0, "tomato_revenue": 0.0,
+                "cheese": 0, "cheese_revenue": 0.0,
+                "sour_cream": 0, "sour_cream_revenue": 0.0,
+                "peri_peri": 0, "peri_peri_revenue": 0.0,
                 "total_bottles": 0,
                 "revenue": 0.0
             }
@@ -1141,12 +1191,16 @@ def get_analytics(year: Optional[int] = None, current_user: Dict[str, Any] = Dep
         weekly_dict[wn]["revenue"] += rev
         if flv == "Tomato":
             weekly_dict[wn]["tomato"] += qty
+            weekly_dict[wn]["tomato_revenue"] += rev
         elif flv == "Cheese":
             weekly_dict[wn]["cheese"] += qty
+            weekly_dict[wn]["cheese_revenue"] += rev
         elif flv == "Sour Cream":
             weekly_dict[wn]["sour_cream"] += qty
+            weekly_dict[wn]["sour_cream_revenue"] += rev
         elif flv == "Peri Peri":
             weekly_dict[wn]["peri_peri"] += qty
+            weekly_dict[wn]["peri_peri_revenue"] += rev
 
     weekly_data = []
     for wn in sorted(weekly_dict.keys()):
@@ -1157,13 +1211,14 @@ def get_analytics(year: Optional[int] = None, current_user: Dict[str, Any] = Dep
             "Sour Cream": w["sour_cream"],
             "Peri Peri": w["peri_peri"]
         }
-        w_most = max(f_counts.items(), key=lambda x: x[1]) if any(f_counts.values()) else ("-", 0)
+        w_most = max(f_counts.items(), key=lambda x: x[1]) if any(f_counts.values()) else ("None", 0)
         w["most_purchased_flavour"] = w_most[0] if w_most[1] > 0 else "None"
         weekly_data.append(w)
 
     # 5. Annual Report (All months of target year combined)
     annual_data = {
         "year": target_year,
+        "total_orders": year_total_orders,
         "total_bottles": year_total_bottles,
         "total_revenue": year_total_revenue,
         "tomato_bottles": flavour_stats["Tomato"]["bottles"],
@@ -1181,6 +1236,8 @@ def get_analytics(year: Optional[int] = None, current_user: Dict[str, Any] = Dep
 
     return {
         "selected_year": target_year,
+        "selected_month": month,
+        "selected_month_data": selected_month_data,
         "available_years": available_years,
         "overview": {
             "total_orders": year_total_orders,
@@ -1206,6 +1263,14 @@ def serve_logo():
     if os.path.exists(logo_path):
         return FileResponse(logo_path, media_type="image/jpeg")
     return FileResponse(os.path.join(STATIC_DIR, "assets", "logo.jpg"), media_type="image/jpeg")
+
+# Directly serve icon.png from workspace or static/assets
+@app.get("/icon.png")
+def serve_icon():
+    icon_path = os.path.join(os.path.dirname(__file__), "icon.png")
+    if os.path.exists(icon_path):
+        return FileResponse(icon_path, media_type="image/png")
+    return FileResponse(os.path.join(STATIC_DIR, "assets", "icon.png"), media_type="image/png")
 
 @app.api_route("/", methods=["GET", "HEAD"])
 def serve_index():

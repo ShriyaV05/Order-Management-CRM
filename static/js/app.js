@@ -1,4 +1,8 @@
 // POPCONE ORDER & SALES CRM - MAIN CLIENT APPLICATION
+// Asset constants (simple and replaceable)
+const APP_ICON_PATH = '/icon.png';
+const APP_LOGO_PATH = '/logo.jpg';
+
 document.addEventListener('DOMContentLoaded', async () => {
   // Global App State
   const state = {
@@ -14,9 +18,14 @@ document.addEventListener('DOMContentLoaded', async () => {
       dispatch: 'All',
       district: 'All',
       date_filter: 'All',
+      date_from: '',
+      date_to: '',
       sort_by: 'Newest'
     },
+    analyticsMode: 'monthly', // 'weekly', 'monthly', 'annual'
     analyticsYear: new Date().getFullYear(),
+    analyticsMonth: new Date().getMonth() + 1,
+    analyticsData: null,
     newOrderState: {
       flavours: {
         'Tomato': 0,
@@ -26,17 +35,22 @@ document.addEventListener('DOMContentLoaded', async () => {
       },
       deliveryFee: 0.0,
       deliveryCalculated: 0.0,
-      deliveryNotes: ''
+      deliveryNotes: '',
+      isManualDeliveryFee: false
     }
   };
 
-  // Toast Helper
+  // Toast Helper (Clean SVG Icons, NO Emojis)
   function showToast(message, type = 'success') {
     const container = document.getElementById('toast-container');
     const toast = document.createElement('div');
     toast.className = `toast toast-${type}`;
-    const icon = type === 'success' ? '✅' : type === 'danger' ? '❌' : '⚠️';
-    toast.innerHTML = `<span>${icon}</span> <span>${message}</span>`;
+    const iconSvg = type === 'success' 
+      ? `<svg class="icon-svg" style="color:var(--success-green);" viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>`
+      : type === 'danger'
+      ? `<svg class="icon-svg" style="color:var(--danger-red);" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="15" x2="9" y1="9" y2="15"/><line x1="9" x2="15" y1="9" y2="15"/></svg>`
+      : `<svg class="icon-svg" style="color:var(--warning-amber);" viewBox="0 0 24 24"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" x2="12" y1="9" y2="13"/><line x1="12" x2="12.01" y1="17" y2="17"/></svg>`;
+    toast.innerHTML = `<span>${iconSvg}</span> <span>${message}</span>`;
     container.appendChild(toast);
     setTimeout(() => {
       toast.style.opacity = '0';
@@ -59,15 +73,24 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
     loginOverlay.style.display = 'none';
 
-    // Update Sidebar User Section (Requirement 6)
+    // Requirement 22: User Display in Bottom-Left
+    // For Ashish: Ashish \n ADMIN
+    // For other members: Shriya / Vaishnavi / Harini / Suguna [no role label]
     const displayName = state.user.display_name || state.user.username.split('@')[0];
     document.getElementById('sidebar-user-name').textContent = displayName;
     const roleBadge = document.getElementById('sidebar-user-role');
-    roleBadge.textContent = state.user.role;
-    roleBadge.className = `user-role-badge role-${state.user.role.toLowerCase()}`;
+    const isAdmin = state.user.role === 'ADMIN' || displayName.toLowerCase() === 'ashish';
 
-    // Admin-only controls visibility
-    const isAdmin = state.user.role === 'ADMIN';
+    if (isAdmin) {
+      roleBadge.textContent = 'ADMIN';
+      roleBadge.style.display = 'inline-block';
+      roleBadge.className = 'user-role-badge role-admin';
+    } else {
+      roleBadge.style.display = 'none';
+      roleBadge.textContent = '';
+    }
+
+    // Requirement 4: Only Ashish can modify inventory, add stock, adjust stock, reset stock, change bottle price
     document.querySelectorAll('.admin-only').forEach(el => {
       el.style.display = isAdmin ? '' : 'none';
     });
@@ -120,7 +143,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       page.style.display = page.id === `view-${tab}` ? 'block' : 'none';
     });
 
-    // Set page header title
+    // Header title
     const titles = {
       dashboard: 'Dashboard',
       'new-order': 'New Order',
@@ -218,14 +241,14 @@ document.addEventListener('DOMContentLoaded', async () => {
       const data = await api.getDashboardStats();
       const kpis = data.kpis;
 
-      // Update KPI Cards (Rule 8: ONLY these 5 KPIs, NO prohibited metrics!)
+      // KPI Cards
       document.getElementById('kpi-total-revenue').textContent = `₹${kpis.total_revenue.toLocaleString('en-IN')}`;
       document.getElementById('kpi-total-orders').textContent = kpis.total_orders;
       document.getElementById('kpi-bottles-sold').textContent = kpis.bottles_sold;
       document.getElementById('kpi-paid-orders').textContent = kpis.paid_orders;
       document.getElementById('kpi-cod-orders').textContent = kpis.cod_orders;
 
-      // Low Stock Alert (<= 20 bottles)
+      // Low Stock Alert (threshold <= 20)
       const alertBanner = document.getElementById('low-stock-alert-banner');
       const alertItems = document.getElementById('low-stock-items-list');
       if (data.low_stock && data.low_stock.length > 0) {
@@ -237,15 +260,19 @@ document.addEventListener('DOMContentLoaded', async () => {
         alertBanner.style.display = 'none';
       }
 
-      // Most purchased flavour & Flavour Sales breakdown
+      // Top Selling Flavour (Requirement 8: Top-selling flavour should show no flavour / 0 until orders are created)
       const mostFlv = data.most_purchased_flavour;
-      document.getElementById('dashboard-most-flavour').textContent = mostFlv.name !== 'None' ? `${mostFlv.name} (${mostFlv.bottles} bottles)` : 'None';
+      document.getElementById('dashboard-most-flavour').textContent = (mostFlv && mostFlv.name !== 'None' && mostFlv.bottles > 0)
+        ? `${mostFlv.name} (${mostFlv.bottles} bottles)`
+        : 'None';
 
       const flavourContainer = document.getElementById('dashboard-flavour-sales-grid');
       const sales = data.flavour_sales;
       const totalBottles = Object.values(sales).reduce((a, b) => a + b, 0) || 1;
+      const hasActualSales = Object.values(sales).some(qty => qty > 0);
+
       flavourContainer.innerHTML = Object.entries(sales).map(([flv, qty]) => {
-        const pct = Math.round((qty / totalBottles) * 100);
+        const pct = hasActualSales ? Math.round((qty / totalBottles) * 100) : 0;
         return `
           <div class="flavour-card">
             <div class="flavour-header">
@@ -257,7 +284,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             </div>
             <div style="display:flex; justify-content:space-between; font-size:11px; color:var(--text-muted); margin-top:2px;">
               <span>Share: ${pct}%</span>
-              <span>₹${(qty * state.settings.bottle_price).toLocaleString('en-IN')}</span>
+              <span>₹${(qty * (state.settings.bottle_price || 149)).toLocaleString('en-IN')}</span>
             </div>
           </div>
         `;
@@ -281,7 +308,7 @@ document.addEventListener('DOMContentLoaded', async () => {
           row.addEventListener('click', () => openOrderDetails(row.dataset.orderId));
         });
       } else {
-        recentTableBody.innerHTML = `<tr><td colspan="6" style="text-align:center; padding: 24px;">No orders yet</td></tr>`;
+        recentTableBody.innerHTML = `<tr><td colspan="6" style="text-align:center; padding: 28px; color: var(--text-secondary);">No orders recorded yet</td></tr>`;
       }
 
     } catch (err) {
@@ -314,7 +341,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       stateSelect.innerHTML += `<option value="${st}">${st}</option>`;
     });
 
-    // Default to Tamil Nadu
+    // Default to Tamil Nadu & Chennai
     if (state.locations['Tamil Nadu']) {
       stateSelect.value = 'Tamil Nadu';
       populateDistricts('Tamil Nadu', 'Chennai');
@@ -322,14 +349,22 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     stateSelect.onchange = () => {
       populateDistricts(stateSelect.value);
-      recalcNewOrderPricing();
+      if (!state.newOrderState.isManualDeliveryFee) {
+        recalcNewOrderPricing();
+      } else {
+        updateFinalPricingDisplay();
+      }
     };
 
     districtSelect.onchange = () => {
-      recalcNewOrderPricing();
+      if (!state.newOrderState.isManualDeliveryFee) {
+        recalcNewOrderPricing();
+      } else {
+        updateFinalPricingDisplay();
+      }
     };
 
-    // Phone Unique Check (Rule 11)
+    // Phone Unique Check
     const phoneInput = document.getElementById('new-order-phone');
     const phoneError = document.getElementById('new-order-phone-error');
     phoneInput.onblur = async () => {
@@ -356,22 +391,29 @@ document.addEventListener('DOMContentLoaded', async () => {
       phoneInput.classList.remove('is-invalid');
     };
 
-    // Flavour Counters
+    // Flavour Counter inputs
     ['Tomato', 'Cheese', 'Sour Cream', 'Peri Peri'].forEach(flv => {
       const input = document.getElementById(`qty-${flv.toLowerCase().replace(' ', '-')}`);
       if (input) {
         input.value = state.newOrderState.flavours[flv] || 0;
         input.oninput = () => {
           state.newOrderState.flavours[flv] = Math.max(0, parseInt(input.value) || 0);
-          recalcNewOrderPricing();
+          if (!state.newOrderState.isManualDeliveryFee) {
+            recalcNewOrderPricing();
+          } else {
+            updateFinalPricingDisplay();
+          }
         };
       }
     });
 
-    // Manual delivery fee edit listener
+    // Manual delivery fee edit listener (Requirement 19: If changed manually ₹65 -> ₹80, Final Amount updates immediately)
     const deliveryFeeInput = document.getElementById('new-order-delivery-fee');
     deliveryFeeInput.oninput = () => {
+      state.newOrderState.isManualDeliveryFee = true;
       state.newOrderState.deliveryFee = parseFloat(deliveryFeeInput.value) || 0;
+      const noteEl = document.getElementById('new-order-delivery-note');
+      noteEl.textContent = `Manual rate applied (Standard calculated: ₹${state.newOrderState.deliveryCalculated})`;
       updateFinalPricingDisplay();
     };
 
@@ -390,7 +432,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   }
 
-  // ---------------- Delivery Fee Calculation Rules ----------------
+  // ---------------- Delivery Fee Calculation Rules (Requirement 19) ----------------
   const SOUTH_INDIA_STATES = new Set(['karnataka', 'kerala', 'andhra pradesh', 'telangana', 'puducherry']);
   const DELIVERY_RATES = {
     'Chennai': { tier1: 40.0, tier2: 42.0, tier3: 45.0, excess: 20.0 },
@@ -470,7 +512,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     let val = Math.max(0, (parseInt(input.value) || 0) + delta);
     input.value = val;
     state.newOrderState.flavours[flavourName] = val;
-    recalcNewOrderPricing();
+    if (!state.newOrderState.isManualDeliveryFee) {
+      recalcNewOrderPricing();
+    } else {
+      updateFinalPricingDisplay();
+    }
   };
 
   function recalcNewOrderPricing() {
@@ -491,20 +537,26 @@ document.addEventListener('DOMContentLoaded', async () => {
     const noteEl = document.getElementById('new-order-delivery-note');
 
     if (totalBottles > 0 && stateVal && distVal) {
-      feeInput.value = calc.fee;
       state.newOrderState.deliveryCalculated = calc.fee;
-      state.newOrderState.deliveryFee = calc.fee;
-      state.newOrderState.deliveryNotes = calc.notes;
-      noteEl.textContent = `Zone: ${calc.zone} | Slab: ${calc.slab} (${calc.notes})`;
-    } else {
-      feeInput.value = 0;
-      state.newOrderState.deliveryCalculated = 0;
-      state.newOrderState.deliveryFee = 0;
-      state.newOrderState.deliveryNotes = '';
-      if (!stateVal || !distVal) {
-        noteEl.textContent = 'Select state and district to calculate';
+      if (!state.newOrderState.isManualDeliveryFee) {
+        feeInput.value = calc.fee;
+        state.newOrderState.deliveryFee = calc.fee;
+        state.newOrderState.deliveryNotes = calc.notes;
+        noteEl.textContent = `Zone: ${calc.zone} | Slab: ${calc.slab} (${calc.notes})`;
       } else {
-        noteEl.textContent = 'Select at least 1 bottle to calculate';
+        noteEl.textContent = `Manual rate: ₹${feeInput.value} (Standard calculated: ₹${calc.fee})`;
+      }
+    } else {
+      state.newOrderState.deliveryCalculated = 0;
+      if (!state.newOrderState.isManualDeliveryFee) {
+        feeInput.value = 0;
+        state.newOrderState.deliveryFee = 0;
+        state.newOrderState.deliveryNotes = '';
+        if (!stateVal || !distVal) {
+          noteEl.textContent = 'Select state and district to calculate';
+        } else {
+          noteEl.textContent = 'Select at least 1 bottle to calculate';
+        }
       }
     }
 
@@ -520,9 +572,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     const finalAmount = productAmount + deliveryFee;
 
     document.getElementById('new-order-final-amount').textContent = `₹${finalAmount.toLocaleString('en-IN')}`;
+    document.getElementById('new-order-bottles-count').textContent = totalBottles;
+    document.getElementById('new-order-product-amount').textContent = `₹${productAmount.toLocaleString('en-IN')}`;
+    const weightGrams = totalBottles * 110;
+    document.getElementById('new-order-weight-display').textContent = weightGrams >= 1000 ? `${(weightGrams / 1000).toFixed(2)}kg` : `${weightGrams}g`;
   }
 
-  // Create Order Submission (Rule 20)
+  // Create Order Submission
   document.getElementById('form-new-order').addEventListener('submit', async (e) => {
     e.preventDefault();
     const phoneError = document.getElementById('new-order-phone-error');
@@ -562,9 +618,10 @@ document.addEventListener('DOMContentLoaded', async () => {
       const res = await api.createOrder(payload);
       showToast(`Order ${res.order_id} created successfully!`);
 
-      // Reset form to blank (Requirement 20: "After successful creation, the New Order screen must become blank/reset and ready for another order")
+      // Reset form to blank
       document.getElementById('form-new-order').reset();
       state.newOrderState.flavours = { 'Tomato': 0, 'Cheese': 0, 'Sour Cream': 0, 'Peri Peri': 0 };
+      state.newOrderState.isManualDeliveryFee = false;
       ['Tomato', 'Cheese', 'Sour Cream', 'Peri Peri'].forEach(flv => {
         const id = `qty-${flv.toLowerCase().replace(' ', '-')}`;
         const input = document.getElementById(id);
@@ -588,6 +645,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Reset form handler
   document.getElementById('form-new-order').addEventListener('reset', () => {
     state.newOrderState.flavours = { 'Tomato': 0, 'Cheese': 0, 'Sour Cream': 0, 'Peri Peri': 0 };
+    state.newOrderState.isManualDeliveryFee = false;
     ['Tomato', 'Cheese', 'Sour Cream', 'Peri Peri'].forEach(flv => {
       const id = `qty-${flv.toLowerCase().replace(' ', '-')}`;
       const input = document.getElementById(id);
@@ -627,27 +685,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     const orders = state.orders;
 
     if (!orders || orders.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="16" style="text-align:center; padding: 40px; color: var(--text-secondary);">No orders match the selected filters.</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="14" style="text-align:center; padding: 40px; color: var(--text-secondary);">No orders match the selected filters.</td></tr>`;
       return;
     }
 
-    // Exact Column Order (Requirement 30):
-    // 1. Order ID
-    // 2. Date
-    // 3. Customer
-    // 4. Phone
-    // 5. District
-    // 6. State
-    // 7. Bottles
-    // 8. Weight
-    // 9. Product
-    // 10. Delivery
-    // 11. Final
-    // 12. Payment
-    // 13. DISPATCHED / PLACED
-    // 14. CREATED BY
-    // 15. EDITED BY
-    // 16. THREE-DOT MENU
+    // Requirement 13: Do NOT display Created By and Edited By as visible columns in the main table!
     tbody.innerHTML = orders.map(o => {
       const isDispatched = o.dispatch === 'DISPATCHED';
       return `
@@ -671,14 +713,20 @@ document.addEventListener('DOMContentLoaded', async () => {
               ${o.dispatch}
             </button>
           </td>
-          <td><span style="font-size:12px; color:var(--text-secondary);">${o.created_by}</span></td>
-          <td><span style="font-size:12px; color:var(--text-secondary);">${o.edited_by}</span></td>
-          <td>
+          <td style="text-align: right;">
             <div class="three-dot-menu-wrapper">
-              <button class="btn-three-dot" data-menu-id="${o.order_id}">⋮</button>
+              <button class="btn-three-dot" data-menu-id="${o.order_id}" title="Order Actions">
+                <svg class="icon-svg" viewBox="0 0 24 24"><circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="5" r="1.5"/><circle cx="12" cy="19" r="1.5"/></svg>
+              </button>
               <div class="three-dot-dropdown" id="dropdown-${o.order_id}">
-                <div class="three-dot-item" data-action="edit" data-order-id="${o.order_id}">✏️ Edit Order</div>
-                <div class="three-dot-item text-danger" data-action="delete" data-order-id="${o.order_id}">🗑️ Delete Order</div>
+                <div class="three-dot-item" data-action="edit" data-order-id="${o.order_id}">
+                  <svg class="icon-svg" viewBox="0 0 24 24"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg>
+                  <span>Edit Order</span>
+                </div>
+                <div class="three-dot-item text-danger" data-action="delete" data-order-id="${o.order_id}">
+                  <svg class="icon-svg" viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg>
+                  <span>Delete Order</span>
+                </div>
               </div>
             </div>
           </td>
@@ -686,7 +734,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       `;
     }).join('');
 
-    // Row click: opens details (Requirement 36)
+    // Row click: opens details (Requirement 14)
     tbody.querySelectorAll('tr').forEach(row => {
       row.addEventListener('click', (e) => {
         // Prevent opening if clicked on dispatch toggle or 3-dot menu
@@ -697,7 +745,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       });
     });
 
-    // Dispatch Toggle click listener (Requirement 34 & 35)
+    // Dispatch Toggle click listener (Requirement 16)
     tbody.querySelectorAll('.btn-dispatch-toggle').forEach(btn => {
       btn.addEventListener('click', async (e) => {
         e.stopPropagation();
@@ -712,12 +760,11 @@ document.addEventListener('DOMContentLoaded', async () => {
       });
     });
 
-    // Three Dot Menu listeners (Requirement 37)
+    // Three Dot Menu listeners (Requirement 15)
     tbody.querySelectorAll('.btn-three-dot').forEach(btn => {
       btn.addEventListener('click', (e) => {
         e.stopPropagation();
         const oid = btn.dataset.menuId;
-        // Close other open menus
         document.querySelectorAll('.three-dot-dropdown.show').forEach(m => {
           if (m.id !== `dropdown-${oid}`) m.classList.remove('show');
         });
@@ -770,8 +817,32 @@ document.addEventListener('DOMContentLoaded', async () => {
     loadOrders();
   });
 
-  document.getElementById('filter-order-date').addEventListener('change', (e) => {
-    state.currentOrderFilter.date_filter = e.target.value;
+  // Date Presets & Custom Range (Requirement 12)
+  const dateFilterSelect = document.getElementById('filter-order-date');
+  const customDateContainer = document.getElementById('custom-date-container');
+  const dateFromInput = document.getElementById('filter-date-from');
+  const dateToInput = document.getElementById('filter-date-to');
+
+  dateFilterSelect.addEventListener('change', (e) => {
+    const val = e.target.value;
+    state.currentOrderFilter.date_filter = val;
+    if (val === 'Custom') {
+      customDateContainer.style.display = 'inline-flex';
+    } else {
+      customDateContainer.style.display = 'none';
+      state.currentOrderFilter.date_from = '';
+      state.currentOrderFilter.date_to = '';
+    }
+    loadOrders();
+  });
+
+  dateFromInput?.addEventListener('change', (e) => {
+    state.currentOrderFilter.date_from = e.target.value;
+    loadOrders();
+  });
+
+  dateToInput?.addEventListener('change', (e) => {
+    state.currentOrderFilter.date_to = e.target.value;
     loadOrders();
   });
 
@@ -780,7 +851,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     loadOrders();
   });
 
-  // Order CSV Export (Requirement 42: Exports currently displayed/filtered/sorted order results)
+  // Order CSV Export
   document.getElementById('btn-export-orders-csv').addEventListener('click', () => {
     if (!state.orders || state.orders.length === 0) {
       showToast('No orders to export', 'warning');
@@ -811,19 +882,10 @@ document.addEventListener('DOMContentLoaded', async () => {
       `"${o.edited_by}"`
     ]);
 
-    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement('a');
-    link.setAttribute('href', encodedUri);
-    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-    link.setAttribute('download', `POPCONE_Orders_Export_${timestamp}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    showToast('Orders exported to CSV successfully');
+    downloadCSV(`POPCONE_Orders_Export_${new Date().toISOString().slice(0, 10)}.csv`, headers, rows);
   });
 
-  // ---------------- 4. ORDER DETAILS MODAL (Second Reference Image Styled) ----------------
+  // ---------------- 4. ORDER DETAILS MODAL ----------------
   const orderDetailsModal = document.getElementById('modal-order-details');
 
   async function openOrderDetails(orderId) {
@@ -844,6 +906,8 @@ document.addEventListener('DOMContentLoaded', async () => {
       document.getElementById('detail-delivery-fee').textContent = `₹${o.delivery_fee.toLocaleString('en-IN')}`;
       document.getElementById('detail-final-amount').textContent = `₹${o.final_amount.toLocaleString('en-IN')}`;
       document.getElementById('detail-payment-method').textContent = o.payment;
+
+      // Requirement 13 & 14: Inside Order Details card, show small but noticeable audit information
       document.getElementById('detail-created-info').textContent = `${o.created_by} (${o.created_at})`;
       document.getElementById('detail-edited-info').textContent = `${o.edited_by} (${o.edited_at})`;
 
@@ -851,7 +915,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       dispatchBadge.textContent = o.dispatch_state;
       dispatchBadge.className = `badge ${o.dispatch_state === 'DISPATCHED' ? 'badge-dispatched' : 'badge-placed'}`;
 
-      // Ordered Products: ONLY ordered flavours (> 0 quantity) (Requirement 13 & 36)
+      // Ordered Products: ONLY ordered flavours (> 0 quantity)
       const productsTbody = document.getElementById('detail-products-tbody');
       productsTbody.innerHTML = o.items.map(it => `
         <tr>
@@ -897,7 +961,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     orderDetailsModal.classList.remove('show');
   });
 
-  // ---------------- 5. EDIT ORDER MODAL (Requirement 38) ----------------
+  // ---------------- 5. EDIT ORDER MODAL ----------------
   const editOrderModal = document.getElementById('modal-edit-order');
   let currentEditingOrder = null;
 
@@ -974,7 +1038,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('edit-total-bottles').textContent = totalBottles;
     document.getElementById('edit-total-weight').textContent = weightDisplay;
 
-    // Maintain historical unit price!
+    // Requirement 20: Maintain historical unit price
     const histPrice = currentEditingOrder.unit_price;
     const productAmount = totalBottles * histPrice;
     const deliveryFee = parseFloat(document.getElementById('edit-delivery-fee').value) || 0;
@@ -1033,7 +1097,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   });
 
-  // ---------------- 6. DELETE ORDER MODAL (Requirement 39) ----------------
+  // ---------------- 6. DELETE ORDER MODAL (Requirement 15) ----------------
   const deleteOrderModal = document.getElementById('modal-delete-order');
   let pendingDeleteOrderId = null;
 
@@ -1055,6 +1119,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       deleteOrderModal.classList.remove('show');
       await loadOrders();
       if (state.activeTab === 'dashboard') loadDashboard();
+      if (state.activeTab === 'analytics') loadAnalytics();
     } catch (err) {
       showToast(err.message || 'Failed to delete order', 'danger');
     }
@@ -1066,9 +1131,13 @@ document.addEventListener('DOMContentLoaded', async () => {
       const data = await api.getInventory();
       const stockGrid = document.getElementById('inventory-stock-grid');
       
-      // Stock Cards (Flavours: Tomato, Cheese, Sour Cream, Peri Peri)
+      // Stock Cards (Requirement 6: 0 stock on reset, low stock <= 20)
       stockGrid.innerHTML = data.stocks.map(s => {
         const isLow = s.current_stock <= s.low_stock_threshold;
+        const statusHtml = isLow
+          ? `<span class="stock-card-status danger"><svg class="icon-svg" style="width:14px;height:14px;" viewBox="0 0 24 24"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" x2="12" y1="9" y2="13"/><line x1="12" x2="12.01" y1="17" y2="17"/></svg> Low Stock (&le; 20)</span>`
+          : `<span class="stock-card-status safe"><svg class="icon-svg" style="width:14px;height:14px;" viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg> In Stock</span>`;
+
         return `
           <div class="stock-card ${isLow ? 'low-stock' : ''}">
             <div class="stock-card-flavour">${s.flavour}</div>
@@ -1076,14 +1145,13 @@ document.addEventListener('DOMContentLoaded', async () => {
               <span class="stock-card-qty">${s.current_stock}</span>
               <span class="stock-card-unit">bottles</span>
             </div>
-            <div class="stock-card-status ${isLow ? 'danger' : 'safe'}">
-              ${isLow ? '⚠️ Low Stock (≤ 20)' : '✅ In Stock'}
-            </div>
+            ${statusHtml}
           </div>
         `;
       }).join('');
 
-      // Movements Table (Columns: When, Flavour, Type, Change, Reference, Created By)
+      // Requirement 5: Do NOT display "Moved By" in the inventory history!
+      // Columns: Date/Time, Flavour, Type, Change, Reference
       const movementsTbody = document.getElementById('inventory-movements-tbody');
       if (data.movements && data.movements.length > 0) {
         movementsTbody.innerHTML = data.movements.map(m => {
@@ -1098,12 +1166,11 @@ document.addEventListener('DOMContentLoaded', async () => {
               <td><span class="badge ${m.type === 'Stock Added' ? 'badge-paid' : m.type === 'Sold' ? 'badge-placed' : 'badge-cod'}">${m.type}</span></td>
               <td>${changeBadge}</td>
               <td>${m.reference}</td>
-              <td>${m.created_by}</td>
             </tr>
           `;
         }).join('');
       } else {
-        movementsTbody.innerHTML = `<tr><td colspan="6" style="text-align:center; padding: 24px;">No movements recorded yet</td></tr>`;
+        movementsTbody.innerHTML = `<tr><td colspan="5" style="text-align:center; padding: 28px; color: var(--text-secondary);">No movements recorded yet</td></tr>`;
       }
 
     } catch (err) {
@@ -1112,7 +1179,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   }
 
-  // Stock Movement Modal (Stock Added / Adjustment) - Admin Only
+  // Stock Movement Modal (Stock Added / Adjustment) - Admin (Ashish) Only
   const stockMovementModal = document.getElementById('modal-stock-movement');
   document.getElementById('btn-open-stock-movement')?.addEventListener('click', () => {
     document.getElementById('form-stock-movement').reset();
@@ -1140,7 +1207,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   });
 
-  // Reset Inventory Modal - Admin Only (Requirement 25)
+  // Reset Inventory Modal - Admin (Ashish) Only
   const resetStockModal = document.getElementById('modal-reset-stock');
   document.getElementById('btn-open-reset-stock')?.addEventListener('click', () => {
     resetStockModal.classList.add('show');
@@ -1161,11 +1228,59 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   });
 
-  // ---------------- 8. ANALYTICS PAGE (NO separate Reports page!) ----------------
+  // ---------------- 8. ANALYTICS PAGE (Requirement 10 & 11) ----------------
+  // Mode switcher listeners
+  ['weekly', 'monthly', 'annual'].forEach(mode => {
+    document.getElementById(`btn-analytics-mode-${mode}`)?.addEventListener('click', () => {
+      setAnalyticsMode(mode);
+    });
+  });
+
+  function setAnalyticsMode(mode) {
+    state.analyticsMode = mode;
+    ['weekly', 'monthly', 'annual'].forEach(m => {
+      const btn = document.getElementById(`btn-analytics-mode-${m}`);
+      btn?.classList.toggle('active', m === mode);
+      const sec = document.getElementById(`analytics-section-${m}`);
+      if (sec) sec.style.display = m === mode ? 'block' : 'none';
+    });
+
+    // Toggle Month Selector visibility
+    const monthWrapper = document.getElementById('analytics-month-select-wrapper');
+    if (monthWrapper) monthWrapper.style.display = mode === 'monthly' ? 'flex' : 'none';
+
+    // Update CSV export button label
+    updateAnalyticsExportLabel();
+
+    // Re-render UI for new mode
+    renderAnalyticsView();
+  }
+
+  function updateAnalyticsExportLabel() {
+    const label = document.getElementById('btn-export-analytics-csv-label');
+    if (!label) return;
+    if (state.analyticsMode === 'monthly') {
+      const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+      label.textContent = `Export ${monthNames[state.analyticsMonth - 1]} ${state.analyticsYear} CSV`;
+    } else if (state.analyticsMode === 'annual') {
+      label.textContent = `Export ${state.analyticsYear} Annual CSV`;
+    } else {
+      label.textContent = `Export Weekly CSV (${state.analyticsYear})`;
+    }
+  }
+
+  // Month selector listener
+  document.getElementById('analytics-month-select')?.addEventListener('change', (e) => {
+    state.analyticsMonth = parseInt(e.target.value);
+    updateAnalyticsExportLabel();
+    renderAnalyticsView();
+  });
+
   async function loadAnalytics() {
     try {
       const year = state.analyticsYear;
-      const data = await api.getAnalytics(year);
+      const data = await api.getAnalytics(year, state.analyticsMonth);
+      state.analyticsData = data;
 
       // Populate year selector
       const yearSelect = document.getElementById('analytics-year-select');
@@ -1175,44 +1290,107 @@ document.addEventListener('DOMContentLoaded', async () => {
 
       yearSelect.onchange = () => {
         state.analyticsYear = parseInt(yearSelect.value);
+        updateAnalyticsExportLabel();
         loadAnalytics();
       };
 
-      // 1. Sales Analytics Overview
-      const ov = data.overview;
-      document.getElementById('analytics-total-revenue').textContent = `₹${ov.total_revenue.toLocaleString('en-IN')}`;
-      document.getElementById('analytics-total-bottles').textContent = ov.total_bottles;
-      document.getElementById('analytics-total-orders').textContent = ov.total_orders;
-      document.getElementById('analytics-most-purchased').textContent = ov.most_purchased_flavour !== 'None' 
-        ? `${ov.most_purchased_flavour} (${ov.most_purchased_bottles} bottles)` 
+      const monthSelect = document.getElementById('analytics-month-select');
+      if (monthSelect) monthSelect.value = state.analyticsMonth;
+
+      updateAnalyticsExportLabel();
+      renderAnalyticsView();
+
+    } catch (err) {
+      console.error('Error loading analytics:', err);
+      showToast('Failed to load analytics data', 'danger');
+    }
+  }
+
+  function renderAnalyticsView() {
+    const data = state.analyticsData;
+    if (!data) return;
+
+    const mode = state.analyticsMode;
+    const monthIdx = state.analyticsMonth;
+    const selectedMonth = data.monthly_report.find(m => m.month_num === monthIdx) || {
+      month_name: 'Month', total_orders: 0, total_bottles: 0, revenue: 0,
+      tomato: 0, tomato_revenue: 0, cheese: 0, cheese_revenue: 0,
+      sour_cream: 0, sour_cream_revenue: 0, peri_peri: 0, peri_peri_revenue: 0,
+      most_purchased_flavour: 'None'
+    };
+
+    // Update Top KPIs depending on Active Mode
+    if (mode === 'monthly') {
+      document.getElementById('analytics-kpi-revenue-label').textContent = `${selectedMonth.month_name} Revenue`;
+      document.getElementById('analytics-kpi-revenue-subtext').textContent = `${selectedMonth.month_name} ${state.analyticsYear}`;
+      document.getElementById('analytics-total-revenue').textContent = `₹${selectedMonth.revenue.toLocaleString('en-IN')}`;
+      document.getElementById('analytics-total-bottles').textContent = selectedMonth.total_bottles;
+      document.getElementById('analytics-total-orders').textContent = selectedMonth.total_orders;
+      document.getElementById('analytics-most-purchased').textContent = selectedMonth.most_purchased_flavour !== 'None'
+        ? selectedMonth.most_purchased_flavour
         : 'None';
+    } else if (mode === 'annual') {
+      const ann = data.annual_report;
+      document.getElementById('analytics-kpi-revenue-label').textContent = 'Annual Revenue';
+      document.getElementById('analytics-kpi-revenue-subtext').textContent = `Full Year ${state.analyticsYear}`;
+      document.getElementById('analytics-total-revenue').textContent = `₹${ann.total_revenue.toLocaleString('en-IN')}`;
+      document.getElementById('analytics-total-bottles').textContent = ann.total_bottles;
+      document.getElementById('analytics-total-orders').textContent = ann.total_orders;
+      document.getElementById('analytics-most-purchased').textContent = ann.most_purchased_flavour !== 'None'
+        ? ann.most_purchased_flavour
+        : 'None';
+    } else {
+      // Weekly mode
+      const totalWeeklyRev = data.weekly_report.reduce((acc, w) => acc + w.revenue, 0);
+      const totalWeeklyBottles = data.weekly_report.reduce((acc, w) => acc + w.total_bottles, 0);
+      document.getElementById('analytics-kpi-revenue-label').textContent = 'Weekly Cumulative Revenue';
+      document.getElementById('analytics-kpi-revenue-subtext').textContent = `Weeks in ${state.analyticsYear}`;
+      document.getElementById('analytics-total-revenue').textContent = `₹${totalWeeklyRev.toLocaleString('en-IN')}`;
+      document.getElementById('analytics-total-bottles').textContent = totalWeeklyBottles;
+      document.getElementById('analytics-total-orders').textContent = data.overview.total_orders;
+      document.getElementById('analytics-most-purchased').textContent = data.overview.most_purchased_flavour !== 'None'
+        ? data.overview.most_purchased_flavour
+        : 'None';
+    }
 
-      // 2. Weekly Report Table
-      const weeklyTbody = document.getElementById('analytics-weekly-tbody');
-      const weeklyData = data.weekly_report;
-      if (weeklyData && weeklyData.length > 0) {
-        weeklyTbody.innerHTML = weeklyData.map(w => `
-          <tr>
-            <td><strong>${w.week_label}</strong></td>
-            <td>${w.tomato}</td>
-            <td>${w.cheese}</td>
-            <td>${w.sour_cream}</td>
-            <td>${w.peri_peri}</td>
-            <td><strong>${w.total_bottles}</strong></td>
-            <td>₹${w.revenue.toLocaleString('en-IN')}</td>
-            <td><strong>${w.most_purchased_flavour}</strong></td>
-          </tr>
-        `).join('');
-      } else {
-        weeklyTbody.innerHTML = `<tr><td colspan="8" style="text-align:center; padding: 24px;">No weekly data for ${year}</td></tr>`;
-      }
+    // 1. Monthly Section Content
+    document.getElementById('analytics-month-detail-title').textContent = `${selectedMonth.month_name} ${state.analyticsYear} - Flavour Sales`;
+    const mFlavourTbody = document.getElementById('analytics-selected-month-flavour-tbody');
+    const mTotBottles = selectedMonth.total_bottles || 1;
+    const flavours = [
+      { name: 'Tomato', qty: selectedMonth.tomato, rev: selectedMonth.tomato_revenue },
+      { name: 'Cheese', qty: selectedMonth.cheese, rev: selectedMonth.cheese_revenue },
+      { name: 'Sour Cream', qty: selectedMonth.sour_cream, rev: selectedMonth.sour_cream_revenue },
+      { name: 'Peri Peri', qty: selectedMonth.peri_peri, rev: selectedMonth.peri_peri_revenue }
+    ];
 
-      // 3. Monthly Report Table (All 12 Months: Jan to Dec)
-      const monthlyTbody = document.getElementById('analytics-monthly-tbody');
-      const monthlyData = data.monthly_report;
-      monthlyTbody.innerHTML = monthlyData.map(m => `
+    mFlavourTbody.innerHTML = flavours.map(f => {
+      const share = selectedMonth.total_bottles > 0 ? Math.round((f.qty / mTotBottles) * 100) : 0;
+      return `
         <tr>
-          <td><strong>${m.month_name}</strong></td>
+          <td><strong>${f.name}</strong></td>
+          <td>${f.qty}</td>
+          <td>₹${f.rev.toLocaleString('en-IN')}</td>
+          <td>${share}%</td>
+        </tr>
+      `;
+    }).join('') + `
+      <tr style="background:#F8FAFC; font-weight:700;">
+        <td>TOTAL</td>
+        <td>${selectedMonth.total_bottles}</td>
+        <td>₹${selectedMonth.revenue.toLocaleString('en-IN')}</td>
+        <td>100%</td>
+      </tr>
+    `;
+
+    // 12-month table
+    const monthlyTbody = document.getElementById('analytics-monthly-tbody');
+    monthlyTbody.innerHTML = data.monthly_report.map(m => {
+      const isSelected = m.month_num === state.analyticsMonth;
+      return `
+        <tr style="${isSelected ? 'background: #EFF6FF; font-weight: 700;' : ''}" data-month-select="${m.month_num}">
+          <td><strong>${m.month_name}</strong> ${isSelected ? '<span class="badge badge-paid">Selected</span>' : ''}</td>
+          <td>${m.total_orders}</td>
           <td>${m.tomato}</td>
           <td>${m.cheese}</td>
           <td>${m.sour_cream}</td>
@@ -1221,64 +1399,100 @@ document.addEventListener('DOMContentLoaded', async () => {
           <td>₹${m.revenue.toLocaleString('en-IN')}</td>
           <td><strong>${m.most_purchased_flavour}</strong></td>
         </tr>
-      `).join('');
-
-      // 4. Annual Report Table (All months of year combined)
-      const ann = data.annual_report;
-      const annualTbody = document.getElementById('analytics-annual-tbody');
-      annualTbody.innerHTML = `
-        <tr style="background:#FFF9C4; font-weight:700;">
-          <td><strong>${ann.year} TOTAL</strong></td>
-          <td>${ann.tomato_bottles} (₹${ann.tomato_revenue.toLocaleString('en-IN')})</td>
-          <td>${ann.cheese_bottles} (₹${ann.cheese_revenue.toLocaleString('en-IN')})</td>
-          <td>${ann.sour_cream_bottles} (₹${ann.sour_cream_revenue.toLocaleString('en-IN')})</td>
-          <td>${ann.peri_peri_bottles} (₹${ann.peri_peri_revenue.toLocaleString('en-IN')})</td>
-          <td><strong>${ann.total_bottles}</strong></td>
-          <td><strong style="color:var(--primary-blue); font-size:15px;">₹${ann.total_revenue.toLocaleString('en-IN')}</strong></td>
-          <td><span class="badge badge-paid">${ann.most_purchased_flavour}</span></td>
-        </tr>
       `;
+    }).join('');
 
-      // Export Buttons (Requirement 50: Weekly, Monthly, Annual CSV)
-      setupAnalyticsExports(data);
+    // Allow clicking a row in 12-month table to select that month
+    monthlyTbody.querySelectorAll('tr').forEach(row => {
+      row.style.cursor = 'pointer';
+      row.addEventListener('click', () => {
+        const mNum = parseInt(row.dataset.monthSelect);
+        if (mNum) {
+          state.analyticsMonth = mNum;
+          const monthSelect = document.getElementById('analytics-month-select');
+          if (monthSelect) monthSelect.value = mNum;
+          updateAnalyticsExportLabel();
+          renderAnalyticsView();
+        }
+      });
+    });
 
-    } catch (err) {
-      console.error('Error loading analytics:', err);
-      showToast('Failed to load analytics data', 'danger');
+    // 2. Weekly Section Content
+    const weeklyTbody = document.getElementById('analytics-weekly-tbody');
+    const weeklyData = data.weekly_report;
+    if (weeklyData && weeklyData.length > 0) {
+      weeklyTbody.innerHTML = weeklyData.map(w => `
+        <tr>
+          <td><strong>${w.week_label}</strong></td>
+          <td>${w.tomato}</td>
+          <td>${w.cheese}</td>
+          <td>${w.sour_cream}</td>
+          <td>${w.peri_peri}</td>
+          <td><strong>${w.total_bottles}</strong></td>
+          <td>₹${w.revenue.toLocaleString('en-IN')}</td>
+          <td><strong>${w.most_purchased_flavour}</strong></td>
+        </tr>
+      `).join('');
+    } else {
+      weeklyTbody.innerHTML = `<tr><td colspan="8" style="text-align:center; padding: 28px; color:var(--text-secondary);">No weekly data recorded for ${state.analyticsYear}</td></tr>`;
     }
+
+    // 3. Annual Section Content
+    const ann = data.annual_report;
+    const annualTbody = document.getElementById('analytics-annual-tbody');
+    annualTbody.innerHTML = `
+      <tr style="background:#FFF9C4; font-weight:700;">
+        <td><strong>${ann.year} TOTAL</strong></td>
+        <td>${ann.total_orders}</td>
+        <td>${ann.tomato_bottles} (₹${ann.tomato_revenue.toLocaleString('en-IN')})</td>
+        <td>${ann.cheese_bottles} (₹${ann.cheese_revenue.toLocaleString('en-IN')})</td>
+        <td>${ann.sour_cream_bottles} (₹${ann.sour_cream_revenue.toLocaleString('en-IN')})</td>
+        <td>${ann.peri_peri_bottles} (₹${ann.peri_peri_revenue.toLocaleString('en-IN')})</td>
+        <td><strong>${ann.total_bottles}</strong></td>
+        <td><strong style="color:var(--primary-blue); font-size:15px;">₹${ann.total_revenue.toLocaleString('en-IN')}</strong></td>
+        <td><span class="badge badge-paid">${ann.most_purchased_flavour}</span></td>
+      </tr>
+    `;
   }
 
-  function setupAnalyticsExports(analyticsData) {
-    // Weekly CSV Export
-    document.getElementById('btn-export-weekly-csv').onclick = () => {
-      const headers = ['Week', 'Tomato Bottles', 'Cheese Bottles', 'Sour Cream Bottles', 'Peri Peri Bottles', 'Total Bottles', 'Revenue', 'Most Purchased Flavour'];
-      const rows = analyticsData.weekly_report.map(w => [
-        `"${w.week_label}"`, w.tomato, w.cheese, w.sour_cream, w.peri_peri, w.total_bottles, w.revenue, `"${w.most_purchased_flavour}"`
-      ]);
-      downloadCSV('POPCONE_Weekly_Report.csv', headers, rows);
-    };
+  // Unified CSV Export for active analytics view (Requirement 11)
+  document.getElementById('btn-export-analytics-csv')?.addEventListener('click', () => {
+    const data = state.analyticsData;
+    if (!data) return;
 
-    // Monthly CSV Export
-    document.getElementById('btn-export-monthly-csv').onclick = () => {
-      const headers = ['Month', 'Tomato Bottles', 'Cheese Bottles', 'Sour Cream Bottles', 'Peri Peri Bottles', 'Total Bottles', 'Revenue', 'Most Purchased Flavour'];
-      const rows = analyticsData.monthly_report.map(m => [
-        `"${m.month_name}"`, m.tomato, m.cheese, m.sour_cream, m.peri_peri, m.total_bottles, m.revenue, `"${m.most_purchased_flavour}"`
-      ]);
-      downloadCSV(`POPCONE_Monthly_Report_${state.analyticsYear}.csv`, headers, rows);
-    };
-
-    // Annual CSV Export
-    document.getElementById('btn-export-annual-csv').onclick = () => {
-      const ann = analyticsData.annual_report;
-      const headers = ['Year', 'Tomato Bottles', 'Tomato Revenue', 'Cheese Bottles', 'Cheese Revenue', 'Sour Cream Bottles', 'Sour Cream Revenue', 'Peri Peri Bottles', 'Peri Peri Revenue', 'Total Bottles', 'Total Revenue', 'Most Purchased Flavour'];
+    if (state.analyticsMode === 'monthly') {
+      const monthIdx = state.analyticsMonth;
+      const m = data.monthly_report.find(x => x.month_num === monthIdx);
+      if (!m) return;
+      const headers = ['Month', 'Year', 'Total Orders', 'Tomato Bottles', 'Tomato Revenue', 'Cheese Bottles', 'Cheese Revenue', 'Sour Cream Bottles', 'Sour Cream Revenue', 'Peri Peri Bottles', 'Peri Peri Revenue', 'Total Bottles', 'Total Revenue', 'Top Flavour'];
       const rows = [[
-        ann.year, ann.tomato_bottles, ann.tomato_revenue, ann.cheese_bottles, ann.cheese_revenue,
+        `"${m.month_name}"`, state.analyticsYear, m.total_orders,
+        m.tomato, m.tomato_revenue, m.cheese, m.cheese_revenue,
+        m.sour_cream, m.sour_cream_revenue, m.peri_peri, m.peri_peri_revenue,
+        m.total_bottles, m.revenue, `"${m.most_purchased_flavour}"`
+      ]];
+      downloadCSV(`POPCONE_${m.month_name}_${state.analyticsYear}_Report.csv`, headers, rows);
+    } else if (state.analyticsMode === 'annual') {
+      const ann = data.annual_report;
+      const headers = ['Year', 'Total Orders', 'Tomato Bottles', 'Tomato Revenue', 'Cheese Bottles', 'Cheese Revenue', 'Sour Cream Bottles', 'Sour Cream Revenue', 'Peri Peri Bottles', 'Peri Peri Revenue', 'Total Bottles', 'Total Revenue', 'Top Flavour'];
+      const rows = [[
+        ann.year, ann.total_orders,
+        ann.tomato_bottles, ann.tomato_revenue, ann.cheese_bottles, ann.cheese_revenue,
         ann.sour_cream_bottles, ann.sour_cream_revenue, ann.peri_peri_bottles, ann.peri_peri_revenue,
         ann.total_bottles, ann.total_revenue, `"${ann.most_purchased_flavour}"`
       ]];
       downloadCSV(`POPCONE_Annual_Report_${state.analyticsYear}.csv`, headers, rows);
-    };
-  }
+    } else {
+      // Weekly export
+      const headers = ['Week', 'Tomato Bottles', 'Tomato Revenue', 'Cheese Bottles', 'Cheese Revenue', 'Sour Cream Bottles', 'Sour Cream Revenue', 'Peri Peri Bottles', 'Peri Peri Revenue', 'Total Bottles', 'Total Revenue', 'Top Flavour'];
+      const rows = data.weekly_report.map(w => [
+        `"${w.week_label}"`, w.tomato, w.tomato_revenue, w.cheese, w.cheese_revenue,
+        w.sour_cream, w.sour_cream_revenue, w.peri_peri, w.peri_peri_revenue,
+        w.total_bottles, w.revenue, `"${w.most_purchased_flavour}"`
+      ]);
+      downloadCSV(`POPCONE_Weekly_Report_${state.analyticsYear}.csv`, headers, rows);
+    }
+  });
 
   function downloadCSV(filename, headers, rows) {
     const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
@@ -1292,6 +1506,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     showToast(`Exported ${filename}`);
   }
 
-  // ---------------- Initial Setup on Page Load ----------------
+  // Initial Setup on Page Load
   updateAuthUI();
 });

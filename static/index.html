@@ -6,7 +6,7 @@
   <title>POPCONE Orders & Sales CRM</title>
   <meta name="description" content="Production-ready Order Management, Inventory Tracking, and Sales Analytics CRM for POPCONE.">
   <link rel="stylesheet" href="/static/css/styles.css">
-  <link rel="icon" href="/logo.jpg" type="image/jpeg">
+  <link rel="icon" href="/icon.png" type="image/png">
 </head>
 <body>
   <!-- Toast Notifications Container -->
@@ -34,10 +34,10 @@
       </form>
 
       <div class="login-users-hint">
-        <strong>Default Credentials (Password: <code>Popcone@123</code>):</strong>
+        <strong>Authorized CRM Accounts:</strong>
         <ul>
-          <li><strong>Admin:</strong> <code>ashish@popcone</code></li>
-          <li><strong>Members:</strong> <code>suguna@popcone</code>, <code>vaishnavi@popcone</code>, <code>harini@popcone</code>, <code>shriya@popcone</code></li>
+          <li><strong>Administrator:</strong> <code>ashish@popcone</code></li>
+          <li><strong>Members:</strong> <code>shriya@popcone</code>, <code>vaishnavi@popcone</code>, <code>harini@popcone</code>, <code>suguna@popcone</code></li>
         </ul>
       </div>
     </div>
@@ -57,23 +57,33 @@
 
       <nav class="sidebar-nav">
         <a href="#dashboard" class="nav-item active" data-tab="dashboard" id="nav-dashboard">
-          <span class="nav-icon">📊</span>
+          <span class="nav-icon">
+            <svg class="icon-svg" viewBox="0 0 24 24"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></svg>
+          </span>
           <span class="nav-text">Dashboard</span>
         </a>
         <a href="#new-order" class="nav-item" data-tab="new-order" id="nav-new-order">
-          <span class="nav-icon">➕</span>
+          <span class="nav-icon">
+            <svg class="icon-svg" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M8 12h8"/><path d="M12 8v8"/></svg>
+          </span>
           <span class="nav-text">New Order</span>
         </a>
         <a href="#orders" class="nav-item" data-tab="orders" id="nav-orders">
-          <span class="nav-icon">📦</span>
+          <span class="nav-icon">
+            <svg class="icon-svg" viewBox="0 0 24 24"><path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg>
+          </span>
           <span class="nav-text">Orders</span>
         </a>
         <a href="#inventory" class="nav-item" data-tab="inventory" id="nav-inventory">
-          <span class="nav-icon">🥫</span>
+          <span class="nav-icon">
+            <svg class="icon-svg" viewBox="0 0 24 24"><path d="m12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83Z"/><path d="m22 17.65-9.17 4.16a2 2 0 0 1-1.66 0L2 17.65"/><path d="m22 12.65-9.17 4.16a2 2 0 0 1-1.66 0L2 12.65"/></svg>
+          </span>
           <span class="nav-text">Inventory</span>
         </a>
         <a href="#analytics" class="nav-item" data-tab="analytics" id="nav-analytics">
-          <span class="nav-icon">📈</span>
+          <span class="nav-icon">
+            <svg class="icon-svg" viewBox="0 0 24 24"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
+          </span>
           <span class="nav-text">Analytics</span>
         </a>
       </nav>
@@ -83,10 +93,13 @@
         <div class="user-profile-box">
           <div class="user-info">
             <span id="sidebar-user-name" class="user-name">Loading...</span>
-            <span id="sidebar-user-role" class="user-role-badge role-admin">ADMIN</span>
+            <span id="sidebar-user-role" class="user-role-badge role-admin" style="display: none;">ADMIN</span>
           </div>
           <div class="user-actions">
-            <button id="btn-logout" class="btn-sidebar-action" title="Sign Out">🚪 Logout</button>
+            <button id="btn-logout" class="btn-sidebar-action" title="Sign Out">
+              <svg class="icon-svg" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" x2="9" y1="12" y2="12"/></svg>
+              <span>Logout</span>
+            </button>
           </div>
         </div>
       </div>
@@ -105,10 +118,12 @@
             <span class="current-bottle-price-display">₹149</span>
           </div>
           <button id="btn-open-bottle-price" class="btn btn-outline btn-sm admin-only" title="Adjust Standard Bottle Price">
-            ⚙️ Edit Price
+            <svg class="icon-svg" viewBox="0 0 24 24"><path d="M12.586 2.586A2 2 0 0 0 11.172 2H4a2 2 0 0 0-2 2v7.172a2 2 0 0 0 .586 1.414l8.704 8.704a2.426 2.426 0 0 0 3.42 0l6.58-6.58a2.426 2.426 0 0 0 0-3.42z"/><circle cx="7.5" cy="7.5" r=".5" fill="currentColor"/></svg>
+            <span>Edit Price</span>
           </button>
           <button id="btn-open-change-password" class="btn btn-outline btn-sm" title="Change Account Password">
-            🔑 Change Password
+            <svg class="icon-svg" viewBox="0 0 24 24"><circle cx="7.5" cy="15.5" r="5.5"/><path d="m21 2-9.6 9.6"/><path d="m15.5 7.5 3 3L22 7l-3-3"/></svg>
+            <span>Change Password</span>
           </button>
         </div>
       </header>
@@ -121,7 +136,9 @@
           <!-- Low Stock Alert Banner -->
           <div id="low-stock-alert-banner" class="low-stock-alert-banner" style="display: none;">
             <div class="low-stock-content">
-              <span class="low-stock-icon">⚠️</span>
+              <span class="low-stock-icon">
+                <svg class="icon-svg" viewBox="0 0 24 24"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" x2="12" y1="9" y2="13"/><line x1="12" x2="12.01" y1="17" y2="17"/></svg>
+              </span>
               <div>
                 <div class="low-stock-title">Low Stock Warning (Threshold ≤ 20 bottles)</div>
                 <div id="low-stock-items-list" class="low-stock-items"></div>
@@ -132,7 +149,7 @@
             </button>
           </div>
 
-          <!-- KPI Cards Grid (Rule 8: ONLY 5 specific KPIs) -->
+          <!-- KPI Cards Grid (ONLY 5 specific KPIs) -->
           <div class="kpi-grid">
             <div class="kpi-card accent-yellow">
               <span class="kpi-label">Total Revenue</span>
@@ -164,9 +181,9 @@
           <!-- Flavour Performance Panel -->
           <div class="panel">
             <div class="panel-header">
-              <h3 class="panel-title">🍿 Flavour Sales Breakdown</h3>
+              <h3 class="panel-title">Flavour Sales Breakdown</h3>
               <div style="font-size: 13px; color: var(--text-secondary);">
-                Top Selling Flavour: <strong id="dashboard-most-flavour" style="color: var(--primary-blue); font-size: 15px;">-</strong>
+                Top Selling Flavour: <strong id="dashboard-most-flavour" style="color: var(--primary-blue); font-size: 15px;">None</strong>
               </div>
             </div>
             <div id="dashboard-flavour-sales-grid" class="flavours-grid">
@@ -177,10 +194,13 @@
           <!-- Recent Orders Panel -->
           <div class="panel">
             <div class="panel-header">
-              <h3 class="panel-title">⏱️ Recent Orders</h3>
+              <h3 class="panel-title">Recent Orders</h3>
               <div style="display: flex; gap: 10px;">
-                <button id="btn-dashboard-new-order" class="btn btn-primary btn-sm">➕ Create Order</button>
-                <button id="btn-dashboard-view-all-orders" class="btn btn-outline btn-sm">View All Orders →</button>
+                <button id="btn-dashboard-new-order" class="btn btn-primary btn-sm">
+                  <svg class="icon-svg" viewBox="0 0 24 24"><line x1="12" x2="12" y1="5" y2="19"/><line x1="5" x2="19" y1="12" y2="12"/></svg>
+                  <span>Create Order</span>
+                </button>
+                <button id="btn-dashboard-view-all-orders" class="btn btn-outline btn-sm">View All Orders &rarr;</button>
               </div>
             </div>
             <div class="table-responsive">
@@ -208,7 +228,7 @@
           <form id="form-new-order">
             <div class="panel">
               <div class="panel-header">
-                <h3 class="panel-title">👤 Customer Information</h3>
+                <h3 class="panel-title">Customer Information</h3>
                 <span style="font-size: 13px; color: var(--text-muted);"><span class="required" style="color:var(--danger-red)">*</span> Required Fields</span>
               </div>
               <div class="form-grid">
@@ -250,14 +270,14 @@
             <!-- Flavour Selection -->
             <div class="panel">
               <div class="panel-header">
-                <h3 class="panel-title">🍿 Select Bottles & Flavours</h3>
+                <h3 class="panel-title">Select Bottles &amp; Flavours</h3>
                 <span class="price-pill">Current Rate: <span class="current-bottle-price-display">₹149</span> / bottle (110g)</span>
               </div>
               <div class="flavours-grid">
                 <!-- Tomato -->
                 <div class="flavour-card">
                   <div class="flavour-header">
-                    <span class="flavour-name">🍅 Tomato</span>
+                    <span class="flavour-name">Tomato</span>
                     <span class="flavour-stock-tag">110g</span>
                   </div>
                   <div class="flavour-qty-control">
@@ -270,7 +290,7 @@
                 <!-- Cheese -->
                 <div class="flavour-card">
                   <div class="flavour-header">
-                    <span class="flavour-name">🧀 Cheese</span>
+                    <span class="flavour-name">Cheese</span>
                     <span class="flavour-stock-tag">110g</span>
                   </div>
                   <div class="flavour-qty-control">
@@ -283,7 +303,7 @@
                 <!-- Sour Cream -->
                 <div class="flavour-card">
                   <div class="flavour-header">
-                    <span class="flavour-name">🥛 Sour Cream</span>
+                    <span class="flavour-name">Sour Cream</span>
                     <span class="flavour-stock-tag">110g</span>
                   </div>
                   <div class="flavour-qty-control">
@@ -296,7 +316,7 @@
                 <!-- Peri Peri -->
                 <div class="flavour-card">
                   <div class="flavour-header">
-                    <span class="flavour-name">🌶️ Peri Peri</span>
+                    <span class="flavour-name">Peri Peri</span>
                     <span class="flavour-stock-tag">110g</span>
                   </div>
                   <div class="flavour-qty-control">
@@ -339,7 +359,10 @@
 
               <div style="margin-top: 24px; display: flex; justify-content: flex-end; gap: 12px;">
                 <button type="reset" class="btn btn-outline" onclick="setTimeout(recalcNewOrderPricing, 50)">Reset Form</button>
-                <button type="submit" class="btn btn-primary btn-lg">✅ Confirm & Create Order</button>
+                <button type="submit" class="btn btn-primary btn-lg">
+                  <svg class="icon-svg" viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                  <span>Confirm &amp; Create Order</span>
+                </button>
               </div>
             </div>
           </form>
@@ -351,8 +374,10 @@
             <!-- Filter Toolbar -->
             <div class="table-toolbar">
               <div class="search-input-wrapper">
-                <span class="search-icon">🔍</span>
-                <input type="text" id="search-orders-input" class="form-control" placeholder="Search by customer, phone, order ID, district...">
+                <span class="search-icon">
+                  <svg class="icon-svg" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+                </span>
+                <input type="text" id="search-orders-input" class="form-control" placeholder="Search customer, phone, order ID, district...">
               </div>
 
               <div class="filter-group">
@@ -378,20 +403,33 @@
                   <option value="Yesterday">Yesterday</option>
                   <option value="This Week">This Week</option>
                   <option value="This Month">This Month</option>
+                  <option value="This Year">This Year</option>
+                  <option value="Custom">Custom Range</option>
                 </select>
+
+                <div id="custom-date-container" style="display: none; align-items: center; gap: 6px;">
+                  <input type="date" id="filter-date-from" class="filter-select" style="padding: 6px 8px;" title="From Date">
+                  <span style="font-size: 12px; color: var(--text-muted);">&ndash;</span>
+                  <input type="date" id="filter-date-to" class="filter-select" style="padding: 6px 8px;" title="To Date">
+                </div>
 
                 <select id="filter-order-sort" class="filter-select">
                   <option value="Newest">Sort: Newest First</option>
                   <option value="Oldest">Sort: Oldest First</option>
                   <option value="AmountHigh">Amount: High to Low</option>
                   <option value="AmountLow">Amount: Low to High</option>
+                  <option value="Customer Name">Customer Name (A-Z)</option>
+                  <option value="District">District (A-Z)</option>
                 </select>
 
-                <button id="btn-export-orders-csv" class="btn btn-accent btn-sm">📥 Export CSV</button>
+                <button id="btn-export-orders-csv" class="btn btn-accent btn-sm">
+                  <svg class="icon-svg" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
+                  <span>Export CSV</span>
+                </button>
               </div>
             </div>
 
-            <!-- Orders Table (Requirement 30: 16 exact columns) -->
+            <!-- Orders Table (Created By & Edited By removed to keep clean width) -->
             <div class="table-responsive">
               <table class="crm-table">
                 <thead>
@@ -409,9 +447,7 @@
                     <th>Final</th>
                     <th>Payment</th>
                     <th>Dispatch</th>
-                    <th>Created By</th>
-                    <th>Edited By</th>
-                    <th>Actions</th>
+                    <th style="text-align: right;">Actions</th>
                   </tr>
                 </thead>
                 <tbody id="orders-table-tbody">
@@ -432,10 +468,12 @@
             </div>
             <div style="display: flex; gap: 10px;">
               <button id="btn-open-stock-movement" class="btn btn-primary btn-sm admin-only">
-                ➕ Stock In / Adjustment
+                <svg class="icon-svg" viewBox="0 0 24 24"><line x1="12" x2="12" y1="5" y2="19"/><line x1="5" x2="19" y1="12" y2="12"/></svg>
+                <span>Stock In / Adjustment</span>
               </button>
               <button id="btn-open-reset-stock" class="btn btn-danger btn-sm admin-only">
-                ⚠️ Reset All Stock to 0
+                <svg class="icon-svg" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+                <span>Reset All Stock to 0</span>
               </button>
             </div>
           </div>
@@ -448,18 +486,17 @@
           <!-- Inventory Movements Table -->
           <div class="panel">
             <div class="panel-header">
-              <h3 class="panel-title">📜 Stock Movement History</h3>
+              <h3 class="panel-title">Stock Movement History</h3>
             </div>
             <div class="table-responsive">
               <table class="crm-table">
                 <thead>
                   <tr>
-                    <th>Timestamp</th>
+                    <th>Date/Time</th>
                     <th>Flavour</th>
-                    <th>Movement Type</th>
-                    <th>Change Quantity</th>
-                    <th>Reference / Notes</th>
-                    <th>Logged By</th>
+                    <th>Type</th>
+                    <th>Change</th>
+                    <th>Reference</th>
                   </tr>
                 </thead>
                 <tbody id="inventory-movements-tbody">
@@ -472,120 +509,191 @@
 
         <!-- ==================== 5. ANALYTICS VIEW ==================== -->
         <section id="view-analytics" class="view-page" style="display: none;">
-          <!-- Year Selector Toolbar -->
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
-            <div style="display: flex; align-items: center; gap: 12px;">
-              <label for="analytics-year-select" style="font-weight: 700; font-size: 14px;">Select Year:</label>
-              <select id="analytics-year-select" class="filter-select" style="font-size: 14px; font-weight: 700;">
-                <!-- Populated dynamically -->
-              </select>
-            </div>
-            <div style="display: flex; gap: 8px;">
-              <button id="btn-export-weekly-csv" class="btn btn-outline btn-sm">📥 Weekly CSV</button>
-              <button id="btn-export-monthly-csv" class="btn btn-outline btn-sm">📥 Monthly CSV</button>
-              <button id="btn-export-annual-csv" class="btn btn-accent btn-sm">📥 Annual CSV</button>
+          <!-- Analytics Filter & Period Toolbar -->
+          <div class="panel" style="margin-bottom: 20px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 14px;">
+              <!-- View Mode Tabs -->
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <span style="font-weight: 700; font-size: 13px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px;">Period:</span>
+                <div class="btn-group" role="group">
+                  <button type="button" id="btn-analytics-mode-weekly" class="btn btn-sm btn-outline analytics-mode-btn" data-mode="weekly">Weekly</button>
+                  <button type="button" id="btn-analytics-mode-monthly" class="btn btn-sm btn-outline analytics-mode-btn active" data-mode="monthly">Monthly</button>
+                  <button type="button" id="btn-analytics-mode-annual" class="btn btn-sm btn-outline analytics-mode-btn" data-mode="annual">Annual</button>
+                </div>
+              </div>
+
+              <!-- Period Selectors & Export -->
+              <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                <!-- Month select (visible in Monthly mode) -->
+                <div id="analytics-month-select-wrapper" style="display: flex; align-items: center; gap: 6px;">
+                  <label for="analytics-month-select" style="font-size: 13px; font-weight: 600;">Month:</label>
+                  <select id="analytics-month-select" class="filter-select" style="font-size: 13px;">
+                    <option value="1">January</option>
+                    <option value="2">February</option>
+                    <option value="3">March</option>
+                    <option value="4">April</option>
+                    <option value="5">May</option>
+                    <option value="6">June</option>
+                    <option value="7">July</option>
+                    <option value="8">August</option>
+                    <option value="9">September</option>
+                    <option value="10">October</option>
+                    <option value="11">November</option>
+                    <option value="12">December</option>
+                  </select>
+                </div>
+
+                <!-- Year select -->
+                <div style="display: flex; align-items: center; gap: 6px;">
+                  <label for="analytics-year-select" style="font-size: 13px; font-weight: 600;">Year:</label>
+                  <select id="analytics-year-select" class="filter-select" style="font-size: 13px; font-weight: 700;">
+                    <!-- Populated dynamically -->
+                  </select>
+                </div>
+
+                <!-- Single Unified CSV Export for active period -->
+                <button id="btn-export-analytics-csv" class="btn btn-accent btn-sm">
+                  <svg class="icon-svg" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
+                  <span id="btn-export-analytics-csv-label">Export CSV</span>
+                </button>
+              </div>
             </div>
           </div>
 
-          <!-- Overview Cards -->
+          <!-- Active Period Summary Banner / KPIs -->
           <div class="kpi-grid">
             <div class="kpi-card accent-yellow">
-              <span class="kpi-label">Annual Revenue</span>
+              <span class="kpi-label" id="analytics-kpi-revenue-label">Revenue</span>
               <span id="analytics-total-revenue" class="kpi-value">₹0</span>
-              <span class="kpi-subtext">Selected Year</span>
+              <span class="kpi-subtext" id="analytics-kpi-revenue-subtext">Selected Period</span>
             </div>
             <div class="kpi-card accent-purple">
-              <span class="kpi-label">Total Bottles Sold</span>
+              <span class="kpi-label">Bottles Sold</span>
               <span id="analytics-total-bottles" class="kpi-value">0</span>
-              <span class="kpi-subtext">Consolidated</span>
+              <span class="kpi-subtext">Across All Flavours</span>
             </div>
             <div class="kpi-card">
               <span class="kpi-label">Total Orders</span>
               <span id="analytics-total-orders" class="kpi-value">0</span>
-              <span class="kpi-subtext">Completed Orders</span>
+              <span class="kpi-subtext">Recorded Orders</span>
             </div>
             <div class="kpi-card accent-green">
               <span class="kpi-label">Top Flavour</span>
-              <span id="analytics-most-purchased" class="kpi-value" style="font-size: 20px;">-</span>
+              <span id="analytics-most-purchased" class="kpi-value" style="font-size: 20px;">None</span>
               <span class="kpi-subtext">Highest Demand</span>
             </div>
           </div>
 
-          <!-- Annual Consolidated Summary -->
-          <div class="panel">
-            <div class="panel-header">
-              <h3 class="panel-title">📅 Annual Report Summary</h3>
+          <!-- Section 1: Monthly Breakdown View -->
+          <div id="analytics-section-monthly" class="analytics-subview">
+            <!-- Active Month Flavour Breakdown Card -->
+            <div class="panel">
+              <div class="panel-header">
+                <h3 class="panel-title" id="analytics-month-detail-title">Monthly Flavour Breakdown</h3>
+                <span style="font-size: 13px; color: var(--text-secondary);" id="analytics-month-detail-subtitle">Real-time CRM order revenue</span>
+              </div>
+              <div class="table-responsive">
+                <table class="crm-table">
+                  <thead>
+                    <tr>
+                      <th>Flavour</th>
+                      <th>Bottles Sold</th>
+                      <th>Revenue (₹)</th>
+                      <th>Sales Share</th>
+                    </tr>
+                  </thead>
+                  <tbody id="analytics-selected-month-flavour-tbody">
+                    <!-- Rendered dynamically -->
+                  </tbody>
+                </table>
+              </div>
             </div>
-            <div class="table-responsive">
-              <table class="crm-table">
-                <thead>
-                  <tr>
-                    <th>Period</th>
-                    <th>Tomato</th>
-                    <th>Cheese</th>
-                    <th>Sour Cream</th>
-                    <th>Peri Peri</th>
-                    <th>Total Bottles</th>
-                    <th>Total Revenue</th>
-                    <th>Top Flavour</th>
-                  </tr>
-                </thead>
-                <tbody id="analytics-annual-tbody">
-                  <!-- Rendered dynamically -->
-                </tbody>
-              </table>
+
+            <!-- Full Year 12-Month Table -->
+            <div class="panel">
+              <div class="panel-header">
+                <h3 class="panel-title">All Months Overview (Jan &ndash; Dec)</h3>
+                <span style="font-size: 13px; color: var(--text-secondary);">Click any row or select above to view month details</span>
+              </div>
+              <div class="table-responsive">
+                <table class="crm-table">
+                  <thead>
+                    <tr>
+                      <th>Month</th>
+                      <th>Orders</th>
+                      <th>Tomato</th>
+                      <th>Cheese</th>
+                      <th>Sour Cream</th>
+                      <th>Peri Peri</th>
+                      <th>Total Bottles</th>
+                      <th>Revenue</th>
+                      <th>Top Flavour</th>
+                    </tr>
+                  </thead>
+                  <tbody id="analytics-monthly-tbody">
+                    <!-- Rendered dynamically -->
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
 
-          <!-- Monthly Report Table (All 12 Months) -->
-          <div class="panel">
-            <div class="panel-header">
-              <h3 class="panel-title">🗓️ Monthly Breakdown (Jan – Dec)</h3>
-            </div>
-            <div class="table-responsive">
-              <table class="crm-table">
-                <thead>
-                  <tr>
-                    <th>Month</th>
-                    <th>Tomato (Bottles)</th>
-                    <th>Cheese (Bottles)</th>
-                    <th>Sour Cream (Bottles)</th>
-                    <th>Peri Peri (Bottles)</th>
-                    <th>Total Bottles</th>
-                    <th>Revenue</th>
-                    <th>Top Flavour</th>
-                  </tr>
-                </thead>
-                <tbody id="analytics-monthly-tbody">
-                  <!-- Rendered dynamically -->
-                </tbody>
-              </table>
+          <!-- Section 2: Weekly Breakdown View -->
+          <div id="analytics-section-weekly" class="analytics-subview" style="display: none;">
+            <div class="panel">
+              <div class="panel-header">
+                <h3 class="panel-title">Weekly Sales Performance</h3>
+                <span style="font-size: 13px; color: var(--text-secondary);">Week-by-week sales &amp; volume analysis</span>
+              </div>
+              <div class="table-responsive">
+                <table class="crm-table">
+                  <thead>
+                    <tr>
+                      <th>Week</th>
+                      <th>Tomato</th>
+                      <th>Cheese</th>
+                      <th>Sour Cream</th>
+                      <th>Peri Peri</th>
+                      <th>Total Bottles</th>
+                      <th>Revenue</th>
+                      <th>Top Flavour</th>
+                    </tr>
+                  </thead>
+                  <tbody id="analytics-weekly-tbody">
+                    <!-- Rendered dynamically -->
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
 
-          <!-- Weekly Report Table -->
-          <div class="panel">
-            <div class="panel-header">
-              <h3 class="panel-title">📊 Weekly Performance</h3>
-            </div>
-            <div class="table-responsive">
-              <table class="crm-table">
-                <thead>
-                  <tr>
-                    <th>Week</th>
-                    <th>Tomato</th>
-                    <th>Cheese</th>
-                    <th>Sour Cream</th>
-                    <th>Peri Peri</th>
-                    <th>Total Bottles</th>
-                    <th>Revenue</th>
-                    <th>Top Flavour</th>
-                  </tr>
-                </thead>
-                <tbody id="analytics-weekly-tbody">
-                  <!-- Rendered dynamically -->
-                </tbody>
-              </table>
+          <!-- Section 3: Annual Breakdown View -->
+          <div id="analytics-section-annual" class="analytics-subview" style="display: none;">
+            <div class="panel">
+              <div class="panel-header">
+                <h3 class="panel-title">Annual Performance Summary</h3>
+                <span style="font-size: 13px; color: var(--text-secondary);">Consolidated full-year metrics</span>
+              </div>
+              <div class="table-responsive">
+                <table class="crm-table">
+                  <thead>
+                    <tr>
+                      <th>Year</th>
+                      <th>Total Orders</th>
+                      <th>Tomato</th>
+                      <th>Cheese</th>
+                      <th>Sour Cream</th>
+                      <th>Peri Peri</th>
+                      <th>Total Bottles</th>
+                      <th>Total Revenue</th>
+                      <th>Top Flavour</th>
+                    </tr>
+                  </thead>
+                  <tbody id="analytics-annual-tbody">
+                    <!-- Rendered dynamically -->
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
         </section>
@@ -600,7 +708,7 @@
   <div id="modal-order-details" class="modal-backdrop">
     <div class="modal-container large">
       <div class="modal-header">
-        <h3 class="modal-title">📦 Order Details</h3>
+        <h3 class="modal-title">Order Details</h3>
         <button id="btn-close-order-details" class="btn-close-modal" aria-label="Close">&times;</button>
       </div>
       <div class="modal-body">
@@ -617,7 +725,7 @@
           </div>
         </div>
 
-        <div class="detail-section-title">👤 Customer & Delivery Address</div>
+        <div class="detail-section-title">Customer &amp; Delivery Address</div>
         <div class="detail-info-grid">
           <div class="detail-info-item">
             <span class="detail-info-label">Customer Name</span>
@@ -637,13 +745,13 @@
           </div>
         </div>
 
-        <div class="detail-section-title">🍿 Ordered Products</div>
+        <div class="detail-section-title">Ordered Products</div>
         <table class="ordered-products-table">
           <thead>
             <tr>
               <th>Flavour</th>
               <th>Quantity (Bottles)</th>
-              <th>Rate</th>
+              <th>Unit Rate</th>
               <th>Total Amount</th>
             </tr>
           </thead>
@@ -652,7 +760,7 @@
           </tbody>
         </table>
 
-        <div class="detail-section-title">💰 Payment & Logistics</div>
+        <div class="detail-section-title">Payment &amp; Logistics</div>
         <div class="detail-info-grid">
           <div class="detail-info-item">
             <span class="detail-info-label">Total Bottles</span>
@@ -678,20 +786,25 @@
             <span class="detail-info-label" style="color: var(--primary-blue);">Final Billed Amount</span>
             <span id="detail-final-amount" class="detail-info-value" style="font-size: 18px; color: var(--primary-blue);">₹0</span>
           </div>
-          <div class="detail-info-item">
-            <span class="detail-info-label">Created By</span>
-            <span id="detail-created-info" class="detail-info-value" style="font-size: 12px; font-weight: normal;">-</span>
-          </div>
-          <div class="detail-info-item">
-            <span class="detail-info-label">Last Edited By</span>
-            <span id="detail-edited-info" class="detail-info-value" style="font-size: 12px; font-weight: normal;">-</span>
-          </div>
+        </div>
+
+        <!-- Subtle Professional Audit Information (Requirement 13 & 14) -->
+        <div class="order-detail-audit-bar">
+          <span>Created by: <strong id="detail-created-info">-</strong></span>
+          <span class="audit-divider">&bull;</span>
+          <span>Last edited by: <strong id="detail-edited-info">-</strong></span>
         </div>
       </div>
       <div class="modal-footer">
         <button id="btn-detail-toggle-dispatch" class="btn btn-outline">Toggle Dispatch Status</button>
-        <button id="btn-detail-edit" class="btn btn-primary">✏️ Edit Order</button>
-        <button id="btn-detail-delete" class="btn btn-danger">🗑️ Delete Order</button>
+        <button id="btn-detail-edit" class="btn btn-primary">
+          <svg class="icon-svg" viewBox="0 0 24 24"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg>
+          <span>Edit Order</span>
+        </button>
+        <button id="btn-detail-delete" class="btn btn-danger">
+          <svg class="icon-svg" viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg>
+          <span>Delete Order</span>
+        </button>
       </div>
     </div>
   </div>
@@ -700,7 +813,7 @@
   <div id="modal-edit-order" class="modal-backdrop">
     <div class="modal-container large">
       <div class="modal-header">
-        <h3 class="modal-title">✏️ Edit Order: <span id="edit-order-id-display"></span></h3>
+        <h3 class="modal-title">Edit Order: <span id="edit-order-id-display"></span></h3>
         <button id="btn-close-edit-order" class="btn-close-modal" aria-label="Close">&times;</button>
       </div>
       <form id="form-edit-order">
@@ -742,7 +855,7 @@
           <div class="detail-section-title" style="margin-top: 24px;">Flavour Quantities</div>
           <div class="flavours-grid">
             <div class="flavour-card">
-              <div class="flavour-header"><span class="flavour-name">🍅 Tomato</span></div>
+              <div class="flavour-header"><span class="flavour-name">Tomato</span></div>
               <div class="flavour-qty-control">
                 <button type="button" class="btn-qty" onclick="adjustEditFlavourQty('Tomato', -1)">−</button>
                 <input type="number" id="edit-qty-tomato" class="form-control qty-input" value="0" min="0">
@@ -750,7 +863,7 @@
               </div>
             </div>
             <div class="flavour-card">
-              <div class="flavour-header"><span class="flavour-name">🧀 Cheese</span></div>
+              <div class="flavour-header"><span class="flavour-name">Cheese</span></div>
               <div class="flavour-qty-control">
                 <button type="button" class="btn-qty" onclick="adjustEditFlavourQty('Cheese', -1)">−</button>
                 <input type="number" id="edit-qty-cheese" class="form-control qty-input" value="0" min="0">
@@ -758,7 +871,7 @@
               </div>
             </div>
             <div class="flavour-card">
-              <div class="flavour-header"><span class="flavour-name">🥛 Sour Cream</span></div>
+              <div class="flavour-header"><span class="flavour-name">Sour Cream</span></div>
               <div class="flavour-qty-control">
                 <button type="button" class="btn-qty" onclick="adjustEditFlavourQty('Sour Cream', -1)">−</button>
                 <input type="number" id="edit-qty-sour-cream" class="form-control qty-input" value="0" min="0">
@@ -766,7 +879,7 @@
               </div>
             </div>
             <div class="flavour-card">
-              <div class="flavour-header"><span class="flavour-name">🌶️ Peri Peri</span></div>
+              <div class="flavour-header"><span class="flavour-name">Peri Peri</span></div>
               <div class="flavour-qty-control">
                 <button type="button" class="btn-qty" onclick="adjustEditFlavourQty('Peri Peri', -1)">−</button>
                 <input type="number" id="edit-qty-peri-peri" class="form-control qty-input" value="0" min="0">
@@ -810,12 +923,12 @@
   <div id="modal-delete-order" class="modal-backdrop">
     <div class="modal-container">
       <div class="modal-header">
-        <h3 class="modal-title" style="color: var(--danger-red);">🗑️ Delete Order Confirmation</h3>
+        <h3 class="modal-title" style="color: var(--danger-red);">Delete Order Confirmation</h3>
       </div>
       <div class="modal-body">
         <p>Are you sure you want to permanently delete order <strong id="delete-order-id-display"></strong>?</p>
         <p style="margin-top: 10px; font-size: 13px; color: var(--text-secondary);">
-          <strong>Note:</strong> Deleting this order will automatically restore the ordered bottles back into inventory stock and record an audit log.
+          <strong>Note:</strong> Deleting this order will automatically restore the ordered bottles back into inventory stock and reverse this order from all reports.
         </p>
       </div>
       <div class="modal-footer">
@@ -829,7 +942,7 @@
   <div id="modal-change-password" class="modal-backdrop">
     <div class="modal-container">
       <div class="modal-header">
-        <h3 class="modal-title">🔑 Change Password</h3>
+        <h3 class="modal-title">Change Password</h3>
         <button id="btn-close-change-pwd" class="btn-close-modal" aria-label="Close">&times;</button>
       </div>
       <form id="form-change-password">
@@ -860,7 +973,7 @@
   <div id="modal-bottle-price" class="modal-backdrop">
     <div class="modal-container">
       <div class="modal-header">
-        <h3 class="modal-title">⚙️ Update Standard Bottle Price</h3>
+        <h3 class="modal-title">Update Standard Bottle Price</h3>
         <button id="btn-close-bottle-price" class="btn-close-modal" aria-label="Close">&times;</button>
       </div>
       <form id="form-bottle-price">
@@ -885,7 +998,7 @@
   <div id="modal-stock-movement" class="modal-backdrop">
     <div class="modal-container">
       <div class="modal-header">
-        <h3 class="modal-title">🥫 Inventory Stock In / Adjustment</h3>
+        <h3 class="modal-title">Inventory Stock In / Adjustment</h3>
         <button id="btn-close-stock-movement" class="btn-close-modal" aria-label="Close">&times;</button>
       </div>
       <form id="form-stock-movement">
@@ -927,7 +1040,7 @@
   <div id="modal-reset-stock" class="modal-backdrop">
     <div class="modal-container">
       <div class="modal-header">
-        <h3 class="modal-title" style="color: var(--danger-red);">⚠️ Reset Inventory Stock</h3>
+        <h3 class="modal-title" style="color: var(--danger-red);">Reset Inventory Stock</h3>
       </div>
       <div class="modal-body">
         <p>Are you sure you want to reset <strong>all flavour inventory stock levels to 0</strong>?</p>

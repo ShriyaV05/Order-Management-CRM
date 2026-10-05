@@ -226,9 +226,30 @@ body {
 }
 
 .nav-icon {
-  font-size: 18px;
   width: 22px;
-  text-align: center;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.icon-svg {
+  display: inline-block;
+  vertical-align: middle;
+  width: 16px;
+  height: 16px;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  fill: none;
+  flex-shrink: 0;
+}
+
+.nav-icon .icon-svg {
+  width: 19px;
+  height: 19px;
 }
 
 /* Section 6: Sidebar User Section (Bottom-Left) */
@@ -1296,3 +1317,68 @@ body {
     padding: 16px;
   }
 }
+
+/* ---------------- Analytics & Button Group Styles ---------------- */
+.btn-group {
+  display: inline-flex;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  border: 1px solid var(--border-light);
+  background: var(--bg-surface);
+}
+
+.analytics-mode-btn {
+  border-radius: 0 !important;
+  border: none !important;
+  padding: 7px 16px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-secondary);
+  background: transparent;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  border-right: 1px solid var(--border-light) !important;
+}
+
+.analytics-mode-btn:last-child {
+  border-right: none !important;
+}
+
+.analytics-mode-btn:hover {
+  background-color: var(--primary-blue-subtle);
+  color: var(--primary-blue);
+}
+
+.analytics-mode-btn.active {
+  background-color: var(--primary-blue) !important;
+  color: var(--accent-yellow) !important;
+}
+
+/* Subtle Professional Audit Bar (Requirement 13 & 14) */
+.order-detail-audit-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  background: #F8FAFC;
+  border: 1px solid var(--border-light);
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
+  margin-top: 20px;
+}
+
+.order-detail-audit-bar strong {
+  color: var(--text-main);
+}
+
+.audit-divider {
+  color: var(--text-muted);
+}
+
+#custom-date-container {
+  display: none;
+  align-items: center;
+  gap: 6px;
+}
+

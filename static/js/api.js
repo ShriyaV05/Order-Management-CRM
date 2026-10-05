@@ -147,6 +147,8 @@ const api = {
     if (params.dispatch) query.append('dispatch', params.dispatch);
     if (params.district) query.append('district', params.district);
     if (params.date_filter) query.append('date_filter', params.date_filter);
+    if (params.date_from) query.append('date_from', params.date_from);
+    if (params.date_to) query.append('date_to', params.date_to);
     if (params.sort_by) query.append('sort_by', params.sort_by);
     return this.request(`/orders?${query.toString()}`);
   },
@@ -200,8 +202,11 @@ const api = {
   },
 
   // Analytics
-  async getAnalytics(year) {
-    const query = year ? `?year=${year}` : '';
-    return this.request(`/analytics${query}`);
+  async getAnalytics(year, month = null) {
+    const query = new URLSearchParams();
+    if (year) query.append('year', year);
+    if (month) query.append('month', month);
+    const qs = query.toString();
+    return this.request(`/analytics${qs ? '?' + qs : ''}`);
   }
 };

@@ -2,25 +2,25 @@
 
 A full-stack **Order & Sales CRM** built for POPCONE to manage customer orders, inventory, sales analytics, and business operations in one place.
 
-## ✨ Features
+## Features
 
-* 🔐 Secure authentication with **Admin / Member** roles
-* 🛒 Create, edit, view and delete orders 
-* 📦 Real-time inventory management
-* ➕ Stock additions and +/- inventory adjustments
-* 🔄 Automatic inventory deduction and restoration
-* 💰 Configurable bottle pricing with historical price preservation
-* 🚚 Automatic delivery-fee calculation
-* 🔍 Order search, filtering and sorting
-* 🚚 Placed / Dispatched tracking
-* 👤 Created By / Edited By tracking
-* 📝 Complete audit history
-* 📊 Weekly, Monthly and Annual analytics
-* 📁 CSV exports for orders and reports
-* 🔑 Password change functionality
-* 🍿 POPCONE branded interface using `logo.jpg`
+* Secure authentication with **Admin / Member** roles
+* Create, edit, view and delete orders 
+* Real-time inventory management
+* Stock additions and adjustments
+* Automatic inventory deduction and restoration
+* Configurable bottle pricing with historical price preservation
+* Automatic delivery-fee calculation
+* Order search, filtering and sorting
+* Placed / Dispatched tracking
+* Created By / Edited By audit tracking
+* Complete audit history
+* Weekly, Monthly and Annual analytics
+* CSV exports for orders and reports
+* Password change functionality
+* POPCONE branded interface using `logo.jpg` and `icon.png`
 
-## 👥 Roles
+## Roles
 
 ### Admin
 
@@ -38,7 +38,7 @@ Full access including:
 * View analytics
 * Export data
 
-## 🛠️ Core Modules
+## Core Modules
 
 ```text
 Dashboard
@@ -48,7 +48,7 @@ Inventory
 Analytics
 ```
 
-## 🗄️ Database
+## Database
 
 Core entities:
 
@@ -64,7 +64,7 @@ Settings
 
 The system uses transactional operations to maintain consistency between orders, inventory and audit records.
 
-## 🔒 Security
+## Security
 
 * Secure password hashing
 * Role-based authorization
@@ -73,6 +73,6 @@ The system uses transactional operations to maintain consistency between orders,
 * Secure session handling
 * No plaintext passwords
 
-## 🚀 Purpose
+## Purpose
 
 POPCONE CRM provides a centralized system to manage **orders, customers, inventory, sales analytics and operational history** with accurate real-time data.

@@ -157,179 +157,27 @@ def init_db():
     # Check inventory
     cursor.execute("SELECT COUNT(*) FROM inventory;")
     if cursor.fetchone()[0] == 0:
-        # Initial flavour stock: Tomato 85, Cheese 0, Sour Cream 0, Peri Peri 12
-        # (Directly exhibits low stock alerts for Cheese, Sour Cream, Peri Peri as described in prompt)
         initial_inventory = [
-            ("Tomato", 85, 20, now_str),
+            ("Tomato", 0, 20, now_str),
             ("Cheese", 0, 20, now_str),
             ("Sour Cream", 0, 20, now_str),
-            ("Peri Peri", 12, 20, now_str),
+            ("Peri Peri", 0, 20, now_str),
         ]
         cursor.executemany("INSERT INTO inventory (flavour, current_stock, low_stock_threshold, updated_at) VALUES (?, ?, ?, ?);", initial_inventory)
-        
-        # Initial movements
-        cursor.executemany("""
-        INSERT INTO inventory_movements (timestamp, flavour, movement_type, quantity, reference, created_by)
-        VALUES (?, ?, ?, ?, ?, ?);
-        """, [
-            (now_str, "Tomato", "Stock Added", 100, "Initial Stocking", "Ashish"),
-            (now_str, "Cheese", "Stock Added", 50, "Initial Stocking", "Ashish"),
-            (now_str, "Sour Cream", "Stock Added", 40, "Initial Stocking", "Ashish"),
-            (now_str, "Peri Peri", "Stock Added", 60, "Initial Stocking", "Ashish"),
-        ])
         conn.commit()
 
-    # Check orders seed
-    cursor.execute("SELECT COUNT(*) FROM orders;")
-    if cursor.fetchone()[0] == 0:
-        seed_orders = [
-            {
-                "order_id": "ORD0001",
-                "customer_name": "Karthik Raja",
-                "phone": "9840123456",
-                "address": "42 Anna Salai, T. Nagar",
-                "pin_code": "600017",
-                "state": "Tamil Nadu",
-                "district": "Chennai",
-                "total_bottles": 2,
-                "total_weight_grams": 220,
-                "unit_price": 149.0,
-                "product_amount": 298.0,
-                "delivery_fee": 40.0,
-                "final_amount": 338.0,
-                "payment": "Paid",
-                "dispatch_state": "DISPATCHED",
-                "created_by": "Shriya",
-                "created_at": "2026-01-14 10:30:00",
-                "edited_by": "Ashish",
-                "edited_at": "2026-01-14 14:15:00",
-                "items": [("Tomato", 2, 149.0, 298.0)]
-            },
-            {
-                "order_id": "ORD0002",
-                "customer_name": "Priya Sundaram",
-                "phone": "9841234567",
-                "address": "15 Gandhipuram 4th Street",
-                "pin_code": "641012",
-                "state": "Tamil Nadu",
-                "district": "Coimbatore",
-                "total_bottles": 3,
-                "total_weight_grams": 330,
-                "unit_price": 149.0,
-                "product_amount": 447.0,
-                "delivery_fee": 65.0,
-                "final_amount": 512.0,
-                "payment": "COD",
-                "dispatch_state": "PLACED",
-                "created_by": "Suguna",
-                "created_at": "2026-02-18 11:20:00",
-                "edited_by": "Suguna",
-                "edited_at": "2026-02-18 11:20:00",
-                "items": [("Tomato", 1, 149.0, 149.0), ("Cheese", 2, 149.0, 298.0)]
-            },
-            {
-                "order_id": "ORD0003",
-                "customer_name": "Rahul Sharma",
-                "phone": "9819876543",
-                "address": "802 Palm Beach Residency, Vashi",
-                "pin_code": "400703",
-                "state": "Maharashtra",
-                "district": "Navi Mumbai",
-                "total_bottles": 4,
-                "total_weight_grams": 440,
-                "unit_price": 149.0,
-                "product_amount": 596.0,
-                "delivery_fee": 150.0,
-                "final_amount": 746.0,
-                "payment": "Paid",
-                "dispatch_state": "DISPATCHED",
-                "created_by": "Vaishnavi",
-                "created_at": "2026-03-05 15:45:00",
-                "edited_by": "Ashish",
-                "edited_at": "2026-03-06 09:10:00",
-                "items": [("Tomato", 2, 149.0, 298.0), ("Peri Peri", 2, 149.0, 298.0)]
-            },
-            {
-                "order_id": "ORD0023",
-                "customer_name": "Ananya Krishnan",
-                "phone": "9790554433",
-                "address": "28 Besant Nagar Beach Road",
-                "pin_code": "600090",
-                "state": "Tamil Nadu",
-                "district": "Chennai",
-                "total_bottles": 2,
-                "total_weight_grams": 220,
-                "unit_price": 149.0,
-                "product_amount": 298.0,
-                "delivery_fee": 40.0,
-                "final_amount": 338.0,
-                "payment": "COD",
-                "dispatch_state": "PLACED",
-                "created_by": "Harini",
-                "created_at": "2026-09-20 16:10:00",
-                "edited_by": "Harini",
-                "edited_at": "2026-09-20 16:10:00",
-                "items": [("Tomato", 1, 149.0, 149.0), ("Peri Peri", 1, 149.0, 149.0)]
-            },
-            {
-                "order_id": "ORD0042",
-                "customer_name": "Deepak Menon",
-                "phone": "9447123987",
-                "address": "12 Marine Drive Apartments",
-                "pin_code": "682031",
-                "state": "Kerala",
-                "district": "Ernakulam",
-                "total_bottles": 3,
-                "total_weight_grams": 330,
-                "unit_price": 149.0,
-                "product_amount": 447.0,
-                "delivery_fee": 78.0,
-                "final_amount": 525.0,
-                "payment": "Paid",
-                "dispatch_state": "DISPATCHED",
-                "created_by": "Shriya",
-                "created_at": "2026-09-26 12:00:00",
-                "edited_by": "Ashish",
-                "edited_at": "2026-09-26 14:30:00",
-                "items": [("Tomato", 2, 149.0, 298.0), ("Peri Peri", 1, 149.0, 149.0)]
-            }
-        ]
+    conn.close()
 
-        for o in seed_orders:
-            cursor.execute("""
-            INSERT INTO orders (
-                order_id, customer_name, phone, address, pin_code, state, district,
-                total_bottles, total_weight_grams, unit_price, product_amount,
-                delivery_fee, final_amount, payment, dispatch_state,
-                created_by, created_at, edited_by, edited_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
-            """, (
-                o["order_id"], o["customer_name"], o["phone"], o["address"], o["pin_code"],
-                o["state"], o["district"], o["total_bottles"], o["total_weight_grams"],
-                o["unit_price"], o["product_amount"], o["delivery_fee"], o["final_amount"],
-                o["payment"], o["dispatch_state"], o["created_by"], o["created_at"],
-                o["edited_by"], o["edited_at"]
-            ))
-
-            for item in o["items"]:
-                cursor.execute("""
-                INSERT INTO order_items (order_id, flavour, quantity, unit_price, line_amount)
-                VALUES (?, ?, ?, ?, ?);
-                """, (o["order_id"], item[0], item[1], item[2], item[3]))
-                
-                # record sold movement
-                cursor.execute("""
-                INSERT INTO inventory_movements (timestamp, flavour, movement_type, quantity, reference, created_by)
-                VALUES (?, ?, ?, ?, ?, ?);
-                """, (o["created_at"], item[0], "Sold", -item[1], o["order_id"], o["created_by"]))
-
-            cursor.execute("""
-            INSERT INTO audit_logs (timestamp, user, action, entity_id, details)
-            VALUES (?, ?, ?, ?, ?);
-            """, (o["created_at"], o["created_by"], "Order Created", o["order_id"], f"Created order with {o['total_bottles']} bottles, final ₹{o['final_amount']}"))
-
-        conn.commit()
-
+def reset_crm_data():
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM order_items;")
+    cursor.execute("DELETE FROM orders;")
+    cursor.execute("DELETE FROM inventory_movements;")
+    cursor.execute("DELETE FROM audit_logs WHERE action IN ('Order Created', 'Order Edited', 'Order Deleted', 'Dispatched', 'Undispatched', 'Inventory Reset', 'Inventory Stock Added', 'Inventory Adjustment');")
+    now_str = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+    cursor.execute("UPDATE inventory SET current_stock = 0, updated_at = ?;", (now_str,))
+    conn.commit()
     conn.close()
 
 if __name__ == "__main__":

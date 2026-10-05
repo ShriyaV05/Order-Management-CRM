@@ -1264,6 +1264,14 @@ def serve_logo():
         return FileResponse(logo_path, media_type="image/jpeg")
     return FileResponse(os.path.join(STATIC_DIR, "assets", "logo.jpg"), media_type="image/jpeg")
 
+# Directly serve favicon.ico using logo.jpg
+@app.get("/favicon.ico")
+def serve_favicon():
+    logo_path = os.path.join(os.path.dirname(__file__), "logo.jpg")
+    if os.path.exists(logo_path):
+        return FileResponse(logo_path, media_type="image/jpeg")
+    return FileResponse(os.path.join(STATIC_DIR, "assets", "logo.jpg"), media_type="image/jpeg")
+
 # Directly serve icon.png from workspace or static/assets
 @app.get("/icon.png")
 def serve_icon():

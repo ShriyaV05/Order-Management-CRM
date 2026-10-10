@@ -88,6 +88,12 @@
           </span>
           <span class="nav-text">Analytics</span>
         </a>
+        <a href="#settings" class="nav-item" id="nav-settings" title="CRM Settings">
+          <span class="nav-icon">
+            <svg class="icon-svg" viewBox="0 0 24 24"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
+          </span>
+          <span class="nav-text">Settings</span>
+        </a>
       </nav>
 
       <!-- Sidebar User Section (Bottom-Left) -->
@@ -98,6 +104,10 @@
             <span id="sidebar-user-role" class="user-role-badge role-admin" style="display: none;">ADMIN</span>
           </div>
           <div class="user-actions">
+            <button id="btn-sidebar-settings" class="btn-sidebar-action" title="Settings" type="button">
+              <svg class="icon-svg" viewBox="0 0 24 24"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
+              <span>Settings</span>
+            </button>
             <button id="btn-logout" class="btn-sidebar-action" title="Sign Out">
               <svg class="icon-svg" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" x2="9" y1="12" y2="12"/></svg>
               <span>Logout</span>
@@ -947,82 +957,71 @@
     </div>
   </div>
 
-  <!-- 4. Unified CRM Settings Modal (Requirements 1, 2, 3, 12) -->
+  <!-- 4. Unified CRM Settings Modal (Requirements: Discount Per Bottle & Admin Password Management) -->
   <div id="modal-settings" class="modal-backdrop">
-    <div class="modal-container large">
+    <div class="modal-container">
       <div class="modal-header">
         <div style="display: flex; align-items: center; gap: 10px;">
           <svg class="icon-svg" style="width: 22px; height: 22px; color: var(--primary-blue);" viewBox="0 0 24 24"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
-          <h3 class="modal-title">System Settings</h3>
+          <h3 class="modal-title">Settings</h3>
         </div>
         <button id="btn-close-settings" class="btn-close-modal" aria-label="Close">&times;</button>
       </div>
       <div class="modal-body">
-        <!-- Section 1: Pricing & Discount Configuration (Requirements 2 & 3) -->
+        <!-- Section A: Discount Per Bottle -->
         <div class="settings-box">
           <div class="settings-box-header">
-            <h4 class="settings-box-title">Bottle Pricing &amp; Per-Bottle Discount</h4>
-            <span class="settings-box-subtitle">Configures original baseline pricing and automatic order discounts</span>
+            <h4 class="settings-box-title">Discount Per Bottle</h4>
+            <span class="settings-box-subtitle">Admin-only per-bottle discount applied automatically to all new orders</span>
           </div>
 
-          <div class="settings-columns-grid">
-            <!-- Original Selling Price (Fixed at ₹160) -->
-            <div class="settings-card">
-              <span class="settings-card-label">Original Selling Price</span>
-              <div class="settings-fixed-price-tag">
-                <span style="font-size: 22px; font-weight: 800; color: var(--primary-blue);">₹160</span>
-                <span class="badge badge-placed" style="font-size: 11px;">Fixed &bull; Non-Modifiable</span>
-              </div>
-              <p style="font-size: 12px; color: var(--text-muted); margin-top: 6px;">
-                Original baseline selling price per 100g bottle across all flavours. Cannot be modified.
-              </p>
-            </div>
-
-            <!-- Discount per Bottle Configuration -->
-            <div class="settings-card">
-              <span class="settings-card-label">Discount per Bottle (₹)</span>
-              <div id="admin-discount-ctrl" class="admin-only">
-                <form id="form-setting-discount" style="display: flex; gap: 8px; align-items: center; margin-top: 4px;">
-                  <div style="position: relative; flex: 1;">
-                    <span style="position: absolute; left: 10px; top: 10px; font-weight: 700; color: var(--text-secondary);">₹</span>
-                    <input type="number" id="setting-discount-input" class="form-control" style="padding-left: 24px; font-weight: 700;" min="0" max="159" step="1" required>
-                  </div>
-                  <button type="submit" class="btn btn-primary btn-sm">Save Discount</button>
-                </form>
-                <div id="discount-setting-feedback" class="feedback-msg" style="display: none; font-size: 12px; margin-top: 4px;"></div>
-              </div>
-              <div id="member-discount-view" class="member-only" style="display: none; margin-top: 4px;">
-                <div style="font-size: 18px; font-weight: 700; color: var(--text-main);">
-                  ₹<span id="member-discount-display">11</span> / bottle
+          <div class="settings-card" style="margin-top: 10px;">
+            <label class="form-label" for="setting-discount-input" style="font-weight: 700; margin-bottom: 6px;">Discount Per Bottle (₹) <span class="required">*</span></label>
+            <div id="admin-discount-ctrl" class="admin-only">
+              <form id="form-setting-discount" style="display: flex; gap: 10px; align-items: center; max-width: 420px;">
+                <div style="position: relative; flex: 1;">
+                  <span style="position: absolute; left: 12px; top: 10px; font-weight: 700; color: var(--text-secondary);">₹</span>
+                  <input type="number" id="setting-discount-input" class="form-control" style="padding-left: 28px; font-weight: 700;" min="0" max="159" step="1" required placeholder="e.g. 11">
                 </div>
-                <span style="font-size: 11px; color: var(--text-muted);">Configured by Administrator (Ashish)</span>
-              </div>
-              <div style="margin-top: 8px; padding-top: 8px; border-top: 1px dashed var(--border-light); font-size: 12px; color: var(--text-secondary);">
-                Effective Price per Bottle: <strong id="setting-effective-price-display" style="color: var(--primary-blue); font-size: 14px;">₹149</strong>
-              </div>
+                <button type="submit" id="btn-save-discount" class="btn btn-primary">Save Discount</button>
+              </form>
+              <div id="discount-setting-feedback" class="feedback-msg" style="display: none; font-size: 13px; margin-top: 8px; font-weight: 600;"></div>
             </div>
+            <div id="member-discount-view" class="member-only" style="display: none; margin-top: 4px;">
+              <div style="font-size: 18px; font-weight: 700; color: var(--text-main);">
+                ₹<span id="member-discount-display">11</span> / bottle
+              </div>
+              <span style="font-size: 11px; color: var(--text-muted);">Configured by Administrator (Ashish)</span>
+            </div>
+            <p style="font-size: 12px; color: var(--text-muted); margin-top: 8px;">
+              Applied per bottle (e.g. 1 bottle: ₹11 discount, 2 bottles: ₹22 discount, 4 bottles: ₹44 discount, 6 bottles: ₹66 discount).
+            </p>
           </div>
         </div>
 
-        <!-- Section 2: User Password Management (Requirement 12) -->
+        <!-- Section B: User Password Management — ADMIN ONLY -->
         <div class="settings-box" style="margin-top: 24px;">
           <div class="settings-box-header">
-            <h4 class="settings-box-title">User Password Management</h4>
+            <h4 class="settings-box-title">User Password Management <span class="badge badge-placed" style="font-size: 10px; vertical-align: middle; margin-left: 6px;">ADMIN ONLY</span></h4>
             <span class="settings-box-subtitle">Admin controls for all 5 authorized team accounts</span>
           </div>
 
           <!-- Admin Password Form -->
           <div id="admin-password-section" class="admin-only">
             <p style="font-size: 13px; color: var(--text-secondary); margin-bottom: 14px;">
-              As Administrator, you can set a new password for any of the five team accounts without needing their old password.
+              Select a team account and set a new password without requiring their current password.
             </p>
             <form id="form-admin-user-password">
-              <div id="admin-pwd-status" class="error-feedback" style="margin-bottom: 12px; padding: 10px; border-radius: var(--radius-sm);"></div>
+              <div id="admin-pwd-status" class="error-feedback" style="margin-bottom: 12px; padding: 10px; border-radius: var(--radius-sm); display: none;"></div>
               <div class="form-grid">
                 <div class="form-group">
                   <label class="form-label" for="admin-select-user">Select Account <span class="required">*</span></label>
                   <select id="admin-select-user" class="form-control" required>
-                    <!-- Populated dynamically with all 5 accounts -->
+                    <option value="ashish@popcone">Ashish (ADMIN)</option>
+                    <option value="shriya@popcone">Shriya (MEMBER)</option>
+                    <option value="vaishnavi@popcone">Vaishnavi (MEMBER)</option>
+                    <option value="harini@popcone">Harini (MEMBER)</option>
+                    <option value="suguna@popcone">Suguna (MEMBER)</option>
                   </select>
                 </div>
                 <div class="form-group">
@@ -1033,7 +1032,7 @@
               <div style="margin-top: 16px; display: flex; justify-content: flex-end;">
                 <button type="submit" id="btn-admin-save-password" class="btn btn-primary">
                   <svg class="icon-svg" viewBox="0 0 24 24"><path d="M21 2-9.6 9.6"/><circle cx="7.5" cy="15.5" r="5.5"/><path d="m15.5 7.5 3 3L22 7l-3-3"/></svg>
-                  <span>Set New Password</span>
+                  <span>Update Password</span>
                 </button>
               </div>
             </form>

@@ -168,17 +168,27 @@ document.addEventListener('DOMContentLoaded', async () => {
     else if (tab === 'analytics') loadAnalytics();
   }
 
-  // ---------------- Professional Settings Modal (Requirements 1, 3, 12) ----------------
+  // ---------------- Professional Settings Modal (Requirements: Discount Per Bottle & Admin Password Management) ----------------
   const settingsModal = document.getElementById('modal-settings');
   const btnOpenSettings = document.getElementById('btn-open-settings');
+  const btnSidebarSettings = document.getElementById('btn-sidebar-settings');
+  const navSettings = document.getElementById('nav-settings');
   const btnCloseSettings = document.getElementById('btn-close-settings');
+  const btnCloseSettingsFooter = document.getElementById('btn-close-settings-footer');
 
   async function openSettingsModal() {
-    const isAdmin = state.user && (state.user.role === 'ADMIN' || (state.user.display_name || '').toLowerCase() === 'ashish' || (state.user.username || '').toLowerCase().startsWith('ashish'));
+    if (!settingsModal) return;
+    settingsModal.classList.add('show');
 
-    // Toggle role visibility inside settings
-    document.querySelectorAll('.admin-only').forEach(el => el.style.display = isAdmin ? '' : 'none');
-    document.querySelectorAll('.member-only').forEach(el => el.style.display = isAdmin ? 'none' : '');
+    const isAdmin = state.user && (
+      state.user.role === 'ADMIN' || 
+      (state.user.display_name || '').toLowerCase() === 'ashish' || 
+      (state.user.username || '').toLowerCase().startsWith('ashish')
+    );
+
+    // Toggle role visibility ONLY within settings modal
+    settingsModal.querySelectorAll('.admin-only').forEach(el => el.style.display = isAdmin ? '' : 'none');
+    settingsModal.querySelectorAll('.member-only').forEach(el => el.style.display = isAdmin ? 'none' : '');
 
     await refreshGlobalSettings();
 
@@ -191,17 +201,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (memberDiscountDisplay) {
       memberDiscountDisplay.textContent = state.settings.discount_per_bottle !== undefined ? state.settings.discount_per_bottle : 11;
     }
-    const effectiveDisplay = document.getElementById('setting-effective-price-display');
-    if (effectiveDisplay) {
-      effectiveDisplay.textContent = `₹${state.settings.effective_bottle_price || (160 - (state.settings.discount_per_bottle || 11))}`;
-    }
 
     // Populate Admin User Password dropdown
     if (isAdmin) {
+      const userSelect = document.getElementById('admin-select-user');
       try {
         const usersData = await api.getUsers();
-        const userSelect = document.getElementById('admin-select-user');
-        if (userSelect && usersData.users) {
+        if (userSelect && usersData && usersData.users && usersData.users.length > 0) {
           userSelect.innerHTML = usersData.users.map(u => 
             `<option value="${u.username}">${u.display_name} (${u.role})</option>`
           ).join('');
@@ -217,29 +223,48 @@ document.addEventListener('DOMContentLoaded', async () => {
         pwdStatus.textContent = '';
       }
     }
-
-    settingsModal?.classList.add('show');
   }
 
-  btnOpenSettings?.addEventListener('click', openSettingsModal);
+  btnOpenSettings?.addEventListener('click', (e) => { e.preventDefault(); openSettingsModal(); });
+  btnSidebarSettings?.addEventListener('click', (e) => { e.preventDefault(); openSettingsModal(); });
+  navSettings?.addEventListener('click', (e) => { e.preventDefault(); openSettingsModal(); });
   btnCloseSettings?.addEventListener('click', () => settingsModal?.classList.remove('show'));
+  btnCloseSettingsFooter?.addEventListener('click', () => settingsModal?.classList.remove('show'));
 
-  // Discount Form submit (Admin only, Requirement 3)
+  // Close when clicking modal backdrop
+  settingsModal?.addEventListener('click', (e) => {
+    if (e.target === settingsModal) {
+      settingsModal.classList.remove('show');
+    }
+  });
+
+  // Discount Form submit (Admin only)
   document.getElementById('form-setting-discount')?.addEventListener('submit', async (e) => {
     e.preventDefault();
-    const discountVal = parseFloat(document.getElementById('setting-discount-input').value);
+    const inputEl = document.getElementById('setting-discount-input');
+    const discountVal = parseFloat(inputEl.value);
     const feedback = document.getElementById('discount-setting-feedback');
+
+    if (isNaN(discountVal) || discountVal < 0 || discountVal >= 160) {
+      const errMsg = 'Discount must be between ₹0 and ₹159';
+      showToast(errMsg, 'danger');
+      if (feedback) {
+        feedback.textContent = errMsg;
+        feedback.style.color = 'var(--danger-red)';
+        feedback.style.display = 'block';
+      }
+      return;
+    }
+
     try {
       const res = await api.updateDiscount(discountVal);
       showToast(`Discount per bottle updated to ₹${res.discount_per_bottle}`);
       await refreshGlobalSettings();
-      const effEl = document.getElementById('setting-effective-price-display');
-      if (effEl) effEl.textContent = `₹${res.effective_bottle_price}`;
       if (feedback) {
-        feedback.textContent = `Saved: ₹${res.discount_per_bottle}/bottle discount applied.`;
+        feedback.textContent = `Saved: ₹${res.discount_per_bottle}/bottle discount applied successfully.`;
         feedback.style.color = 'var(--success-green)';
         feedback.style.display = 'block';
-        setTimeout(() => { feedback.style.display = 'none'; }, 3000);
+        setTimeout(() => { if (feedback) feedback.style.display = 'none'; }, 4000);
       }
       if (state.activeTab === 'new-order') recalcNewOrderPricing();
     } catch (err) {
@@ -252,22 +277,44 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   });
 
-  // Admin User Password Form submit (Admin only, Requirement 12)
+  // Admin User Password Form submit (Admin only)
   document.getElementById('form-admin-user-password')?.addEventListener('submit', async (e) => {
     e.preventDefault();
-    const targetUsername = document.getElementById('admin-select-user').value;
-    const newPassword = document.getElementById('admin-input-new-password').value;
+    const userSelect = document.getElementById('admin-select-user');
+    const targetUsername = userSelect ? userSelect.value : '';
+    const pwdInput = document.getElementById('admin-input-new-password');
+    const newPassword = pwdInput ? pwdInput.value : '';
     const statusBox = document.getElementById('admin-pwd-status');
+
+    if (!targetUsername) {
+      if (statusBox) {
+        statusBox.textContent = 'Please select a team account';
+        statusBox.style.color = 'var(--danger-red)';
+        statusBox.style.display = 'block';
+      }
+      return;
+    }
+
+    if (!newPassword || newPassword.length < 6) {
+      const errMsg = 'New password must be at least 6 characters long';
+      showToast(errMsg, 'danger');
+      if (statusBox) {
+        statusBox.textContent = errMsg;
+        statusBox.style.color = 'var(--danger-red)';
+        statusBox.style.display = 'block';
+      }
+      return;
+    }
 
     try {
       const res = await api.adminChangePassword(targetUsername, newPassword);
       showToast(res.message || `Password updated for ${targetUsername}`);
-      document.getElementById('admin-input-new-password').value = '';
+      if (pwdInput) pwdInput.value = '';
       if (statusBox) {
-        statusBox.textContent = `Success: New password configured for ${targetUsername}!`;
+        statusBox.textContent = `Success: New password saved for ${targetUsername}! Old password is no longer valid.`;
         statusBox.style.color = 'var(--success-green)';
         statusBox.style.display = 'block';
-        setTimeout(() => { statusBox.style.display = 'none'; }, 4000);
+        setTimeout(() => { if (statusBox) statusBox.style.display = 'none'; }, 5000);
       }
     } catch (err) {
       showToast(err.message || 'Failed to update password', 'danger');

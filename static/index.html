@@ -115,17 +115,14 @@
           <h2 id="header-page-title" class="page-title">Dashboard</h2>
         </div>
         <div class="header-actions">
-          <div class="price-pill" title="Standard Selling Price per Bottle">
+          <div class="price-pill" title="Standard Original Bottle Price: ₹160">
             <span>Bottle Price:</span>
-            <span class="current-bottle-price-display">₹149</span>
+            <span class="current-bottle-price-display">₹160</span>
+            <span id="header-discount-badge" class="header-discount-badge" style="margin-left: 6px; padding: 2px 7px; background: var(--accent-yellow); color: #78350F; border-radius: 4px; font-size: 11px; font-weight: 700;">-₹11 Disc</span>
           </div>
-          <button id="btn-open-bottle-price" class="btn btn-outline btn-sm admin-only" title="Adjust Standard Bottle Price">
-            <svg class="icon-svg" viewBox="0 0 24 24"><path d="M12.586 2.586A2 2 0 0 0 11.172 2H4a2 2 0 0 0-2 2v7.172a2 2 0 0 0 .586 1.414l8.704 8.704a2.426 2.426 0 0 0 3.42 0l6.58-6.58a2.426 2.426 0 0 0 0-3.42z"/><circle cx="7.5" cy="7.5" r=".5" fill="currentColor"/></svg>
-            <span>Edit Price</span>
-          </button>
-          <button id="btn-open-change-password" class="btn btn-outline btn-sm" title="Change Account Password">
-            <svg class="icon-svg" viewBox="0 0 24 24"><circle cx="7.5" cy="15.5" r="5.5"/><path d="m21 2-9.6 9.6"/><path d="m15.5 7.5 3 3L22 7l-3-3"/></svg>
-            <span>Change Password</span>
+          <button id="btn-open-settings" class="btn btn-outline btn-sm" title="CRM System Settings">
+            <svg class="icon-svg" viewBox="0 0 24 24"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
+            <span>Settings</span>
           </button>
         </div>
       </header>
@@ -135,23 +132,7 @@
 
         <!-- ==================== 1. DASHBOARD VIEW ==================== -->
         <section id="view-dashboard" class="view-page">
-          <!-- Low Stock Alert Banner -->
-          <div id="low-stock-alert-banner" class="low-stock-alert-banner" style="display: none;">
-            <div class="low-stock-content">
-              <span class="low-stock-icon">
-                <svg class="icon-svg" viewBox="0 0 24 24"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" x2="12" y1="9" y2="13"/><line x1="12" x2="12.01" y1="17" y2="17"/></svg>
-              </span>
-              <div>
-                <div class="low-stock-title">Low Stock Warning (Threshold ≤ 20 bottles)</div>
-                <div id="low-stock-items-list" class="low-stock-items"></div>
-              </div>
-            </div>
-            <button class="btn btn-danger btn-sm" onclick="document.getElementById('nav-inventory').click()">
-              Go to Inventory
-            </button>
-          </div>
-
-          <!-- KPI Cards Grid (ONLY 5 specific KPIs) -->
+          <!-- KPI Cards Grid (ONLY 5 specific KPIs preserved) -->
           <div class="kpi-grid">
             <div class="kpi-card accent-yellow">
               <span class="kpi-label">Total Revenue</span>
@@ -177,19 +158,6 @@
               <span class="kpi-label">COD Orders</span>
               <span id="kpi-cod-orders" class="kpi-value">0</span>
               <span class="kpi-subtext">Cash on Delivery</span>
-            </div>
-          </div>
-
-          <!-- Flavour Performance Panel -->
-          <div class="panel">
-            <div class="panel-header">
-              <h3 class="panel-title">Flavour Sales Breakdown</h3>
-              <div style="font-size: 13px; color: var(--text-secondary);">
-                Top Selling Flavour: <strong id="dashboard-most-flavour" style="color: var(--primary-blue); font-size: 15px;">None</strong>
-              </div>
-            </div>
-            <div id="dashboard-flavour-sales-grid" class="flavours-grid">
-              <!-- Rendered dynamically -->
             </div>
           </div>
 
@@ -256,8 +224,12 @@
                   <select id="new-order-district" class="form-control" required></select>
                 </div>
                 <div class="form-group">
-                  <label class="form-label" for="new-order-pincode">PIN Code <span class="required">*</span></label>
-                  <input type="text" id="new-order-pincode" class="form-control" placeholder="6-digit PIN" required pattern="[0-9]{6}">
+                  <label class="form-label" for="new-order-pincode">
+                    PIN Code <span class="required">*</span>
+                    <span id="pincode-spinner" class="pincode-spinner" style="display:none; font-size:11px; color:var(--primary-blue); font-weight:normal;">(Looking up location...)</span>
+                  </label>
+                  <input type="text" id="new-order-pincode" class="form-control" placeholder="6-digit PIN (Auto-fills State & District)" required pattern="[0-9]{6}" maxlength="6">
+                  <span id="pincode-feedback" class="pincode-feedback" style="display:none; font-size:11px; margin-top:2px;"></span>
                 </div>
                 <div class="form-group">
                   <label class="form-label" for="new-order-payment">Payment Method <span class="required">*</span></label>
@@ -273,19 +245,19 @@
             <div class="panel">
               <div class="panel-header">
                 <h3 class="panel-title">Select Bottles &amp; Flavours</h3>
-                <span class="price-pill">Current Rate: <span class="current-bottle-price-display">₹149</span> / bottle (110g)</span>
+                <span class="price-pill">Original: <span class="current-bottle-price-display">₹160</span> / bottle (100g) &bull; Effective: <span class="effective-price-display">₹149</span></span>
               </div>
               <div class="flavours-grid">
                 <!-- Tomato -->
                 <div class="flavour-card">
                   <div class="flavour-header">
                     <span class="flavour-name">Tomato</span>
-                    <span class="flavour-stock-tag">110g</span>
+                    <span class="flavour-stock-tag">100g</span>
                   </div>
                   <div class="flavour-qty-control">
-                    <button type="button" class="btn-qty" onclick="adjustFlavourQty('Tomato', -1)">−</button>
+                    <button type="button" class="btn-qty" onclick="adjustFlavourQty('Tomato', -1)" aria-label="Decrease Tomato">&minus;</button>
                     <input type="number" id="qty-tomato" class="form-control qty-input" value="0" min="0">
-                    <button type="button" class="btn-qty" onclick="adjustFlavourQty('Tomato', 1)">+</button>
+                    <button type="button" class="btn-qty" onclick="adjustFlavourQty('Tomato', 1)" aria-label="Increase Tomato">&plus;</button>
                   </div>
                 </div>
 
@@ -293,12 +265,12 @@
                 <div class="flavour-card">
                   <div class="flavour-header">
                     <span class="flavour-name">Cheese</span>
-                    <span class="flavour-stock-tag">110g</span>
+                    <span class="flavour-stock-tag">100g</span>
                   </div>
                   <div class="flavour-qty-control">
-                    <button type="button" class="btn-qty" onclick="adjustFlavourQty('Cheese', -1)">−</button>
+                    <button type="button" class="btn-qty" onclick="adjustFlavourQty('Cheese', -1)" aria-label="Decrease Cheese">&minus;</button>
                     <input type="number" id="qty-cheese" class="form-control qty-input" value="0" min="0">
-                    <button type="button" class="btn-qty" onclick="adjustFlavourQty('Cheese', 1)">+</button>
+                    <button type="button" class="btn-qty" onclick="adjustFlavourQty('Cheese', 1)" aria-label="Increase Cheese">&plus;</button>
                   </div>
                 </div>
 
@@ -306,12 +278,12 @@
                 <div class="flavour-card">
                   <div class="flavour-header">
                     <span class="flavour-name">Sour Cream</span>
-                    <span class="flavour-stock-tag">110g</span>
+                    <span class="flavour-stock-tag">100g</span>
                   </div>
                   <div class="flavour-qty-control">
-                    <button type="button" class="btn-qty" onclick="adjustFlavourQty('Sour Cream', -1)">−</button>
+                    <button type="button" class="btn-qty" onclick="adjustFlavourQty('Sour Cream', -1)" aria-label="Decrease Sour Cream">&minus;</button>
                     <input type="number" id="qty-sour-cream" class="form-control qty-input" value="0" min="0">
-                    <button type="button" class="btn-qty" onclick="adjustFlavourQty('Sour Cream', 1)">+</button>
+                    <button type="button" class="btn-qty" onclick="adjustFlavourQty('Sour Cream', 1)" aria-label="Increase Sour Cream">&plus;</button>
                   </div>
                 </div>
 
@@ -319,20 +291,36 @@
                 <div class="flavour-card">
                   <div class="flavour-header">
                     <span class="flavour-name">Peri Peri</span>
-                    <span class="flavour-stock-tag">110g</span>
+                    <span class="flavour-stock-tag">100g</span>
                   </div>
                   <div class="flavour-qty-control">
-                    <button type="button" class="btn-qty" onclick="adjustFlavourQty('Peri Peri', -1)">−</button>
+                    <button type="button" class="btn-qty" onclick="adjustFlavourQty('Peri Peri', -1)" aria-label="Decrease Peri Peri">&minus;</button>
                     <input type="number" id="qty-peri-peri" class="form-control qty-input" value="0" min="0">
-                    <button type="button" class="btn-qty" onclick="adjustFlavourQty('Peri Peri', 1)">+</button>
+                    <button type="button" class="btn-qty" onclick="adjustFlavourQty('Peri Peri', 1)" aria-label="Increase Peri Peri">&plus;</button>
                   </div>
                 </div>
               </div>
 
-              <!-- Pricing Summary Card -->
+              <!-- Optional Combo Offers (Requirement 4: Display below order details and above blue summary card) -->
+              <div id="combo-offers-container" class="combo-offers-container" style="display: none;">
+                <div class="combo-offers-header">
+                  <span class="combo-offers-badge">SPECIAL OFFER</span>
+                  <span class="combo-offers-text">An optional combo offer is available for this quantity!</span>
+                </div>
+                <div class="combo-buttons-wrap">
+                  <button type="button" id="btn-combo-2" class="btn btn-combo" style="display: none;">
+                    Apply 2-Bottle Combo — ₹289
+                  </button>
+                  <button type="button" id="btn-combo-4" class="btn btn-combo" style="display: none;">
+                    Apply 4-Bottle Combo — ₹559
+                  </button>
+                </div>
+              </div>
+
+              <!-- Blue Bill Summary Card (Requirement 7 & 8) -->
               <div class="pricing-summary-card">
                 <div class="pricing-row">
-                  <span>Total Bottles:</span>
+                  <span>Total Number of Bottles:</span>
                   <strong id="new-order-bottles-count">0</strong>
                 </div>
                 <div class="pricing-row">
@@ -340,8 +328,24 @@
                   <strong id="new-order-weight-display">0g</strong>
                 </div>
                 <div class="pricing-row">
-                  <span>Product Amount:</span>
-                  <strong id="new-order-product-amount">₹0</strong>
+                  <span>Original Product Amount (₹160/bottle):</span>
+                  <strong id="new-order-original-amount">₹0</strong>
+                </div>
+                <div class="pricing-row">
+                  <span>Discount per Bottle:</span>
+                  <strong id="new-order-discount-per-bottle">-₹11</strong>
+                </div>
+                <div class="pricing-row">
+                  <span>Total Discount Amount:</span>
+                  <strong id="new-order-total-discount" style="color: var(--accent-yellow);">-₹0</strong>
+                </div>
+                <div class="pricing-row">
+                  <span>Discounted Product Amount:</span>
+                  <strong id="new-order-discounted-product-amount">₹0</strong>
+                </div>
+                <div class="pricing-row" id="row-selected-combo" style="display: none;">
+                  <span>Selected Combo Offer:</span>
+                  <strong id="new-order-selected-combo-display" style="color: var(--accent-yellow);">None</strong>
                 </div>
                 <div class="pricing-row">
                   <div>
@@ -349,12 +353,15 @@
                     <div id="new-order-delivery-note" class="delivery-calc-note">Select state and district to calculate</div>
                   </div>
                   <div class="delivery-fee-field">
-                    <span>₹</span>
-                    <input type="number" id="new-order-delivery-fee" class="form-control delivery-input" value="0" min="0" step="1" placeholder="0">
+                    <span id="delivery-fee-free-badge" class="badge badge-free-delivery" style="display: none; background: #10B981; color: white; padding: 4px 10px; border-radius: 4px; font-weight: 700; font-size: 11px;">FREE DELIVERY</span>
+                    <div class="delivery-fee-input-wrap" id="delivery-fee-input-wrap">
+                      <span>₹</span>
+                      <input type="number" id="new-order-delivery-fee" class="form-control delivery-input" value="0" min="0" step="1" placeholder="0">
+                    </div>
                   </div>
                 </div>
                 <div class="pricing-row total-row">
-                  <span>Final Total Amount:</span>
+                  <span>Final Payable Amount:</span>
                   <strong id="new-order-final-amount">₹0</strong>
                 </div>
               </div>
@@ -940,59 +947,115 @@
     </div>
   </div>
 
-  <!-- 4. Change Password Modal -->
-  <div id="modal-change-password" class="modal-backdrop">
-    <div class="modal-container">
+  <!-- 4. Unified CRM Settings Modal (Requirements 1, 2, 3, 12) -->
+  <div id="modal-settings" class="modal-backdrop">
+    <div class="modal-container large">
       <div class="modal-header">
-        <h3 class="modal-title">Change Password</h3>
-        <button id="btn-close-change-pwd" class="btn-close-modal" aria-label="Close">&times;</button>
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <svg class="icon-svg" style="width: 22px; height: 22px; color: var(--primary-blue);" viewBox="0 0 24 24"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
+          <h3 class="modal-title">System Settings</h3>
+        </div>
+        <button id="btn-close-settings" class="btn-close-modal" aria-label="Close">&times;</button>
       </div>
-      <form id="form-change-password">
-        <div class="modal-body">
-          <div id="change-pwd-error" class="error-feedback" style="margin-bottom: 14px; padding: 8px 12px; background: var(--danger-bg); border-radius: var(--radius-sm); border: 1px solid #FCA5A5;"></div>
-          <div class="form-group" style="margin-bottom: 14px;">
-            <label class="form-label" for="pwd-current">Current Password</label>
-            <input type="password" id="pwd-current" class="form-control" required autocomplete="current-password">
+      <div class="modal-body">
+        <!-- Section 1: Pricing & Discount Configuration (Requirements 2 & 3) -->
+        <div class="settings-box">
+          <div class="settings-box-header">
+            <h4 class="settings-box-title">Bottle Pricing &amp; Per-Bottle Discount</h4>
+            <span class="settings-box-subtitle">Configures original baseline pricing and automatic order discounts</span>
           </div>
-          <div class="form-group" style="margin-bottom: 14px;">
-            <label class="form-label" for="pwd-new">New Password</label>
-            <input type="password" id="pwd-new" class="form-control" required autocomplete="new-password">
-          </div>
-          <div class="form-group">
-            <label class="form-label" for="pwd-confirm">Confirm New Password</label>
-            <input type="password" id="pwd-confirm" class="form-control" required autocomplete="new-password">
-          </div>
-        </div>
-        <div class="modal-footer">
-          <button type="button" class="btn btn-outline" onclick="document.getElementById('modal-change-password').classList.remove('show')">Cancel</button>
-          <button type="submit" class="btn btn-primary">Update Password</button>
-        </div>
-      </form>
-    </div>
-  </div>
 
-  <!-- 5. Bottle Price Modal (Admin Only) -->
-  <div id="modal-bottle-price" class="modal-backdrop">
-    <div class="modal-container">
-      <div class="modal-header">
-        <h3 class="modal-title">Update Standard Bottle Price</h3>
-        <button id="btn-close-bottle-price" class="btn-close-modal" aria-label="Close">&times;</button>
-      </div>
-      <form id="form-bottle-price">
-        <div class="modal-body">
-          <div class="form-group">
-            <label class="form-label" for="setting-bottle-price-input">Unit Bottle Price (₹)</label>
-            <input type="number" id="setting-bottle-price-input" class="form-control" step="1" min="1" required>
-            <span style="font-size: 12px; color: var(--text-muted); margin-top: 4px;">
-              Applied to all newly created orders. Existing historical orders will retain their locked purchase price.
-            </span>
+          <div class="settings-columns-grid">
+            <!-- Original Selling Price (Fixed at ₹160) -->
+            <div class="settings-card">
+              <span class="settings-card-label">Original Selling Price</span>
+              <div class="settings-fixed-price-tag">
+                <span style="font-size: 22px; font-weight: 800; color: var(--primary-blue);">₹160</span>
+                <span class="badge badge-placed" style="font-size: 11px;">Fixed &bull; Non-Modifiable</span>
+              </div>
+              <p style="font-size: 12px; color: var(--text-muted); margin-top: 6px;">
+                Original baseline selling price per 100g bottle across all flavours. Cannot be modified.
+              </p>
+            </div>
+
+            <!-- Discount per Bottle Configuration -->
+            <div class="settings-card">
+              <span class="settings-card-label">Discount per Bottle (₹)</span>
+              <div id="admin-discount-ctrl" class="admin-only">
+                <form id="form-setting-discount" style="display: flex; gap: 8px; align-items: center; margin-top: 4px;">
+                  <div style="position: relative; flex: 1;">
+                    <span style="position: absolute; left: 10px; top: 10px; font-weight: 700; color: var(--text-secondary);">₹</span>
+                    <input type="number" id="setting-discount-input" class="form-control" style="padding-left: 24px; font-weight: 700;" min="0" max="159" step="1" required>
+                  </div>
+                  <button type="submit" class="btn btn-primary btn-sm">Save Discount</button>
+                </form>
+                <div id="discount-setting-feedback" class="feedback-msg" style="display: none; font-size: 12px; margin-top: 4px;"></div>
+              </div>
+              <div id="member-discount-view" class="member-only" style="display: none; margin-top: 4px;">
+                <div style="font-size: 18px; font-weight: 700; color: var(--text-main);">
+                  ₹<span id="member-discount-display">11</span> / bottle
+                </div>
+                <span style="font-size: 11px; color: var(--text-muted);">Configured by Administrator (Ashish)</span>
+              </div>
+              <div style="margin-top: 8px; padding-top: 8px; border-top: 1px dashed var(--border-light); font-size: 12px; color: var(--text-secondary);">
+                Effective Price per Bottle: <strong id="setting-effective-price-display" style="color: var(--primary-blue); font-size: 14px;">₹149</strong>
+              </div>
+            </div>
           </div>
         </div>
-        <div class="modal-footer">
-          <button type="button" class="btn btn-outline" onclick="document.getElementById('modal-bottle-price').classList.remove('show')">Cancel</button>
-          <button type="submit" class="btn btn-primary">Save Price</button>
+
+        <!-- Section 2: User Password Management (Requirement 12) -->
+        <div class="settings-box" style="margin-top: 24px;">
+          <div class="settings-box-header">
+            <h4 class="settings-box-title">User Password Management</h4>
+            <span class="settings-box-subtitle">Admin controls for all 5 authorized team accounts</span>
+          </div>
+
+          <!-- Admin Password Form -->
+          <div id="admin-password-section" class="admin-only">
+            <p style="font-size: 13px; color: var(--text-secondary); margin-bottom: 14px;">
+              As Administrator, you can set a new password for any of the five team accounts without needing their old password.
+            </p>
+            <form id="form-admin-user-password">
+              <div id="admin-pwd-status" class="error-feedback" style="margin-bottom: 12px; padding: 10px; border-radius: var(--radius-sm);"></div>
+              <div class="form-grid">
+                <div class="form-group">
+                  <label class="form-label" for="admin-select-user">Select Account <span class="required">*</span></label>
+                  <select id="admin-select-user" class="form-control" required>
+                    <!-- Populated dynamically with all 5 accounts -->
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label class="form-label" for="admin-input-new-password">New Password <span class="required">*</span></label>
+                  <input type="password" id="admin-input-new-password" class="form-control" placeholder="Enter new password (min. 6 chars)" minlength="6" required autocomplete="new-password">
+                </div>
+              </div>
+              <div style="margin-top: 16px; display: flex; justify-content: flex-end;">
+                <button type="submit" id="btn-admin-save-password" class="btn btn-primary">
+                  <svg class="icon-svg" viewBox="0 0 24 24"><path d="M21 2-9.6 9.6"/><circle cx="7.5" cy="15.5" r="5.5"/><path d="m15.5 7.5 3 3L22 7l-3-3"/></svg>
+                  <span>Set New Password</span>
+                </button>
+              </div>
+            </form>
+          </div>
+
+          <!-- Member Notice (Members cannot change passwords) -->
+          <div id="member-password-notice" class="member-only" style="display: none; padding: 16px; background: var(--bg-app); border-radius: var(--radius-md); border: 1px solid var(--border-light);">
+            <div style="display: flex; align-items: center; gap: 10px;">
+              <svg class="icon-svg" style="color: var(--primary-blue);" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/></svg>
+              <div>
+                <strong style="color: var(--primary-blue);">Restricted Administrator Access</strong>
+                <p style="font-size: 13px; color: var(--text-secondary); margin-top: 2px;">
+                  Password management is restricted to administrator (Ashish). To reset or change your account password, please contact Ashish.
+                </p>
+              </div>
+            </div>
+          </div>
         </div>
-      </form>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline" onclick="document.getElementById('modal-settings').classList.remove('show')">Close</button>
+      </div>
     </div>
   </div>
 

@@ -124,6 +124,25 @@ def init_db():
 
     conn.commit()
 
+    # Safe Schema Migrations for Orders Table (Pricing & Combo Fields)
+    cursor.execute("PRAGMA table_info(orders);")
+    existing_cols = [row["name"] for row in cursor.fetchall()]
+
+    if "discount_per_bottle" not in existing_cols:
+        cursor.execute("ALTER TABLE orders ADD COLUMN discount_per_bottle REAL NOT NULL DEFAULT 0.0;")
+    if "total_discount" not in existing_cols:
+        cursor.execute("ALTER TABLE orders ADD COLUMN total_discount REAL NOT NULL DEFAULT 0.0;")
+    if "normal_product_amount" not in existing_cols:
+        cursor.execute("ALTER TABLE orders ADD COLUMN normal_product_amount REAL NOT NULL DEFAULT 0.0;")
+    if "is_combo" not in existing_cols:
+        cursor.execute("ALTER TABLE orders ADD COLUMN is_combo INTEGER NOT NULL DEFAULT 0;")
+    if "combo_type" not in existing_cols:
+        cursor.execute("ALTER TABLE orders ADD COLUMN combo_type TEXT NOT NULL DEFAULT '';")
+    if "combo_price" not in existing_cols:
+        cursor.execute("ALTER TABLE orders ADD COLUMN combo_price REAL NOT NULL DEFAULT 0.0;")
+
+    conn.commit()
+
     # Seed Initial Data if empty
     now_str = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
 
@@ -148,10 +167,19 @@ def init_db():
     cursor.execute("SELECT COUNT(*) FROM settings;")
     if cursor.fetchone()[0] == 0:
         initial_settings = [
-            ("bottle_price", "149", now_str),
+            ("bottle_price", "160", now_str),
+            ("discount_per_bottle", "11", now_str),
             ("low_stock_threshold", "20", now_str),
         ]
         cursor.executemany("INSERT INTO settings (key, value, updated_at) VALUES (?, ?, ?);", initial_settings)
+        conn.commit()
+    else:
+        # Ensure discount_per_bottle exists in settings
+        cursor.execute("SELECT value FROM settings WHERE key = 'discount_per_bottle';")
+        if not cursor.fetchone():
+            cursor.execute("INSERT INTO settings (key, value, updated_at) VALUES ('discount_per_bottle', '11', ?);", (now_str,))
+        # Update bottle_price setting to 160
+        cursor.execute("UPDATE settings SET value = '160', updated_at = ? WHERE key = 'bottle_price';", (now_str,))
         conn.commit()
 
     # Check inventory

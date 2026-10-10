@@ -93,6 +93,10 @@ const api = {
     return this.request('/auth/me');
   },
 
+  async getUsers() {
+    return this.request('/users');
+  },
+
   async changePassword(currentPassword, newPassword, confirmPassword) {
     return this.request('/auth/change-password', {
       method: 'POST',
@@ -109,6 +113,24 @@ const api = {
     return this.request('/settings');
   },
 
+  async updateDiscount(discount) {
+    return this.request('/settings/discount', {
+      method: 'POST',
+      body: { discount_per_bottle: parseFloat(discount) }
+    });
+  },
+
+  async adminChangePassword(targetUser, newPassword) {
+    const isNum = typeof targetUser === 'number' || (/^\d+$/.test(String(targetUser)));
+    const body = isNum
+      ? { user_id: parseInt(targetUser, 10), new_password: newPassword }
+      : { username: String(targetUser), new_password: newPassword };
+    return this.request('/settings/user-password', {
+      method: 'POST',
+      body
+    });
+  },
+
   async updateBottlePrice(price) {
     return this.request('/settings/bottle-price', {
       method: 'POST',
@@ -116,15 +138,19 @@ const api = {
     });
   },
 
-  // Locations & shipping
+  // Locations, Shipping & Postal Lookup
   async getLocations() {
     return this.request('/locations');
   },
 
-  async calculateDelivery(state, district, totalBottles) {
+  async lookupPincode(pincode) {
+    return this.request(`/pincode/${encodeURIComponent(pincode)}`);
+  },
+
+  async calculateDelivery(state, district, totalBottles, productAmount = null) {
     return this.request('/calculate-delivery', {
       method: 'POST',
-      body: { state, district, total_bottles: totalBottles }
+      body: { state, district, total_bottles: totalBottles, product_amount: productAmount }
     });
   },
 

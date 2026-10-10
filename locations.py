@@ -1,5 +1,5 @@
 import math
-from typing import Dict, List, Any
+from typing import Dict, List, Any, Optional
 
 INDIA_LOCATIONS: Dict[str, List[str]] = {
     "Tamil Nadu": [
@@ -140,14 +140,19 @@ def determine_zone(state: str, district: str) -> str:
     # Otherwise: North/East/West
     return "North/East/West"
 
-def calculate_delivery_fee(state: str, district: str, total_bottles: int) -> Dict[str, Any]:
+def calculate_delivery_fee(state: str, district: str, total_bottles: int, product_amount: Optional[float] = None) -> Dict[str, Any]:
     st = (state or "").strip()
     dist = (district or "").strip()
 
     if not st or not dist:
+        weight_grams = total_bottles * 100 if total_bottles > 0 else 0
+        if weight_grams >= 1000:
+            weight_display = f"{weight_grams // 1000}kg" if weight_grams % 1000 == 0 else f"{weight_grams / 1000:.2f}kg"
+        else:
+            weight_display = f"{weight_grams}g"
         return {
-            "weight_grams": total_bottles * 110 if total_bottles > 0 else 0,
-            "weight_display": f"{total_bottles * 110}g" if total_bottles > 0 else "0g",
+            "weight_grams": weight_grams,
+            "weight_display": weight_display,
             "zone": "Unknown",
             "slab": "None",
             "fee": 0.0,
@@ -164,12 +169,12 @@ def calculate_delivery_fee(state: str, district: str, total_bottles: int) -> Dic
             "notes": "No bottles selected"
         }
     
-    weight_grams = total_bottles * 110
+    weight_grams = total_bottles * 100
     zone = determine_zone(st, dist)
     rates = DELIVERY_RATES.get(zone, DELIVERY_RATES["North/East/West"])
 
     if weight_grams >= 1000:
-        weight_display = f"{weight_grams / 1000:.2f}kg"
+        weight_display = f"{weight_grams // 1000}kg" if weight_grams % 1000 == 0 else f"{weight_grams / 1000:.2f}kg"
     else:
         weight_display = f"{weight_grams}g"
 
@@ -194,11 +199,20 @@ def calculate_delivery_fee(state: str, district: str, total_bottles: int) -> Dic
         slab = f"> 1kg ({weight_display})"
         notes = f"{zone} 1kg base (Rs.{rates['tier3']:.0f}) + Rs.{surcharge:.0f} excess weight ({excess_units} x 500g slab)"
 
+    # Rule: Free delivery if applicable product amount strictly exceeds Rs.800
+    is_free_delivery = False
+    if product_amount is not None and product_amount > 800.0:
+        notes = f"Free Delivery (Product amount > Rs.800) [Standard {zone} was Rs.{fee:.0f}]"
+        fee = 0.0
+        is_free_delivery = True
+
     return {
         "weight_grams": weight_grams,
         "weight_display": weight_display,
         "zone": zone,
         "slab": slab,
         "fee": float(fee),
+        "is_free_delivery": is_free_delivery,
+        "is_free": is_free_delivery,
         "notes": notes
     }

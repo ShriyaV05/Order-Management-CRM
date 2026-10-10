@@ -9,7 +9,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     user: api.getUser(),
     activeTab: 'dashboard',
     locations: {},
-    settings: { bottle_price: 149, low_stock_threshold: 20 },
+    settings: { 
+      original_bottle_price: 160, 
+      bottle_price: 160, 
+      discount_per_bottle: 11, 
+      effective_bottle_price: 149, 
+      low_stock_threshold: 20 
+    },
     orders: [],
     availableDistricts: [],
     currentOrderFilter: {
@@ -33,6 +39,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         'Sour Cream': 0,
         'Peri Peri': 0
       },
+      comboSelected: null, // null | '2_BOTTLE' | '4_BOTTLE'
       deliveryFee: 0.0,
       deliveryCalculated: 0.0,
       deliveryNotes: '',
@@ -161,74 +168,135 @@ document.addEventListener('DOMContentLoaded', async () => {
     else if (tab === 'analytics') loadAnalytics();
   }
 
-  // ---------------- Change Password Modal ----------------
-  const changePasswordModal = document.getElementById('modal-change-password');
-  document.getElementById('btn-open-change-password').addEventListener('click', () => {
-    document.getElementById('form-change-password').reset();
-    document.getElementById('change-pwd-error').style.display = 'none';
-    changePasswordModal.classList.add('show');
-  });
+  // ---------------- Professional Settings Modal (Requirements 1, 3, 12) ----------------
+  const settingsModal = document.getElementById('modal-settings');
+  const btnOpenSettings = document.getElementById('btn-open-settings');
+  const btnCloseSettings = document.getElementById('btn-close-settings');
 
-  document.getElementById('btn-close-change-pwd').addEventListener('click', () => {
-    changePasswordModal.classList.remove('show');
-  });
+  async function openSettingsModal() {
+    const isAdmin = state.user && (state.user.role === 'ADMIN' || (state.user.display_name || '').toLowerCase() === 'ashish' || (state.user.username || '').toLowerCase().startsWith('ashish'));
 
-  document.getElementById('form-change-password').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const curr = document.getElementById('pwd-current').value;
-    const nw = document.getElementById('pwd-new').value;
-    const conf = document.getElementById('pwd-confirm').value;
-    const errBox = document.getElementById('change-pwd-error');
-    errBox.style.display = 'none';
+    // Toggle role visibility inside settings
+    document.querySelectorAll('.admin-only').forEach(el => el.style.display = isAdmin ? '' : 'none');
+    document.querySelectorAll('.member-only').forEach(el => el.style.display = isAdmin ? 'none' : '');
 
-    if (nw !== conf) {
-      errBox.textContent = 'New passwords do not match';
-      errBox.style.display = 'block';
-      return;
+    await refreshGlobalSettings();
+
+    // Fill settings inputs
+    const discountInput = document.getElementById('setting-discount-input');
+    if (discountInput) {
+      discountInput.value = state.settings.discount_per_bottle !== undefined ? state.settings.discount_per_bottle : 11;
+    }
+    const memberDiscountDisplay = document.getElementById('member-discount-display');
+    if (memberDiscountDisplay) {
+      memberDiscountDisplay.textContent = state.settings.discount_per_bottle !== undefined ? state.settings.discount_per_bottle : 11;
+    }
+    const effectiveDisplay = document.getElementById('setting-effective-price-display');
+    if (effectiveDisplay) {
+      effectiveDisplay.textContent = `₹${state.settings.effective_bottle_price || (160 - (state.settings.discount_per_bottle || 11))}`;
     }
 
-    try {
-      await api.changePassword(curr, nw, conf);
-      showToast('Password changed successfully');
-      changePasswordModal.classList.remove('show');
-    } catch (err) {
-      errBox.textContent = err.message || 'Failed to change password';
-      errBox.style.display = 'block';
+    // Populate Admin User Password dropdown
+    if (isAdmin) {
+      try {
+        const usersData = await api.getUsers();
+        const userSelect = document.getElementById('admin-select-user');
+        if (userSelect && usersData.users) {
+          userSelect.innerHTML = usersData.users.map(u => 
+            `<option value="${u.username}">${u.display_name} (${u.role})</option>`
+          ).join('');
+        }
+      } catch (err) {
+        console.error('Failed to load users for settings:', err);
+      }
+      const pwdInput = document.getElementById('admin-input-new-password');
+      if (pwdInput) pwdInput.value = '';
+      const pwdStatus = document.getElementById('admin-pwd-status');
+      if (pwdStatus) {
+        pwdStatus.style.display = 'none';
+        pwdStatus.textContent = '';
+      }
     }
-  });
 
-  // ---------------- Bottle Price Setting Modal (Admin Only) ----------------
-  const bottlePriceModal = document.getElementById('modal-bottle-price');
-  document.getElementById('btn-open-bottle-price')?.addEventListener('click', async () => {
-    const s = await api.getSettings();
-    document.getElementById('setting-bottle-price-input').value = s.bottle_price;
-    bottlePriceModal.classList.add('show');
-  });
+    settingsModal?.classList.add('show');
+  }
 
-  document.getElementById('btn-close-bottle-price').addEventListener('click', () => {
-    bottlePriceModal.classList.remove('show');
-  });
+  btnOpenSettings?.addEventListener('click', openSettingsModal);
+  btnCloseSettings?.addEventListener('click', () => settingsModal?.classList.remove('show'));
 
-  document.getElementById('form-bottle-price').addEventListener('submit', async (e) => {
+  // Discount Form submit (Admin only, Requirement 3)
+  document.getElementById('form-setting-discount')?.addEventListener('submit', async (e) => {
     e.preventDefault();
-    const newPrice = document.getElementById('setting-bottle-price-input').value;
+    const discountVal = parseFloat(document.getElementById('setting-discount-input').value);
+    const feedback = document.getElementById('discount-setting-feedback');
     try {
-      await api.updateBottlePrice(newPrice);
-      showToast(`Bottle price updated to ₹${newPrice}`);
-      bottlePriceModal.classList.remove('show');
+      const res = await api.updateDiscount(discountVal);
+      showToast(`Discount per bottle updated to ₹${res.discount_per_bottle}`);
       await refreshGlobalSettings();
+      const effEl = document.getElementById('setting-effective-price-display');
+      if (effEl) effEl.textContent = `₹${res.effective_bottle_price}`;
+      if (feedback) {
+        feedback.textContent = `Saved: ₹${res.discount_per_bottle}/bottle discount applied.`;
+        feedback.style.color = 'var(--success-green)';
+        feedback.style.display = 'block';
+        setTimeout(() => { feedback.style.display = 'none'; }, 3000);
+      }
       if (state.activeTab === 'new-order') recalcNewOrderPricing();
     } catch (err) {
-      showToast(err.message, 'danger');
+      showToast(err.message || 'Failed to update discount', 'danger');
+      if (feedback) {
+        feedback.textContent = err.message || 'Failed to update discount';
+        feedback.style.color = 'var(--danger-red)';
+        feedback.style.display = 'block';
+      }
+    }
+  });
+
+  // Admin User Password Form submit (Admin only, Requirement 12)
+  document.getElementById('form-admin-user-password')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const targetUsername = document.getElementById('admin-select-user').value;
+    const newPassword = document.getElementById('admin-input-new-password').value;
+    const statusBox = document.getElementById('admin-pwd-status');
+
+    try {
+      const res = await api.adminChangePassword(targetUsername, newPassword);
+      showToast(res.message || `Password updated for ${targetUsername}`);
+      document.getElementById('admin-input-new-password').value = '';
+      if (statusBox) {
+        statusBox.textContent = `Success: New password configured for ${targetUsername}!`;
+        statusBox.style.color = 'var(--success-green)';
+        statusBox.style.display = 'block';
+        setTimeout(() => { statusBox.style.display = 'none'; }, 4000);
+      }
+    } catch (err) {
+      showToast(err.message || 'Failed to update password', 'danger');
+      if (statusBox) {
+        statusBox.textContent = err.message || 'Failed to set password';
+        statusBox.style.color = 'var(--danger-red)';
+        statusBox.style.display = 'block';
+      }
     }
   });
 
   async function refreshGlobalSettings() {
     try {
       const res = await api.getSettings();
-      state.settings = res;
+      state.settings = {
+        ...state.settings,
+        ...res
+      };
+      // Original bottle price is fixed at 160 (Requirement 2)
       document.querySelectorAll('.current-bottle-price-display').forEach(el => {
-        el.textContent = `₹${res.bottle_price}`;
+        el.textContent = `₹160`;
+      });
+      // Effective bottle price
+      document.querySelectorAll('.effective-price-display').forEach(el => {
+        el.textContent = `₹${res.effective_bottle_price || (160 - (res.discount_per_bottle || 11))}`;
+      });
+      // Header discount badge
+      document.querySelectorAll('.header-discount-badge').forEach(el => {
+        el.textContent = `Discount: -₹${res.discount_per_bottle !== undefined ? res.discount_per_bottle : 11}/bottle`;
       });
     } catch (e) {
       console.warn('Could not load settings:', e);
@@ -248,47 +316,14 @@ document.addEventListener('DOMContentLoaded', async () => {
       document.getElementById('kpi-paid-orders').textContent = kpis.paid_orders;
       document.getElementById('kpi-cod-orders').textContent = kpis.cod_orders;
 
-      // Low Stock Alert (threshold <= 20)
-      const alertBanner = document.getElementById('low-stock-alert-banner');
-      const alertItems = document.getElementById('low-stock-items-list');
-      if (data.low_stock && data.low_stock.length > 0) {
-        alertItems.innerHTML = data.low_stock.map(item => 
-          `<span class="low-stock-tag">${item.flavour} (${item.stock})</span>`
-        ).join(' ');
-        alertBanner.style.display = 'flex';
-      } else {
-        alertBanner.style.display = 'none';
-      }
-
-      // Top Selling Flavour (Requirement 8: Top-selling flavour should show no flavour / 0 until orders are created)
+      // Top Selling Flavour (Requirement 8)
       const mostFlv = data.most_purchased_flavour;
-      document.getElementById('dashboard-most-flavour').textContent = (mostFlv && mostFlv.name !== 'None' && mostFlv.bottles > 0)
-        ? `${mostFlv.name} (${mostFlv.bottles} bottles)`
-        : 'None';
-
-      const flavourContainer = document.getElementById('dashboard-flavour-sales-grid');
-      const sales = data.flavour_sales;
-      const totalBottles = Object.values(sales).reduce((a, b) => a + b, 0) || 1;
-      const hasActualSales = Object.values(sales).some(qty => qty > 0);
-
-      flavourContainer.innerHTML = Object.entries(sales).map(([flv, qty]) => {
-        const pct = hasActualSales ? Math.round((qty / totalBottles) * 100) : 0;
-        return `
-          <div class="flavour-card">
-            <div class="flavour-header">
-              <span class="flavour-name">${flv}</span>
-              <span class="badge ${qty > 20 ? 'badge-paid' : 'badge-cod'}">${qty} sold</span>
-            </div>
-            <div style="background: #E2E8F0; height: 8px; border-radius: 4px; overflow: hidden; margin-top: 6px;">
-              <div style="background: var(--primary-blue); width: ${pct}%; height: 100%; border-radius: 4px;"></div>
-            </div>
-            <div style="display:flex; justify-content:space-between; font-size:11px; color:var(--text-muted); margin-top:2px;">
-              <span>Share: ${pct}%</span>
-              <span>₹${(qty * (state.settings.bottle_price || 149)).toLocaleString('en-IN')}</span>
-            </div>
-          </div>
-        `;
-      }).join('');
+      const mostFlvEl = document.getElementById('dashboard-most-flavour');
+      if (mostFlvEl) {
+        mostFlvEl.textContent = (mostFlv && mostFlv.name !== 'None' && mostFlv.bottles > 0)
+          ? `${mostFlv.name} (${mostFlv.bottles} bottles)`
+          : 'None';
+      }
 
       // Recent Orders Table
       const recentTableBody = document.getElementById('dashboard-recent-orders-tbody');
@@ -391,6 +426,79 @@ document.addEventListener('DOMContentLoaded', async () => {
       phoneInput.classList.remove('is-invalid');
     };
 
+    // Automatic Indian PIN Code Lookup (Requirement 9)
+    const pincodeInput = document.getElementById('new-order-pincode');
+    const pincodeSpinner = document.getElementById('pincode-spinner');
+    const pincodeFeedback = document.getElementById('pincode-feedback');
+    let lastLookedUpPincode = '';
+    let pincodeLookupSeq = 0;
+
+    pincodeInput.oninput = async () => {
+      const pin = pincodeInput.value.trim();
+      pincodeFeedback.style.display = 'none';
+      pincodeFeedback.className = 'pincode-feedback';
+
+      if (pin.length === 6 && /^\d{6}$/.test(pin)) {
+        if (pin === lastLookedUpPincode) return;
+        const currentSeq = ++pincodeLookupSeq;
+        pincodeSpinner.style.display = 'inline';
+
+        try {
+          const res = await api.lookupPincode(pin);
+          if (currentSeq !== pincodeLookupSeq) return; // Ignore stale response
+          pincodeSpinner.style.display = 'none';
+
+          if (res && res.status === 'success' && res.state) {
+            lastLookedUpPincode = pin;
+            // Match State
+            let matchedState = null;
+            for (let opt of stateSelect.options) {
+              if (opt.value.toLowerCase() === res.state.toLowerCase()) {
+                matchedState = opt.value;
+                break;
+              }
+            }
+            if (matchedState) {
+              stateSelect.value = matchedState;
+              populateDistricts(matchedState, res.district);
+              // Match District
+              if (res.district) {
+                for (let opt of districtSelect.options) {
+                  if (opt.value.toLowerCase() === res.district.toLowerCase()) {
+                    districtSelect.value = opt.value;
+                    break;
+                  }
+                }
+              }
+              pincodeFeedback.textContent = `Auto-detected: ${districtSelect.value || res.district}, ${matchedState}`;
+              pincodeFeedback.className = 'pincode-feedback success';
+              pincodeFeedback.style.display = 'block';
+
+              // Reset manual override and recalculate shipping
+              state.newOrderState.isManualDeliveryFee = false;
+              recalcNewOrderPricing();
+            } else {
+              pincodeFeedback.textContent = `Detected State: ${res.state}. Please choose your district manually.`;
+              pincodeFeedback.className = 'pincode-feedback success';
+              pincodeFeedback.style.display = 'block';
+            }
+          } else {
+            pincodeFeedback.textContent = 'Postal information not found for this PIN code. Please select State & District manually.';
+            pincodeFeedback.className = 'pincode-feedback error';
+            pincodeFeedback.style.display = 'block';
+          }
+        } catch (err) {
+          if (currentSeq !== pincodeLookupSeq) return;
+          pincodeSpinner.style.display = 'none';
+          pincodeFeedback.textContent = 'Postal lookup unavailable. Please enter State & District manually.';
+          pincodeFeedback.className = 'pincode-feedback error';
+          pincodeFeedback.style.display = 'block';
+        }
+      } else {
+        lastLookedUpPincode = '';
+      }
+    };
+
     // Flavour Counter inputs
     ['Tomato', 'Cheese', 'Sour Cream', 'Peri Peri'].forEach(flv => {
       const input = document.getElementById(`qty-${flv.toLowerCase().replace(' ', '-')}`);
@@ -398,23 +506,41 @@ document.addEventListener('DOMContentLoaded', async () => {
         input.value = state.newOrderState.flavours[flv] || 0;
         input.oninput = () => {
           state.newOrderState.flavours[flv] = Math.max(0, parseInt(input.value) || 0);
-          if (!state.newOrderState.isManualDeliveryFee) {
-            recalcNewOrderPricing();
-          } else {
-            updateFinalPricingDisplay();
-          }
+          recalcNewOrderPricing();
         };
       }
     });
 
-    // Manual delivery fee edit listener (Requirement 19: If changed manually ₹65 -> ₹80, Final Amount updates immediately)
+    // Optional Combo Offer Buttons (Requirement 4)
+    const btnCombo2 = document.getElementById('btn-combo-2');
+    const btnCombo4 = document.getElementById('btn-combo-4');
+
+    btnCombo2?.addEventListener('click', () => {
+      if (state.newOrderState.comboSelected === '2_BOTTLE') {
+        state.newOrderState.comboSelected = null;
+      } else {
+        state.newOrderState.comboSelected = '2_BOTTLE';
+      }
+      recalcNewOrderPricing();
+    });
+
+    btnCombo4?.addEventListener('click', () => {
+      if (state.newOrderState.comboSelected === '4_BOTTLE') {
+        state.newOrderState.comboSelected = null;
+      } else {
+        state.newOrderState.comboSelected = '4_BOTTLE';
+      }
+      recalcNewOrderPricing();
+    });
+
+    // Manual delivery fee edit listener
     const deliveryFeeInput = document.getElementById('new-order-delivery-fee');
     deliveryFeeInput.oninput = () => {
       state.newOrderState.isManualDeliveryFee = true;
       state.newOrderState.deliveryFee = parseFloat(deliveryFeeInput.value) || 0;
       const noteEl = document.getElementById('new-order-delivery-note');
       noteEl.textContent = `Manual rate applied (Standard calculated: ₹${state.newOrderState.deliveryCalculated})`;
-      updateFinalPricingDisplay();
+      recalcNewOrderPricing();
     };
 
     recalcNewOrderPricing();
@@ -432,7 +558,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   }
 
-  // ---------------- Delivery Fee Calculation Rules (Requirement 19) ----------------
+  // ---------------- Delivery Fee Calculation Rules (Requirement 8 & 10) ----------------
   const SOUTH_INDIA_STATES = new Set(['karnataka', 'kerala', 'andhra pradesh', 'telangana', 'puducherry']);
   const DELIVERY_RATES = {
     'Chennai': { tier1: 40.0, tier2: 42.0, tier3: 45.0, excess: 20.0 },
@@ -441,23 +567,45 @@ document.addEventListener('DOMContentLoaded', async () => {
     'North/East/West': { tier1: 100.0, tier2: 150.0, tier3: 230.0, excess: 80.0 }
   };
 
-  function computeDeliveryFeeClient(stateVal, distVal, totalBottles) {
+  function computeDeliveryFeeClient(stateVal, distVal, totalBottles, applicableProductAmount = 0) {
     const st = (stateVal || '').trim().toLowerCase();
     const dist = (distVal || '').trim().toLowerCase();
+
+    // Standard bottle weight: strictly 100g per bottle (Requirement 5)
+    const weightGrams = totalBottles > 0 ? totalBottles * 100 : 0;
+    let weightDisplay = '0g';
+    if (weightGrams >= 1000) {
+      weightDisplay = (weightGrams % 1000 === 0) 
+        ? `${weightGrams / 1000}kg` 
+        : `${(weightGrams / 1000).toFixed(2).replace(/\.?0+$/, '')}kg`;
+    } else {
+      weightDisplay = `${weightGrams}g`;
+    }
 
     if (!st || !dist || totalBottles <= 0) {
       return {
         fee: 0,
-        weightGrams: totalBottles > 0 ? totalBottles * 110 : 0,
-        weightDisplay: totalBottles * 110 >= 1000 ? `${(totalBottles * 110 / 1000).toFixed(2)}kg` : `${totalBottles * 110}g`,
+        weightGrams,
+        weightDisplay,
         zone: 'Unknown',
         slab: 'None',
-        notes: (!st || !dist) ? 'Select state and district to calculate' : 'Select at least 1 bottle to calculate'
+        notes: (!st || !dist) ? 'Select state and district to calculate' : 'Select at least 1 bottle to calculate',
+        isFree: false
       };
     }
 
-    const weightGrams = totalBottles * 110;
-    const weightDisplay = weightGrams >= 1000 ? `${(weightGrams / 1000).toFixed(2)}kg` : `${weightGrams}g`;
+    // Free delivery rule: STRICTLY applicable product amount > 800.0 (Requirement 8)
+    if (applicableProductAmount > 800.0) {
+      return {
+        fee: 0,
+        weightGrams,
+        weightDisplay,
+        zone: 'All India',
+        slab: 'Free Delivery',
+        notes: 'Free Delivery (Applicable product amount > ₹800)',
+        isFree: true
+      };
+    }
 
     let zone = 'North/East/West';
     if (st === 'tamil nadu' && dist === 'chennai') {
@@ -500,11 +648,12 @@ document.addEventListener('DOMContentLoaded', async () => {
       weightDisplay,
       zone,
       slab,
-      notes
+      notes,
+      isFree: false
     };
   }
 
-  // Adjust flavour quantity button helper
+  // Adjust flavour quantity button helper (Requirement 6)
   window.adjustFlavourQty = (flavourName, delta) => {
     const id = `qty-${flavourName.toLowerCase().replace(' ', '-')}`;
     const input = document.getElementById(id);
@@ -512,73 +661,154 @@ document.addEventListener('DOMContentLoaded', async () => {
     let val = Math.max(0, (parseInt(input.value) || 0) + delta);
     input.value = val;
     state.newOrderState.flavours[flavourName] = val;
-    if (!state.newOrderState.isManualDeliveryFee) {
-      recalcNewOrderPricing();
-    } else {
-      updateFinalPricingDisplay();
-    }
+    recalcNewOrderPricing();
   };
 
+  // Authoritative Reactive New Order Pricing Recalculation (Requirements 2, 3, 4, 7, 8)
   function recalcNewOrderPricing() {
     const stateVal = document.getElementById('new-order-state').value;
     const distVal = document.getElementById('new-order-district').value;
     const totalBottles = Object.values(state.newOrderState.flavours).reduce((a, b) => a + b, 0);
 
-    const calc = computeDeliveryFeeClient(stateVal, distVal, totalBottles);
+    // Requirement 2: Fixed original bottle price ₹160
+    const originalUnitPrice = 160.0;
+    const discountPerBottle = (state.settings.discount_per_bottle !== undefined) 
+      ? Number(state.settings.discount_per_bottle) 
+      : 11.0;
 
+    // Formulas:
+    // Original Product Amount = Total Bottle Quantity * ₹160
+    // Total Discount = Total Bottle Quantity * Discount Per Bottle
+    // Discounted Product Amount = Original Product Amount - Total Discount
+    const originalAmount = totalBottles * originalUnitPrice;
+    const totalDiscount = totalBottles * discountPerBottle;
+    const normalDiscountedAmount = originalAmount - totalDiscount;
+
+    // Requirement 4: Optional Combo Offers (2 bottles for ₹289, 4 bottles for ₹559)
+    const comboContainer = document.getElementById('combo-offers-container');
+    const btnCombo2 = document.getElementById('btn-combo-2');
+    const btnCombo4 = document.getElementById('btn-combo-4');
+
+    if (totalBottles === 2) {
+      if (comboContainer) comboContainer.style.display = 'block';
+      if (btnCombo2) btnCombo2.style.display = 'inline-flex';
+      if (btnCombo4) btnCombo4.style.display = 'none';
+      if (state.newOrderState.comboSelected === '4_BOTTLE') {
+        state.newOrderState.comboSelected = null;
+      }
+      if (btnCombo2) btnCombo2.classList.toggle('active', state.newOrderState.comboSelected === '2_BOTTLE');
+    } else if (totalBottles === 4) {
+      if (comboContainer) comboContainer.style.display = 'block';
+      if (btnCombo4) btnCombo4.style.display = 'inline-flex';
+      if (btnCombo2) btnCombo2.style.display = 'none';
+      if (state.newOrderState.comboSelected === '2_BOTTLE') {
+        state.newOrderState.comboSelected = null;
+      }
+      if (btnCombo4) btnCombo4.classList.toggle('active', state.newOrderState.comboSelected === '4_BOTTLE');
+    } else {
+      if (comboContainer) comboContainer.style.display = 'none';
+      if (btnCombo2) btnCombo2.style.display = 'none';
+      if (btnCombo4) btnCombo4.style.display = 'none';
+      state.newOrderState.comboSelected = null;
+      if (btnCombo2) btnCombo2.classList.remove('active');
+      if (btnCombo4) btnCombo4.classList.remove('active');
+    }
+
+    let isComboApplied = false;
+    let comboType = null;
+    let applicableProductAmount = normalDiscountedAmount;
+
+    if (state.newOrderState.comboSelected === '2_BOTTLE' && totalBottles === 2) {
+      applicableProductAmount = 289.0;
+      isComboApplied = true;
+      comboType = '2_BOTTLE';
+    } else if (state.newOrderState.comboSelected === '4_BOTTLE' && totalBottles === 4) {
+      applicableProductAmount = 559.0;
+      isComboApplied = true;
+      comboType = '4_BOTTLE';
+    }
+
+    const calc = computeDeliveryFeeClient(stateVal, distVal, totalBottles, applicableProductAmount);
+
+    // Update Blue Bill Summary Card (Requirement 7)
+    // 1. Total number of bottles
     document.getElementById('new-order-bottles-count').textContent = totalBottles;
+    // 2. Total consignment weight
     document.getElementById('new-order-weight-display').textContent = calc.weightDisplay;
+    // 3. Original product amount
+    document.getElementById('new-order-original-amount').textContent = `₹${originalAmount.toLocaleString('en-IN')}`;
+    // 4. Discount per bottle
+    document.getElementById('new-order-discount-per-bottle').textContent = `-₹${discountPerBottle}`;
+    // 5. Total discount amount
+    document.getElementById('new-order-total-discount').textContent = `-₹${totalDiscount.toLocaleString('en-IN')}`;
+    // 6. Discounted / Applicable product amount
+    document.getElementById('new-order-discounted-product-amount').textContent = `₹${applicableProductAmount.toLocaleString('en-IN')}`;
 
-    const unitPrice = state.settings.bottle_price || 149;
-    const productAmount = totalBottles * unitPrice;
-    document.getElementById('new-order-product-amount').textContent = `₹${productAmount.toLocaleString('en-IN')}`;
-
-    const feeInput = document.getElementById('new-order-delivery-fee');
-    const noteEl = document.getElementById('new-order-delivery-note');
-
-    if (totalBottles > 0 && stateVal && distVal) {
-      state.newOrderState.deliveryCalculated = calc.fee;
-      if (!state.newOrderState.isManualDeliveryFee) {
-        feeInput.value = calc.fee;
-        state.newOrderState.deliveryFee = calc.fee;
-        state.newOrderState.deliveryNotes = calc.notes;
-        noteEl.textContent = `Zone: ${calc.zone} | Slab: ${calc.slab} (${calc.notes})`;
-      } else {
-        noteEl.textContent = `Manual rate: ₹${feeInput.value} (Standard calculated: ₹${calc.fee})`;
+    // 7. Selected combo offer
+    const rowSelectedCombo = document.getElementById('row-selected-combo');
+    const comboDisplay = document.getElementById('new-order-selected-combo-display');
+    if (isComboApplied) {
+      if (rowSelectedCombo) rowSelectedCombo.style.display = 'flex';
+      if (comboDisplay) {
+        comboDisplay.textContent = (comboType === '2_BOTTLE' ? '2 Bottles for ₹289' : '4 Bottles for ₹559');
       }
     } else {
+      if (rowSelectedCombo) rowSelectedCombo.style.display = 'none';
+    }
+
+    // 8. Delivery fee & Free Delivery (Requirement 8)
+    const feeInput = document.getElementById('new-order-delivery-fee');
+    const noteEl = document.getElementById('new-order-delivery-note');
+    const freeDeliveryBadge = document.getElementById('new-order-free-delivery-badge');
+
+    if (calc.isFree) {
+      // Mandatory free delivery: overrides and disables manual fee input
+      feeInput.value = 0;
+      feeInput.disabled = true;
+      state.newOrderState.deliveryFee = 0;
       state.newOrderState.deliveryCalculated = 0;
-      if (!state.newOrderState.isManualDeliveryFee) {
-        feeInput.value = 0;
-        state.newOrderState.deliveryFee = 0;
-        state.newOrderState.deliveryNotes = '';
-        if (!stateVal || !distVal) {
-          noteEl.textContent = 'Select state and district to calculate';
+      if (freeDeliveryBadge) freeDeliveryBadge.style.display = 'inline-block';
+      if (noteEl) noteEl.textContent = 'FREE DELIVERY APPLIED (Product amount exceeds ₹800)';
+    } else {
+      feeInput.disabled = false;
+      if (freeDeliveryBadge) freeDeliveryBadge.style.display = 'none';
+      if (totalBottles > 0 && stateVal && distVal) {
+        state.newOrderState.deliveryCalculated = calc.fee;
+        if (!state.newOrderState.isManualDeliveryFee) {
+          feeInput.value = calc.fee;
+          state.newOrderState.deliveryFee = calc.fee;
+          state.newOrderState.deliveryNotes = calc.notes;
+          if (noteEl) noteEl.textContent = `Zone: ${calc.zone} | Slab: ${calc.slab} (${calc.notes})`;
         } else {
-          noteEl.textContent = 'Select at least 1 bottle to calculate';
+          state.newOrderState.deliveryFee = parseFloat(feeInput.value) || 0;
+          if (noteEl) noteEl.textContent = `Manual rate: ₹${feeInput.value} (Standard calculated: ₹${calc.fee})`;
+        }
+      } else {
+        state.newOrderState.deliveryCalculated = 0;
+        if (!state.newOrderState.isManualDeliveryFee) {
+          feeInput.value = 0;
+          state.newOrderState.deliveryFee = 0;
+          state.newOrderState.deliveryNotes = '';
+          if (noteEl) {
+            noteEl.textContent = (!stateVal || !distVal) 
+              ? 'Select state and district to calculate' 
+              : 'Select at least 1 bottle to calculate';
+          }
         }
       }
     }
 
-    updateFinalPricingDisplay();
+    // 9. Final payable amount
+    const deliveryFee = parseFloat(feeInput.value) || 0;
+    const finalAmount = applicableProductAmount + deliveryFee;
+    document.getElementById('new-order-final-amount').textContent = `₹${finalAmount.toLocaleString('en-IN')}`;
   }
 
   function updateFinalPricingDisplay() {
-    const totalBottles = Object.values(state.newOrderState.flavours).reduce((a, b) => a + b, 0);
-    const unitPrice = state.settings.bottle_price || 149;
-    const productAmount = totalBottles * unitPrice;
-    const feeInput = document.getElementById('new-order-delivery-fee');
-    const deliveryFee = feeInput && feeInput.value !== '' ? (parseFloat(feeInput.value) || 0) : 0;
-    const finalAmount = productAmount + deliveryFee;
-
-    document.getElementById('new-order-final-amount').textContent = `₹${finalAmount.toLocaleString('en-IN')}`;
-    document.getElementById('new-order-bottles-count').textContent = totalBottles;
-    document.getElementById('new-order-product-amount').textContent = `₹${productAmount.toLocaleString('en-IN')}`;
-    const weightGrams = totalBottles * 110;
-    document.getElementById('new-order-weight-display').textContent = weightGrams >= 1000 ? `${(weightGrams / 1000).toFixed(2)}kg` : `${weightGrams}g`;
+    recalcNewOrderPricing();
   }
 
-  // Create Order Submission
+  // Create Order Submission (Requirements 4, 8, 13)
   document.getElementById('form-new-order').addEventListener('submit', async (e) => {
     e.preventDefault();
     const phoneError = document.getElementById('new-order-phone-error');
@@ -611,6 +841,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       district: distVal,
       payment,
       delivery_fee: deliveryFee,
+      apply_combo: !!state.newOrderState.comboSelected,
       items
     };
 
@@ -621,6 +852,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       // Reset form to blank
       document.getElementById('form-new-order').reset();
       state.newOrderState.flavours = { 'Tomato': 0, 'Cheese': 0, 'Sour Cream': 0, 'Peri Peri': 0 };
+      state.newOrderState.comboSelected = null;
       state.newOrderState.isManualDeliveryFee = false;
       ['Tomato', 'Cheese', 'Sour Cream', 'Peri Peri'].forEach(flv => {
         const id = `qty-${flv.toLowerCase().replace(' ', '-')}`;
@@ -628,6 +860,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (input) input.value = 0;
       });
       document.getElementById('new-order-delivery-fee').value = 0;
+      document.getElementById('pincode-feedback').style.display = 'none';
       populateDistricts('Tamil Nadu', 'Chennai');
       recalcNewOrderPricing();
 
@@ -645,6 +878,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Reset form handler
   document.getElementById('form-new-order').addEventListener('reset', () => {
     state.newOrderState.flavours = { 'Tomato': 0, 'Cheese': 0, 'Sour Cream': 0, 'Peri Peri': 0 };
+    state.newOrderState.comboSelected = null;
     state.newOrderState.isManualDeliveryFee = false;
     ['Tomato', 'Cheese', 'Sour Cream', 'Peri Peri'].forEach(flv => {
       const id = `qty-${flv.toLowerCase().replace(' ', '-')}`;
@@ -652,6 +886,8 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (input) input.value = 0;
     });
     document.getElementById('new-order-delivery-fee').value = 0;
+    const pinFb = document.getElementById('pincode-feedback');
+    if (pinFb) pinFb.style.display = 'none';
     setTimeout(() => {
       populateDistricts('Tamil Nadu', 'Chennai');
       recalcNewOrderPricing();
@@ -902,8 +1138,13 @@ document.addEventListener('DOMContentLoaded', async () => {
 
       document.getElementById('detail-total-bottles').textContent = o.total_bottles;
       document.getElementById('detail-total-weight').textContent = o.total_weight;
-      document.getElementById('detail-product-amount').textContent = `₹${o.product_amount.toLocaleString('en-IN')}`;
-      document.getElementById('detail-delivery-fee').textContent = `₹${o.delivery_fee.toLocaleString('en-IN')}`;
+      const prodAmtDisplay = o.is_combo 
+        ? `₹${o.product_amount.toLocaleString('en-IN')} (${o.combo_type === '2_BOTTLE' ? '2-Bottle Combo' : '4-Bottle Combo'})`
+        : (o.total_discount > 0 
+          ? `₹${o.product_amount.toLocaleString('en-IN')} (Discount: -₹${o.total_discount})`
+          : `₹${o.product_amount.toLocaleString('en-IN')}`);
+      document.getElementById('detail-product-amount').textContent = prodAmtDisplay;
+      document.getElementById('detail-delivery-fee').textContent = o.delivery_fee === 0 ? '₹0 (Free Delivery)' : `₹${o.delivery_fee.toLocaleString('en-IN')}`;
       document.getElementById('detail-final-amount').textContent = `₹${o.final_amount.toLocaleString('en-IN')}`;
       document.getElementById('detail-payment-method').textContent = o.payment;
 
@@ -1032,8 +1273,15 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (input) totalBottles += Math.max(0, parseInt(input.value) || 0);
     });
 
-    const weightGrams = totalBottles * 110;
-    const weightDisplay = weightGrams >= 1000 ? `${(weightGrams / 1000).toFixed(2)}kg` : `${weightGrams}g`;
+    const weightGrams = totalBottles * 100;
+    let weightDisplay = '0g';
+    if (weightGrams >= 1000) {
+      weightDisplay = (weightGrams % 1000 === 0) 
+        ? `${weightGrams / 1000}kg` 
+        : `${(weightGrams / 1000).toFixed(2).replace(/\.?0+$/, '')}kg`;
+    } else {
+      weightDisplay = `${weightGrams}g`;
+    }
 
     document.getElementById('edit-total-bottles').textContent = totalBottles;
     document.getElementById('edit-total-weight').textContent = weightDisplay;
@@ -1041,7 +1289,17 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Requirement 20: Maintain historical unit price
     const histPrice = currentEditingOrder.unit_price;
     const productAmount = totalBottles * histPrice;
-    const deliveryFee = parseFloat(document.getElementById('edit-delivery-fee').value) || 0;
+    const feeInput = document.getElementById('edit-delivery-fee');
+
+    let deliveryFee = 0;
+    if (productAmount > 800.0) {
+      feeInput.value = 0;
+      feeInput.disabled = true;
+      deliveryFee = 0;
+    } else {
+      feeInput.disabled = false;
+      deliveryFee = parseFloat(feeInput.value) || 0;
+    }
     const finalAmount = productAmount + deliveryFee;
 
     document.getElementById('edit-product-amount').textContent = `₹${productAmount.toLocaleString('en-IN')}`;

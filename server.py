@@ -1,6 +1,8 @@
 import os
 import sqlite3
 import math
+import urllib.request
+import json
 from datetime import datetime, timezone, timedelta
 from typing import Optional, List, Dict, Any
 
@@ -24,6 +26,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Constant original bottle price (Requirement 2: Fixed at ₹160)
+ORIGINAL_BOTTLE_PRICE = 160.0
+
 # ----------------- Models -----------------
 class LoginRequest(BaseModel):
     username: str
@@ -33,6 +38,11 @@ class ChangePasswordRequest(BaseModel):
     current_password: str
     new_password: str
     confirm_password: str
+
+class AdminUserPasswordRequest(BaseModel):
+    user_id: Optional[int] = None
+    username: Optional[str] = None
+    new_password: str
 
 class OrderItemInput(BaseModel):
     flavour: str
@@ -46,7 +56,8 @@ class CreateOrderRequest(BaseModel):
     state: str
     district: str
     payment: str
-    delivery_fee: float
+    delivery_fee: Optional[float] = 0.0
+    apply_combo: Optional[bool] = False
     items: List[OrderItemInput]
 
 class EditOrderRequest(BaseModel):
@@ -57,7 +68,8 @@ class EditOrderRequest(BaseModel):
     state: str
     district: str
     payment: str
-    delivery_fee: float
+    delivery_fee: Optional[float] = 0.0
+    apply_combo: Optional[bool] = False
     items: List[OrderItemInput]
 
 class StockMovementRequest(BaseModel):
@@ -69,10 +81,14 @@ class StockMovementRequest(BaseModel):
 class BottlePriceRequest(BaseModel):
     bottle_price: float
 
+class DiscountRequest(BaseModel):
+    discount_per_bottle: float
+
 class DeliveryCalcRequest(BaseModel):
     state: str
     district: str
     total_bottles: int
+    product_amount: Optional[float] = None
 
 # ----------------- Auth Helpers -----------------
 def get_current_user(authorization: Optional[str] = Header(None)) -> Dict[str, Any]:
@@ -184,32 +200,26 @@ def logout(current_user: Dict[str, Any] = Depends(get_current_user)):
 
 @app.post("/api/auth/change-password")
 def change_password(req: ChangePasswordRequest, current_user: Dict[str, Any] = Depends(get_current_user)):
-    if req.new_password != req.confirm_password:
-        raise HTTPException(status_code=400, detail="New password and confirm password do not match")
-    if len(req.new_password) < 6:
-        raise HTTPException(status_code=400, detail="New password must be at least 6 characters")
+    # Requirement 12: Members must not be allowed to change their own passwords. Only Ashish (ADMIN) may manage passwords.
+    raise HTTPException(status_code=403, detail="Forbidden: User password changes are restricted to administrator (Ashish) via Settings.")
 
+@app.get("/api/users")
+def get_users(current_user: Dict[str, Any] = Depends(get_current_user)):
     conn = get_db()
     cursor = conn.cursor()
-    cursor.execute("SELECT password_hash FROM users WHERE id = ?;", (current_user["id"],))
-    user = cursor.fetchone()
-
-    if not user or not verify_password(req.current_password, user["password_hash"]):
-        conn.close()
-        raise HTTPException(status_code=400, detail="Current password is incorrect")
-
-    new_hash = hash_password(req.new_password)
-    now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
-    cursor.execute("UPDATE users SET password_hash = ?, updated_at = ? WHERE id = ?;", (new_hash, now, current_user["id"]))
-    
-    cursor.execute("""
-    INSERT INTO audit_logs (timestamp, user, action, entity_id, details)
-    VALUES (?, ?, ?, ?, ?);
-    """, (now, current_user["display_name"], "Password Changed", current_user["username"], "Password was updated successfully"))
-    
-    conn.commit()
+    cursor.execute("SELECT id, username, display_name, role FROM users ORDER BY id ASC;")
+    rows = cursor.fetchall()
     conn.close()
-    return {"success": True, "message": "Password changed successfully"}
+    return {
+        "users": [
+            {
+                "id": r["id"],
+                "username": r["username"],
+                "display_name": r["display_name"],
+                "role": r["role"]
+            } for r in rows
+        ]
+    }
 
 # ----------------- Settings Routes -----------------
 @app.get("/api/settings")
@@ -220,46 +230,153 @@ def get_settings(current_user: Dict[str, Any] = Depends(get_current_user)):
     rows = cursor.fetchall()
     conn.close()
     settings = {r["key"]: r["value"] for r in rows}
+    discount = float(settings.get("discount_per_bottle", 11.0))
     return {
-        "bottle_price": float(settings.get("bottle_price", 149.0)),
+        "original_bottle_price": ORIGINAL_BOTTLE_PRICE,
+        "bottle_price": ORIGINAL_BOTTLE_PRICE,
+        "discount_per_bottle": discount,
+        "effective_bottle_price": ORIGINAL_BOTTLE_PRICE - discount,
         "low_stock_threshold": int(settings.get("low_stock_threshold", 20))
     }
 
-@app.post("/api/settings/bottle-price")
-def update_bottle_price(req: BottlePriceRequest, current_user: Dict[str, Any] = Depends(require_admin)):
-    if req.bottle_price <= 0:
-        raise HTTPException(status_code=400, detail="Bottle price must be greater than 0")
+@app.post("/api/settings/discount")
+def update_discount(req: DiscountRequest, current_user: Dict[str, Any] = Depends(require_admin)):
+    # Requirement 3: Only admin (Ashish) may change discount per bottle. Validate discount.
+    if req.discount_per_bottle < 0:
+        raise HTTPException(status_code=400, detail="Discount per bottle cannot be negative")
+    if req.discount_per_bottle >= ORIGINAL_BOTTLE_PRICE:
+        raise HTTPException(status_code=400, detail=f"Discount per bottle must be less than original bottle price (Rs.{ORIGINAL_BOTTLE_PRICE:.0f})")
     
     conn = get_db()
     cursor = conn.cursor()
     now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
-    
-    cursor.execute("SELECT value FROM settings WHERE key = 'bottle_price';")
+    cursor.execute("SELECT value FROM settings WHERE key = 'discount_per_bottle';")
     old_val = cursor.fetchone()
-    old_price = old_val["value"] if old_val else "149"
-    
+    old_disc = old_val["value"] if old_val else "11"
+
     cursor.execute("""
-    INSERT INTO settings (key, value, updated_at) VALUES ('bottle_price', ?, ?)
+    INSERT INTO settings (key, value, updated_at) VALUES ('discount_per_bottle', ?, ?)
     ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at;
-    """, (str(req.bottle_price), now))
-    
+    """, (str(req.discount_per_bottle), now))
+
+    effective_price = ORIGINAL_BOTTLE_PRICE - req.discount_per_bottle
     cursor.execute("""
     INSERT INTO audit_logs (timestamp, user, action, entity_id, details)
     VALUES (?, ?, ?, ?, ?);
-    """, (now, current_user["display_name"], "Bottle Price Changed", "bottle_price", f"Changed from Rs.{old_price} to Rs.{req.bottle_price}"))
-    
+    """, (now, current_user["display_name"], "Discount Per Bottle Changed", "discount_per_bottle", f"Changed from Rs.{old_disc} to Rs.{req.discount_per_bottle} per bottle (Effective price: Rs.{effective_price:.2f})"))
+
     conn.commit()
     conn.close()
-    return {"success": True, "bottle_price": req.bottle_price, "message": f"Bottle price updated to Rs.{req.bottle_price}"}
+    return {
+        "success": True,
+        "discount_per_bottle": req.discount_per_bottle,
+        "effective_bottle_price": effective_price,
+        "message": f"Discount updated to Rs.{req.discount_per_bottle} per bottle (Effective price: Rs.{effective_price:.2f})"
+    }
 
-# ----------------- Locations & Delivery Calculation -----------------
+@app.post("/api/settings/bottle-price")
+def update_bottle_price(req: BottlePriceRequest, current_user: Dict[str, Any] = Depends(require_admin)):
+    # Requirement 2: Original bottle price is fixed at Rs.160. Users must not be able to modify this original price.
+    raise HTTPException(status_code=400, detail="Original selling price is fixed at Rs.160 per bottle and cannot be modified.")
+
+@app.post("/api/settings/user-password")
+def admin_set_user_password(req: AdminUserPasswordRequest, current_user: Dict[str, Any] = Depends(require_admin)):
+    # Requirement 12: Admin password management for any of the 5 user accounts
+    new_pwd = (req.new_password or "").strip()
+    if len(new_pwd) < 6:
+        raise HTTPException(status_code=400, detail="New password must be at least 6 characters")
+    
+    conn = get_db()
+    cursor = conn.cursor()
+
+    if req.user_id:
+        cursor.execute("SELECT id, username, display_name FROM users WHERE id = ?;", (req.user_id,))
+    elif req.username:
+        u = req.username.strip().lower()
+        cursor.execute("SELECT id, username, display_name FROM users WHERE LOWER(username) = ? OR LOWER(display_name) = ?;", (u, u))
+    else:
+        conn.close()
+        raise HTTPException(status_code=400, detail="Please select a user account to update password")
+
+    target_user = cursor.fetchone()
+    if not target_user:
+        conn.close()
+        raise HTTPException(status_code=404, detail="Selected user account not found")
+
+    new_hash = hash_password(new_pwd)
+    now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+
+    # Update password hash in database
+    cursor.execute("UPDATE users SET password_hash = ?, updated_at = ? WHERE id = ?;", (new_hash, now, target_user["id"]))
+    # Invalidate active sessions for that user so old password stops working immediately
+    cursor.execute("DELETE FROM sessions WHERE user_id = ?;", (target_user["id"],))
+
+    cursor.execute("""
+    INSERT INTO audit_logs (timestamp, user, action, entity_id, details)
+    VALUES (?, ?, ?, ?, ?);
+    """, (now, current_user["display_name"], "Admin Set User Password", target_user["username"], f"Admin changed password for {target_user['display_name']} ({target_user['username']})"))
+
+    conn.commit()
+    conn.close()
+    return {
+        "success": True,
+        "message": f"Password for {target_user['display_name']} updated successfully. New password is active immediately."
+    }
+
+# ----------------- Locations, Postal PIN Lookup & Delivery -----------------
 @app.get("/api/locations")
 def get_locations():
     return {"locations": INDIA_LOCATIONS}
 
+@app.get("/api/pincode/{pincode}")
+def lookup_pincode(pincode: str):
+    # Requirement 9: Automatic District and State lookup using PIN code via India Post API
+    cleaned_pin = "".join(filter(str.isdigit, pincode or ""))
+    if len(cleaned_pin) != 6:
+        raise HTTPException(status_code=400, detail="Please enter a valid 6-digit Indian PIN code")
+
+    url = f"https://api.postalpincode.in/pincode/{cleaned_pin}"
+    try:
+        req = urllib.request.Request(
+            url,
+            headers={
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) POPCONE-CRM/1.0",
+                "Origin": "http://localhost:8000"
+            }
+        )
+        with urllib.request.urlopen(req, timeout=6) as response:
+            raw = response.read().decode("utf-8")
+            data = json.loads(raw)
+            if isinstance(data, list) and len(data) > 0:
+                entry = data[0]
+                if entry.get("Status") == "Success" and entry.get("PostOffice"):
+                    post_offices = entry["PostOffice"]
+                    district = (post_offices[0].get("District") or "").strip()
+                    state = (post_offices[0].get("State") or "").strip()
+                    office_names = [p.get("Name") for p in post_offices[:6] if p.get("Name")]
+                    return {
+                        "success": True,
+                        "status": "success",
+                        "pincode": cleaned_pin,
+                        "state": state,
+                        "district": district,
+                        "post_offices": office_names
+                    }
+        return {
+            "success": False,
+            "status": "error",
+            "message": "No matching postal records found for this PIN code. Please select District and State manually."
+        }
+    except Exception as e:
+        return {
+            "success": False,
+            "status": "error",
+            "message": f"Postal lookup service unavailable ({str(e)}). Manual entry enabled."
+        }
+
 @app.post("/api/calculate-delivery")
 def calc_delivery(req: DeliveryCalcRequest):
-    return calculate_delivery_fee(req.state, req.district, req.total_bottles)
+    return calculate_delivery_fee(req.state, req.district, req.total_bottles, req.product_amount)
 
 # ----------------- Dashboard -----------------
 @app.get("/api/dashboard/stats")
@@ -490,9 +607,16 @@ def get_orders(
     for r in order_rows:
         oid = r["order_id"]
         items = items_by_order.get(oid, [])
-        # Ordered flavours display: only ordered flavours (quantity > 0)
         flavours_display = ", ".join([f"{it['flavour']} x {it['quantity']}" for it in items])
-        weight_str = f"{r['total_weight_grams']}g" if r['total_weight_grams'] < 1000 else f"{r['total_weight_grams']/1000:.2f}kg"
+        weight_str = f"{r['total_weight_grams']}g" if r['total_weight_grams'] < 1000 else (f"{r['total_weight_grams']//1000}kg" if r['total_weight_grams'] % 1000 == 0 else f"{r['total_weight_grams']/1000:.2f}kg")
+
+        # Safely extract pricing fields with fallback for legacy records
+        discount_per_bottle = float(r["discount_per_bottle"]) if "discount_per_bottle" in r.keys() and r["discount_per_bottle"] is not None else 0.0
+        total_discount = float(r["total_discount"]) if "total_discount" in r.keys() and r["total_discount"] is not None else 0.0
+        normal_product_amount = float(r["normal_product_amount"]) if "normal_product_amount" in r.keys() and r["normal_product_amount"] is not None and r["normal_product_amount"] > 0 else float(r["product_amount"])
+        is_combo = bool(r["is_combo"]) if "is_combo" in r.keys() and r["is_combo"] is not None else False
+        combo_type = str(r["combo_type"] or "") if "combo_type" in r.keys() else ""
+        combo_price = float(r["combo_price"]) if "combo_price" in r.keys() and r["combo_price"] is not None else 0.0
 
         orders_list.append({
             "order_id": r["order_id"],
@@ -506,6 +630,13 @@ def get_orders(
             "bottles": r["total_bottles"],
             "weight": weight_str,
             "weight_grams": r["total_weight_grams"],
+            "unit_price": r["unit_price"],
+            "discount_per_bottle": discount_per_bottle,
+            "total_discount": total_discount,
+            "normal_product_amount": normal_product_amount,
+            "is_combo": is_combo,
+            "combo_type": combo_type,
+            "combo_price": combo_price,
             "product": r["product_amount"],
             "delivery": r["delivery_fee"],
             "final": r["final_amount"],
@@ -534,7 +665,7 @@ def create_order(req: CreateOrderRequest, current_user: Dict[str, Any] = Depends
     conn = get_db()
     cursor = conn.cursor()
 
-    # Rule 11: Phone number uniqueness
+    # Rule: Phone number uniqueness
     cursor.execute("SELECT order_id FROM orders WHERE phone = ? LIMIT 1;", (cleaned_phone,))
     existing = cursor.fetchone()
     if existing:
@@ -551,15 +682,54 @@ def create_order(req: CreateOrderRequest, current_user: Dict[str, Any] = Depends
         conn.close()
         raise HTTPException(status_code=400, detail="Order must contain at least 1 bottle")
 
-    # Get current bottle price from settings
-    cursor.execute("SELECT value FROM settings WHERE key = 'bottle_price';")
-    price_row = cursor.fetchone()
-    current_bottle_price = float(price_row["value"]) if price_row else 149.0
+    # Requirement 5: Bottle Weight = 100 grams
+    total_weight_grams = total_bottles * 100
 
-    # Calculate weights and amounts
-    total_weight_grams = total_bottles * 110
-    product_amount = total_bottles * current_bottle_price
-    final_amount = product_amount + float(req.delivery_fee)
+    # Requirement 2: Original Unit Price is fixed at Rs.160
+    original_unit_price = ORIGINAL_BOTTLE_PRICE
+
+    # Requirement 3: Configured Discount per Bottle from Settings
+    cursor.execute("SELECT value FROM settings WHERE key = 'discount_per_bottle';")
+    disc_row = cursor.fetchone()
+    discount_per_bottle = float(disc_row["value"]) if disc_row else 11.0
+
+    # Financial formulas:
+    # Original Product Amount = Total Bottle Quantity * Rs.160
+    # Total Discount = Total Bottle Quantity * Discount Per Bottle
+    # Discounted Product Amount = Original Product Amount - Total Discount
+    original_product_amount = total_bottles * original_unit_price
+    total_discount = total_bottles * discount_per_bottle
+    normal_product_amount = original_product_amount - total_discount
+
+    # Requirement 4: Optional Combo Offers
+    # Combo A: Exactly 2 bottles for Rs.289
+    # Combo B: Exactly 4 bottles for Rs.559
+    is_combo = 0
+    combo_type = ""
+    combo_price = 0.0
+
+    if req.apply_combo and total_bottles == 2:
+        is_combo = 1
+        combo_type = "2_BOTTLE"
+        combo_price = 289.0
+        applicable_product_amount = 289.0
+    elif req.apply_combo and total_bottles == 4:
+        is_combo = 1
+        combo_type = "4_BOTTLE"
+        combo_price = 559.0
+        applicable_product_amount = 559.0
+    else:
+        applicable_product_amount = normal_product_amount
+
+    # Requirement 8: Free Delivery if applicable product amount strictly exceeds Rs.800
+    if applicable_product_amount > 800.0:
+        delivery_fee = 0.0
+    else:
+        calc = calculate_delivery_fee(req.state, req.district, total_bottles, applicable_product_amount)
+        # Preserve legitimate manual delivery fee override if provided and applicable_product_amount <= 800
+        delivery_fee = float(req.delivery_fee) if req.delivery_fee is not None else calc["fee"]
+
+    final_amount = applicable_product_amount + delivery_fee
 
     # Generate next Order ID
     cursor.execute("SELECT order_id FROM orders ORDER BY id DESC LIMIT 1;")
@@ -583,22 +753,27 @@ def create_order(req: CreateOrderRequest, current_user: Dict[str, Any] = Depends
             order_id, customer_name, phone, address, pin_code, state, district,
             total_bottles, total_weight_grams, unit_price, product_amount,
             delivery_fee, final_amount, payment, dispatch_state,
-            created_by, created_at, edited_by, edited_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+            created_by, created_at, edited_by, edited_at,
+            discount_per_bottle, total_discount, normal_product_amount,
+            is_combo, combo_type, combo_price
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
         """, (
             new_order_id, req.customer_name.strip(), cleaned_phone, req.address.strip(),
             req.pin_code.strip(), req.state.strip(), req.district.strip(),
-            total_bottles, total_weight_grams, current_bottle_price, product_amount,
-            float(req.delivery_fee), final_amount, req.payment, "PLACED",
-            current_user["display_name"], now_str, current_user["display_name"], now_str
+            total_bottles, total_weight_grams, original_unit_price, applicable_product_amount,
+            delivery_fee, final_amount, req.payment, "PLACED",
+            current_user["display_name"], now_str, current_user["display_name"], now_str,
+            discount_per_bottle, total_discount, normal_product_amount,
+            is_combo, combo_type, combo_price
         ))
 
         for it in valid_items:
-            line_amt = it.quantity * current_bottle_price
+            # Calculate item line share
+            line_amt = (applicable_product_amount / total_bottles) * it.quantity
             cursor.execute("""
             INSERT INTO order_items (order_id, flavour, quantity, unit_price, line_amount)
             VALUES (?, ?, ?, ?, ?);
-            """, (new_order_id, it.flavour, it.quantity, current_bottle_price, line_amt))
+            """, (new_order_id, it.flavour, it.quantity, original_unit_price, line_amt))
 
             # Deduct inventory
             cursor.execute("""
@@ -614,12 +789,13 @@ def create_order(req: CreateOrderRequest, current_user: Dict[str, Any] = Depends
             """, (now_str, it.flavour, "Sold", -it.quantity, new_order_id, "System"))
 
         # Audit log
+        combo_note = f" (Combo: {combo_type})" if is_combo else ""
         cursor.execute("""
         INSERT INTO audit_logs (timestamp, user, action, entity_id, details)
         VALUES (?, ?, ?, ?, ?);
         """, (
             now_str, current_user["display_name"], "Order Created", new_order_id,
-            f"Created {new_order_id} for {req.customer_name} ({total_bottles} bottles, Rs.{final_amount:.2f})"
+            f"Created {new_order_id} for {req.customer_name} ({total_bottles} bottles, Product: Rs.{applicable_product_amount:.2f}, Delivery: Rs.{delivery_fee:.2f}, Final: Rs.{final_amount:.2f}){combo_note}"
         ))
 
         conn.commit()
@@ -632,6 +808,10 @@ def create_order(req: CreateOrderRequest, current_user: Dict[str, Any] = Depends
     return {
         "success": True,
         "order_id": new_order_id,
+        "product_amount": applicable_product_amount,
+        "applicable_product_amount": applicable_product_amount,
+        "delivery_fee": delivery_fee,
+        "final_amount": final_amount,
         "message": f"Order {new_order_id} created successfully"
     }
 
@@ -666,7 +846,15 @@ def get_order_details(order_id: str, current_user: Dict[str, Any] = Depends(get_
     ]
     conn.close()
 
-    weight_str = f"{order['total_weight_grams']}g" if order['total_weight_grams'] < 1000 else f"{order['total_weight_grams']/1000:.2f}kg"
+    total_w = order['total_weight_grams']
+    weight_str = f"{total_w}g" if total_w < 1000 else (f"{total_w // 1000}kg" if total_w % 1000 == 0 else f"{total_w / 1000:.2f}kg")
+
+    discount_per_bottle = float(order["discount_per_bottle"]) if "discount_per_bottle" in order.keys() and order["discount_per_bottle"] is not None else 0.0
+    total_discount = float(order["total_discount"]) if "total_discount" in order.keys() and order["total_discount"] is not None else 0.0
+    normal_product_amount = float(order["normal_product_amount"]) if "normal_product_amount" in order.keys() and order["normal_product_amount"] is not None and order["normal_product_amount"] > 0 else float(order["product_amount"])
+    is_combo = bool(order["is_combo"]) if "is_combo" in order.keys() and order["is_combo"] is not None else False
+    combo_type = str(order["combo_type"] or "") if "combo_type" in order.keys() else ""
+    combo_price = float(order["combo_price"]) if "combo_price" in order.keys() and order["combo_price"] is not None else 0.0
 
     return {
         "order": {
@@ -682,6 +870,12 @@ def get_order_details(order_id: str, current_user: Dict[str, Any] = Depends(get_
             "total_weight": weight_str,
             "total_weight_grams": order["total_weight_grams"],
             "unit_price": order["unit_price"],
+            "discount_per_bottle": discount_per_bottle,
+            "total_discount": total_discount,
+            "normal_product_amount": normal_product_amount,
+            "is_combo": is_combo,
+            "combo_type": combo_type,
+            "combo_price": combo_price,
             "product_amount": order["product_amount"],
             "delivery_fee": order["delivery_fee"],
             "final_amount": order["final_amount"],
@@ -729,11 +923,43 @@ def edit_order(order_id: str, req: EditOrderRequest, current_user: Dict[str, Any
         conn.close()
         raise HTTPException(status_code=400, detail="Order must contain at least 1 bottle")
 
-    # Crucial Rule 14 & 38: Maintain historical unit price of this order
+    # Requirement 5: Bottle Weight = 100 grams
+    total_weight_grams = total_bottles * 100
+
+    # Historical pricing preservation
     historical_unit_price = existing_order["unit_price"]
-    product_amount = total_bottles * historical_unit_price
-    total_weight_grams = total_bottles * 110
-    final_amount = product_amount + float(req.delivery_fee)
+    historical_discount = float(existing_order["discount_per_bottle"]) if "discount_per_bottle" in existing_order.keys() and existing_order["discount_per_bottle"] is not None else 0.0
+
+    original_product_amount = total_bottles * historical_unit_price
+    total_discount = total_bottles * historical_discount
+    normal_product_amount = original_product_amount - total_discount
+
+    # Combo handling
+    is_combo = 0
+    combo_type = ""
+    combo_price = 0.0
+
+    if req.apply_combo and total_bottles == 2:
+        is_combo = 1
+        combo_type = "2_BOTTLE"
+        combo_price = 289.0
+        applicable_product_amount = 289.0
+    elif req.apply_combo and total_bottles == 4:
+        is_combo = 1
+        combo_type = "4_BOTTLE"
+        combo_price = 559.0
+        applicable_product_amount = 559.0
+    else:
+        applicable_product_amount = normal_product_amount
+
+    # Free delivery rule (> Rs.800)
+    if applicable_product_amount > 800.0:
+        delivery_fee = 0.0
+    else:
+        calc = calculate_delivery_fee(req.state, req.district, total_bottles, applicable_product_amount)
+        delivery_fee = float(req.delivery_fee) if req.delivery_fee is not None else calc["fee"]
+
+    final_amount = applicable_product_amount + delivery_fee
 
     now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
@@ -744,18 +970,22 @@ def edit_order(order_id: str, req: EditOrderRequest, current_user: Dict[str, Any
     try:
         cursor.execute("BEGIN TRANSACTION;")
 
-        # Update order table (Created By NEVER changes, Edited By updates to current user)
         cursor.execute("""
         UPDATE orders
         SET customer_name = ?, phone = ?, address = ?, pin_code = ?, state = ?, district = ?,
             total_bottles = ?, total_weight_grams = ?, product_amount = ?, delivery_fee = ?,
-            final_amount = ?, payment = ?, edited_by = ?, edited_at = ?
+            final_amount = ?, payment = ?, edited_by = ?, edited_at = ?,
+            discount_per_bottle = ?, total_discount = ?, normal_product_amount = ?,
+            is_combo = ?, combo_type = ?, combo_price = ?
         WHERE order_id = ?;
         """, (
             req.customer_name.strip(), cleaned_phone, req.address.strip(), req.pin_code.strip(),
             req.state.strip(), req.district.strip(), total_bottles, total_weight_grams,
-            product_amount, float(req.delivery_fee), final_amount, req.payment,
-            current_user["display_name"], now_str, order_id
+            applicable_product_amount, delivery_fee, final_amount, req.payment,
+            current_user["display_name"], now_str,
+            historical_discount, total_discount, normal_product_amount,
+            is_combo, combo_type, combo_price,
+            order_id
         ))
 
         # Adjust inventory differences
@@ -765,8 +995,6 @@ def edit_order(order_id: str, req: EditOrderRequest, current_user: Dict[str, Any
             new_qty = new_items_dict.get(flv, 0)
             diff = new_qty - old_qty
             if diff != 0:
-                # If diff > 0, deduct diff from stock (Change = -diff)
-                # If diff < 0, restore |diff| to stock (Change = +|diff|)
                 cursor.execute("""
                 UPDATE inventory 
                 SET current_stock = current_stock - ?, updated_at = ?
@@ -782,19 +1010,20 @@ def edit_order(order_id: str, req: EditOrderRequest, current_user: Dict[str, Any
         # Replace order items
         cursor.execute("DELETE FROM order_items WHERE order_id = ?;", (order_id,))
         for flv, qty in new_items_dict.items():
-            line_amt = qty * historical_unit_price
+            line_amt = (applicable_product_amount / total_bottles) * qty
             cursor.execute("""
             INSERT INTO order_items (order_id, flavour, quantity, unit_price, line_amount)
             VALUES (?, ?, ?, ?, ?);
             """, (order_id, flv, qty, historical_unit_price, line_amt))
 
         # Audit log
+        combo_note = f" (Combo: {combo_type})" if is_combo else ""
         cursor.execute("""
         INSERT INTO audit_logs (timestamp, user, action, entity_id, details)
         VALUES (?, ?, ?, ?, ?);
         """, (
             now_str, current_user["display_name"], "Order Edited", order_id,
-            f"Edited {order_id} ({total_bottles} bottles, final Rs.{final_amount:.2f})"
+            f"Edited {order_id} ({total_bottles} bottles, Product: Rs.{applicable_product_amount:.2f}, Delivery: Rs.{delivery_fee:.2f}, Final: Rs.{final_amount:.2f}){combo_note}"
         ))
 
         conn.commit()

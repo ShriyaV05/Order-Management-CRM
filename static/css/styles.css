@@ -1382,3 +1382,179 @@ body {
   gap: 6px;
 }
 
+/* ==========================================================
+   POPCONE ENHANCEMENTS: PRICING, COMBOS, SETTINGS & PIN CODE
+   ========================================================== */
+
+/* 1. Flavour Quantity Input - Remove Arrow Spinners (Requirement 6) */
+.qty-input::-webkit-outer-spin-button,
+.qty-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+.qty-input {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+/* 2. Optional Combo Offers (Requirement 4) */
+.combo-offers-container {
+  margin-top: 18px;
+  background: linear-gradient(135deg, #FFFDF0 0%, #FFF9C4 100%);
+  border: 1.5px dashed var(--accent-yellow-dark);
+  border-radius: var(--radius-md);
+  padding: 14px 18px;
+  animation: fadeInScale 0.25s ease-out;
+}
+
+.combo-offers-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.combo-offers-badge {
+  background: var(--primary-blue);
+  color: var(--accent-yellow);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  padding: 3px 8px;
+  border-radius: var(--radius-sm);
+  text-transform: uppercase;
+}
+
+.combo-offers-text {
+  font-size: 13px;
+  font-weight: 600;
+  color: #78350F;
+}
+
+.combo-buttons-wrap {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.btn-combo {
+  background: #FFFFFF;
+  border: 2px solid var(--accent-yellow-dark);
+  color: #78350F;
+  font-weight: 700;
+  font-size: 14px;
+  padding: 10px 18px;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  transition: all var(--transition-fast);
+  box-shadow: var(--shadow-sm);
+}
+
+.btn-combo:hover {
+  background: var(--accent-yellow-light);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-md);
+}
+
+.btn-combo.active {
+  background: var(--primary-blue);
+  color: var(--accent-yellow);
+  border-color: var(--primary-blue-dark);
+  box-shadow: 0 4px 12px rgba(13, 71, 161, 0.25);
+}
+
+.btn-combo.active::before {
+  content: "✓ ";
+  font-weight: 900;
+  color: var(--accent-yellow);
+}
+
+/* 3. Free Delivery Badge (Requirement 8) */
+.badge-free-delivery {
+  background: #10B981;
+  color: #FFFFFF;
+  font-size: 11px;
+  font-weight: 800;
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+  letter-spacing: 0.5px;
+  display: inline-block;
+  margin-left: 6px;
+  animation: pulseSubtle 2s infinite;
+}
+
+/* 4. PIN Code Lookup Feedback (Requirement 9) */
+.pincode-spinner {
+  font-style: italic;
+  animation: pulseSubtle 1.5s infinite;
+}
+
+.pincode-feedback.success {
+  color: var(--success-green);
+  display: block !important;
+}
+
+.pincode-feedback.error {
+  color: var(--danger-red);
+  display: block !important;
+}
+
+/* 5. Professional Settings Modal (Requirements 1, 3, 12) */
+.settings-box {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-md);
+  padding: 18px 20px;
+}
+
+.settings-box-header {
+  margin-bottom: 14px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.settings-box-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--primary-blue);
+}
+
+.settings-box-subtitle {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.settings-columns-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 16px;
+}
+
+.settings-card {
+  background: #F8FAFC;
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-sm);
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+}
+
+.settings-card-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  letter-spacing: 0.5px;
+  margin-bottom: 6px;
+}
+
+.settings-fixed-price-tag {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+

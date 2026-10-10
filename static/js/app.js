@@ -74,7 +74,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   function updateAuthUI() {
     state.user = api.getUser();
-    if (!state.user) {
+    const token = api.getToken();
+    if (!state.user || !token) {
       loginOverlay.style.display = 'flex';
       return;
     }
@@ -156,7 +157,8 @@ document.addEventListener('DOMContentLoaded', async () => {
       'new-order': 'New Order',
       orders: 'Orders Management',
       inventory: 'Inventory & Stock History',
-      analytics: 'Sales Analytics & Reports'
+      analytics: 'Sales Analytics & Reports',
+      settings: 'Settings'
     };
     document.getElementById('header-page-title').textContent = titles[tab] || 'POPCONE CRM';
 
@@ -166,19 +168,19 @@ document.addEventListener('DOMContentLoaded', async () => {
     else if (tab === 'orders') loadOrders();
     else if (tab === 'inventory') loadInventory();
     else if (tab === 'analytics') loadAnalytics();
+    else if (tab === 'settings') openSettingsModal();
   }
 
-  // ---------------- Professional Settings Modal (Requirements: Discount Per Bottle & Admin Password Management) ----------------
+  // ---------------- Professional Settings (Single Top-Right Access, Requirements: Discount Per Bottle & Admin Password Management) ----------------
   const settingsModal = document.getElementById('modal-settings');
   const btnOpenSettings = document.getElementById('btn-open-settings');
-  const btnSidebarSettings = document.getElementById('btn-sidebar-settings');
-  const navSettings = document.getElementById('nav-settings');
   const btnCloseSettings = document.getElementById('btn-close-settings');
   const btnCloseSettingsFooter = document.getElementById('btn-close-settings-footer');
 
   async function openSettingsModal() {
-    if (!settingsModal) return;
-    settingsModal.classList.add('show');
+    if (settingsModal) {
+      settingsModal.classList.add('show');
+    }
 
     const isAdmin = state.user && (
       state.user.role === 'ADMIN' || 
@@ -186,48 +188,59 @@ document.addEventListener('DOMContentLoaded', async () => {
       (state.user.username || '').toLowerCase().startsWith('ashish')
     );
 
-    // Toggle role visibility ONLY within settings modal
-    settingsModal.querySelectorAll('.admin-only').forEach(el => el.style.display = isAdmin ? '' : 'none');
-    settingsModal.querySelectorAll('.member-only').forEach(el => el.style.display = isAdmin ? 'none' : '');
+    // Toggle role visibility inside settings modal and settings page view
+    document.querySelectorAll('#modal-settings .admin-only, #view-settings .admin-only').forEach(el => el.style.display = isAdmin ? '' : 'none');
+    document.querySelectorAll('#modal-settings .member-only, #view-settings .member-only').forEach(el => el.style.display = isAdmin ? 'none' : '');
 
     await refreshGlobalSettings();
 
-    // Fill settings inputs
-    const discountInput = document.getElementById('setting-discount-input');
-    if (discountInput) {
-      discountInput.value = state.settings.discount_per_bottle !== undefined ? state.settings.discount_per_bottle : 11;
-    }
-    const memberDiscountDisplay = document.getElementById('member-discount-display');
-    if (memberDiscountDisplay) {
-      memberDiscountDisplay.textContent = state.settings.discount_per_bottle !== undefined ? state.settings.discount_per_bottle : 11;
-    }
+    // Fill settings inputs (sync both modal and page view)
+    const discountVal = (state.settings && state.settings.discount_per_bottle !== undefined) 
+      ? state.settings.discount_per_bottle 
+      : 11;
 
-    // Populate Admin User Password dropdown
+    ['setting-discount-input', 'view-setting-discount-input'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.value = discountVal;
+    });
+
+    ['member-discount-display', 'view-member-discount-display'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.textContent = discountVal;
+    });
+
+    // Populate Admin User Password dropdowns
     if (isAdmin) {
-      const userSelect = document.getElementById('admin-select-user');
       try {
         const usersData = await api.getUsers();
-        if (userSelect && usersData && usersData.users && usersData.users.length > 0) {
-          userSelect.innerHTML = usersData.users.map(u => 
+        if (usersData && usersData.users && usersData.users.length > 0) {
+          const optionsHtml = usersData.users.map(u => 
             `<option value="${u.username}">${u.display_name} (${u.role})</option>`
           ).join('');
+          ['admin-select-user', 'view-admin-select-user'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.innerHTML = optionsHtml;
+          });
         }
       } catch (err) {
         console.error('Failed to load users for settings:', err);
       }
-      const pwdInput = document.getElementById('admin-input-new-password');
-      if (pwdInput) pwdInput.value = '';
-      const pwdStatus = document.getElementById('admin-pwd-status');
-      if (pwdStatus) {
-        pwdStatus.style.display = 'none';
-        pwdStatus.textContent = '';
-      }
+      ['admin-input-new-password', 'view-admin-input-new-password'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.value = '';
+      });
+      ['admin-pwd-status', 'view-admin-pwd-status'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) { el.style.display = 'none'; el.textContent = ''; }
+      });
     }
   }
 
-  btnOpenSettings?.addEventListener('click', (e) => { e.preventDefault(); openSettingsModal(); });
-  btnSidebarSettings?.addEventListener('click', (e) => { e.preventDefault(); openSettingsModal(); });
-  navSettings?.addEventListener('click', (e) => { e.preventDefault(); openSettingsModal(); });
+  // Single top-right Settings button
+  btnOpenSettings?.addEventListener('click', (e) => {
+    e.preventDefault();
+    openSettingsModal();
+  });
   btnCloseSettings?.addEventListener('click', () => settingsModal?.classList.remove('show'));
   btnCloseSettingsFooter?.addEventListener('click', () => settingsModal?.classList.remove('show'));
 
@@ -238,20 +251,16 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   });
 
-  // Discount Form submit (Admin only)
-  document.getElementById('form-setting-discount')?.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const inputEl = document.getElementById('setting-discount-input');
+  // Reusable discount saving helper
+  async function handleSaveDiscount(inputEl, feedbackEl) {
     const discountVal = parseFloat(inputEl.value);
-    const feedback = document.getElementById('discount-setting-feedback');
-
     if (isNaN(discountVal) || discountVal < 0 || discountVal >= 160) {
       const errMsg = 'Discount must be between ₹0 and ₹159';
       showToast(errMsg, 'danger');
-      if (feedback) {
-        feedback.textContent = errMsg;
-        feedback.style.color = 'var(--danger-red)';
-        feedback.style.display = 'block';
+      if (feedbackEl) {
+        feedbackEl.textContent = errMsg;
+        feedbackEl.style.color = 'var(--danger-red)';
+        feedbackEl.style.display = 'block';
       }
       return;
     }
@@ -260,37 +269,54 @@ document.addEventListener('DOMContentLoaded', async () => {
       const res = await api.updateDiscount(discountVal);
       showToast(`Discount per bottle updated to ₹${res.discount_per_bottle}`);
       await refreshGlobalSettings();
-      if (feedback) {
-        feedback.textContent = `Saved: ₹${res.discount_per_bottle}/bottle discount applied successfully.`;
-        feedback.style.color = 'var(--success-green)';
-        feedback.style.display = 'block';
-        setTimeout(() => { if (feedback) feedback.style.display = 'none'; }, 4000);
+
+      // Sync both input fields
+      ['setting-discount-input', 'view-setting-discount-input'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.value = res.discount_per_bottle;
+      });
+      ['member-discount-display', 'view-member-discount-display'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.textContent = res.discount_per_bottle;
+      });
+
+      if (feedbackEl) {
+        feedbackEl.textContent = `Saved: ₹${res.discount_per_bottle}/bottle discount applied successfully.`;
+        feedbackEl.style.color = 'var(--success-green)';
+        feedbackEl.style.display = 'block';
+        setTimeout(() => { if (feedbackEl) feedbackEl.style.display = 'none'; }, 4000);
       }
       if (state.activeTab === 'new-order') recalcNewOrderPricing();
     } catch (err) {
       showToast(err.message || 'Failed to update discount', 'danger');
-      if (feedback) {
-        feedback.textContent = err.message || 'Failed to update discount';
-        feedback.style.color = 'var(--danger-red)';
-        feedback.style.display = 'block';
+      if (feedbackEl) {
+        feedbackEl.textContent = err.message || 'Failed to update discount';
+        feedbackEl.style.color = 'var(--danger-red)';
+        feedbackEl.style.display = 'block';
       }
     }
+  }
+
+  // Discount Form submit handlers (Admin only)
+  document.getElementById('form-setting-discount')?.addEventListener('submit', (e) => {
+    e.preventDefault();
+    handleSaveDiscount(document.getElementById('setting-discount-input'), document.getElementById('discount-setting-feedback'));
+  });
+  document.getElementById('form-view-setting-discount')?.addEventListener('submit', (e) => {
+    e.preventDefault();
+    handleSaveDiscount(document.getElementById('view-setting-discount-input'), document.getElementById('view-discount-setting-feedback'));
   });
 
-  // Admin User Password Form submit (Admin only)
-  document.getElementById('form-admin-user-password')?.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const userSelect = document.getElementById('admin-select-user');
-    const targetUsername = userSelect ? userSelect.value : '';
-    const pwdInput = document.getElementById('admin-input-new-password');
-    const newPassword = pwdInput ? pwdInput.value : '';
-    const statusBox = document.getElementById('admin-pwd-status');
+  // Reusable password update helper
+  async function handleAdminSetPassword(userSelectEl, pwdInputEl, statusBoxEl) {
+    const targetUsername = userSelectEl ? userSelectEl.value : '';
+    const newPassword = pwdInputEl ? pwdInputEl.value : '';
 
     if (!targetUsername) {
-      if (statusBox) {
-        statusBox.textContent = 'Please select a team account';
-        statusBox.style.color = 'var(--danger-red)';
-        statusBox.style.display = 'block';
+      if (statusBoxEl) {
+        statusBoxEl.textContent = 'Please select a team account';
+        statusBoxEl.style.color = 'var(--danger-red)';
+        statusBoxEl.style.display = 'block';
       }
       return;
     }
@@ -298,10 +324,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (!newPassword || newPassword.length < 6) {
       const errMsg = 'New password must be at least 6 characters long';
       showToast(errMsg, 'danger');
-      if (statusBox) {
-        statusBox.textContent = errMsg;
-        statusBox.style.color = 'var(--danger-red)';
-        statusBox.style.display = 'block';
+      if (statusBoxEl) {
+        statusBoxEl.textContent = errMsg;
+        statusBoxEl.style.color = 'var(--danger-red)';
+        statusBoxEl.style.display = 'block';
       }
       return;
     }
@@ -309,24 +335,38 @@ document.addEventListener('DOMContentLoaded', async () => {
     try {
       const res = await api.adminChangePassword(targetUsername, newPassword);
       showToast(res.message || `Password updated for ${targetUsername}`);
-      if (pwdInput) pwdInput.value = '';
-      if (statusBox) {
-        statusBox.textContent = `Success: New password saved for ${targetUsername}! Old password is no longer valid.`;
-        statusBox.style.color = 'var(--success-green)';
-        statusBox.style.display = 'block';
-        setTimeout(() => { if (statusBox) statusBox.style.display = 'none'; }, 5000);
+      ['admin-input-new-password', 'view-admin-input-new-password'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.value = '';
+      });
+      if (statusBoxEl) {
+        statusBoxEl.textContent = `Success: New password saved for ${targetUsername}! Old password is no longer valid.`;
+        statusBoxEl.style.color = 'var(--success-green)';
+        statusBoxEl.style.display = 'block';
+        setTimeout(() => { if (statusBoxEl) statusBoxEl.style.display = 'none'; }, 5000);
       }
     } catch (err) {
       showToast(err.message || 'Failed to update password', 'danger');
-      if (statusBox) {
-        statusBox.textContent = err.message || 'Failed to set password';
-        statusBox.style.color = 'var(--danger-red)';
-        statusBox.style.display = 'block';
+      if (statusBoxEl) {
+        statusBoxEl.textContent = err.message || 'Failed to set password';
+        statusBoxEl.style.color = 'var(--danger-red)';
+        statusBoxEl.style.display = 'block';
       }
     }
+  }
+
+  // Admin User Password Form submit handlers (Admin only)
+  document.getElementById('form-admin-user-password')?.addEventListener('submit', (e) => {
+    e.preventDefault();
+    handleAdminSetPassword(document.getElementById('admin-select-user'), document.getElementById('admin-input-new-password'), document.getElementById('admin-pwd-status'));
+  });
+  document.getElementById('form-view-admin-user-password')?.addEventListener('submit', (e) => {
+    e.preventDefault();
+    handleAdminSetPassword(document.getElementById('view-admin-select-user'), document.getElementById('view-admin-input-new-password'), document.getElementById('view-admin-pwd-status'));
   });
 
   async function refreshGlobalSettings() {
+    if (!api.getToken()) return;
     try {
       const res = await api.getSettings();
       state.settings = {
@@ -341,10 +381,6 @@ document.addEventListener('DOMContentLoaded', async () => {
       document.querySelectorAll('.effective-price-display').forEach(el => {
         el.textContent = `₹${res.effective_bottle_price || (160 - (res.discount_per_bottle || 11))}`;
       });
-      // Header discount badge
-      document.querySelectorAll('.header-discount-badge').forEach(el => {
-        el.textContent = `Discount: -₹${res.discount_per_bottle !== undefined ? res.discount_per_bottle : 11}/bottle`;
-      });
     } catch (e) {
       console.warn('Could not load settings:', e);
     }
@@ -352,16 +388,23 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // ---------------- 1. DASHBOARD ----------------
   async function loadDashboard() {
+    if (!api.getToken()) return;
     try {
       const data = await api.getDashboardStats();
-      const kpis = data.kpis;
+      if (!data) return;
+      const kpis = data.kpis || { total_revenue: 0, total_orders: 0, bottles_sold: 0, paid_orders: 0, cod_orders: 0 };
 
       // KPI Cards
-      document.getElementById('kpi-total-revenue').textContent = `₹${kpis.total_revenue.toLocaleString('en-IN')}`;
-      document.getElementById('kpi-total-orders').textContent = kpis.total_orders;
-      document.getElementById('kpi-bottles-sold').textContent = kpis.bottles_sold;
-      document.getElementById('kpi-paid-orders').textContent = kpis.paid_orders;
-      document.getElementById('kpi-cod-orders').textContent = kpis.cod_orders;
+      const revEl = document.getElementById('kpi-total-revenue');
+      if (revEl) revEl.textContent = `₹${(kpis.total_revenue || 0).toLocaleString('en-IN')}`;
+      const ordEl = document.getElementById('kpi-total-orders');
+      if (ordEl) ordEl.textContent = kpis.total_orders || 0;
+      const btlEl = document.getElementById('kpi-bottles-sold');
+      if (btlEl) btlEl.textContent = kpis.bottles_sold || 0;
+      const paidEl = document.getElementById('kpi-paid-orders');
+      if (paidEl) paidEl.textContent = kpis.paid_orders || 0;
+      const codEl = document.getElementById('kpi-cod-orders');
+      if (codEl) codEl.textContent = kpis.cod_orders || 0;
 
       // Top Selling Flavour (Requirement 8)
       const mostFlv = data.most_purchased_flavour;
@@ -374,27 +417,32 @@ document.addEventListener('DOMContentLoaded', async () => {
 
       // Recent Orders Table
       const recentTableBody = document.getElementById('dashboard-recent-orders-tbody');
-      if (data.recent_orders && data.recent_orders.length > 0) {
-        recentTableBody.innerHTML = data.recent_orders.map(o => `
-          <tr data-order-id="${o.order_id}">
-            <td><strong>${o.order_id}</strong></td>
-            <td>${o.customer}</td>
-            <td>₹${o.amount.toLocaleString('en-IN')}</td>
-            <td><span class="badge ${o.payment === 'Paid' ? 'badge-paid' : 'badge-cod'}">${o.payment}</span></td>
-            <td><span class="badge ${o.dispatch_state === 'DISPATCHED' ? 'badge-dispatched' : 'badge-placed'}">${o.dispatch_state}</span></td>
-            <td>${o.created_at}</td>
-          </tr>
-        `).join('');
+      if (recentTableBody) {
+        if (data.recent_orders && data.recent_orders.length > 0) {
+          recentTableBody.innerHTML = data.recent_orders.map(o => `
+            <tr data-order-id="${o.order_id}">
+              <td><strong>${o.order_id}</strong></td>
+              <td>${o.customer}</td>
+              <td>₹${(o.amount || 0).toLocaleString('en-IN')}</td>
+              <td><span class="badge ${o.payment === 'Paid' ? 'badge-paid' : 'badge-cod'}">${o.payment}</span></td>
+              <td><span class="badge ${o.dispatch_state === 'DISPATCHED' ? 'badge-dispatched' : 'badge-placed'}">${o.dispatch_state}</span></td>
+              <td>${o.created_at}</td>
+            </tr>
+          `).join('');
 
-        recentTableBody.querySelectorAll('tr').forEach(row => {
-          row.addEventListener('click', () => openOrderDetails(row.dataset.orderId));
-        });
-      } else {
-        recentTableBody.innerHTML = `<tr><td colspan="6" style="text-align:center; padding: 28px; color: var(--text-secondary);">No orders recorded yet</td></tr>`;
+          recentTableBody.querySelectorAll('tr').forEach(row => {
+            row.addEventListener('click', () => openOrderDetails(row.dataset.orderId));
+          });
+        } else {
+          recentTableBody.innerHTML = `<tr><td colspan="6" style="text-align:center; padding: 28px; color: var(--text-secondary);">No orders recorded yet</td></tr>`;
+        }
       }
 
     } catch (err) {
       console.error('Error loading dashboard:', err);
+      if (!api.getToken() || (err.message && (err.message.includes('Session expired') || err.message.includes('unauthorized') || err.message.includes('401')))) {
+        return;
+      }
       showToast('Failed to load dashboard data', 'danger');
     }
   }
@@ -943,22 +991,28 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // ---------------- 3. ORDERS PAGE ----------------
   async function loadOrders() {
+    if (!api.getToken()) return;
     try {
       const data = await api.getOrders(state.currentOrderFilter);
-      state.orders = data.orders;
-      state.availableDistricts = data.available_districts;
+      state.orders = data.orders || [];
+      state.availableDistricts = data.available_districts || [];
 
       // Update district filter dropdown
       const distFilter = document.getElementById('filter-order-district');
       const currDist = state.currentOrderFilter.district;
-      distFilter.innerHTML = '<option value="All">All Districts</option>';
-      state.availableDistricts.forEach(d => {
-        distFilter.innerHTML += `<option value="${d}" ${d === currDist ? 'selected' : ''}>${d}</option>`;
-      });
+      if (distFilter) {
+        distFilter.innerHTML = '<option value="All">All Districts</option>';
+        state.availableDistricts.forEach(d => {
+          distFilter.innerHTML += `<option value="${d}" ${d === currDist ? 'selected' : ''}>${d}</option>`;
+        });
+      }
 
       renderOrdersTable();
     } catch (err) {
       console.error('Error loading orders:', err);
+      if (!api.getToken() || (err.message && (err.message.includes('Session expired') || err.message.includes('unauthorized') || err.message.includes('401')))) {
+        return;
+      }
       showToast('Failed to load orders', 'danger');
     }
   }
@@ -1432,54 +1486,62 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // ---------------- 7. INVENTORY PAGE ----------------
   async function loadInventory() {
+    if (!api.getToken()) return;
     try {
       const data = await api.getInventory();
       const stockGrid = document.getElementById('inventory-stock-grid');
       
       // Stock Cards (Requirement 6: 0 stock on reset, low stock <= 20)
-      stockGrid.innerHTML = data.stocks.map(s => {
-        const isLow = s.current_stock <= s.low_stock_threshold;
-        const statusHtml = isLow
-          ? `<span class="stock-card-status danger"><svg class="icon-svg" style="width:14px;height:14px;" viewBox="0 0 24 24"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" x2="12" y1="9" y2="13"/><line x1="12" x2="12.01" y1="17" y2="17"/></svg> Low Stock (&le; 20)</span>`
-          : `<span class="stock-card-status safe"><svg class="icon-svg" style="width:14px;height:14px;" viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg> In Stock</span>`;
+      if (stockGrid && data.stocks) {
+        stockGrid.innerHTML = data.stocks.map(s => {
+          const isLow = s.current_stock <= s.low_stock_threshold;
+          const statusHtml = isLow
+            ? `<span class="stock-card-status danger"><svg class="icon-svg" style="width:14px;height:14px;" viewBox="0 0 24 24"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" x2="12" y1="9" y2="13"/><line x1="12" x2="12.01" y1="17" y2="17"/></svg> Low Stock (&le; 20)</span>`
+            : `<span class="stock-card-status safe"><svg class="icon-svg" style="width:14px;height:14px;" viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg> In Stock</span>`;
 
-        return `
-          <div class="stock-card ${isLow ? 'low-stock' : ''}">
-            <div class="stock-card-flavour">${s.flavour}</div>
-            <div>
-              <span class="stock-card-qty">${s.current_stock}</span>
-              <span class="stock-card-unit">bottles</span>
+          return `
+            <div class="stock-card ${isLow ? 'low-stock' : ''}">
+              <div class="stock-card-flavour">${s.flavour}</div>
+              <div>
+                <span class="stock-card-qty">${s.current_stock}</span>
+                <span class="stock-card-unit">bottles</span>
+              </div>
+              ${statusHtml}
             </div>
-            ${statusHtml}
-          </div>
-        `;
-      }).join('');
+          `;
+        }).join('');
+      }
 
       // Requirement 5: Do NOT display "Moved By" in the inventory history!
       // Columns: Date/Time, Flavour, Type, Change, Reference
       const movementsTbody = document.getElementById('inventory-movements-tbody');
-      if (data.movements && data.movements.length > 0) {
-        movementsTbody.innerHTML = data.movements.map(m => {
-          const isPos = m.change > 0;
-          const changeBadge = isPos 
-            ? `<span style="color:var(--success-green); font-weight:700;">+${m.change}</span>` 
-            : `<span style="color:var(--danger-red); font-weight:700;">${m.change}</span>`;
-          return `
-            <tr>
-              <td>${m.when}</td>
-              <td><strong>${m.flavour}</strong></td>
-              <td><span class="badge ${m.type === 'Stock Added' ? 'badge-paid' : m.type === 'Sold' ? 'badge-placed' : 'badge-cod'}">${m.type}</span></td>
-              <td>${changeBadge}</td>
-              <td>${m.reference}</td>
-            </tr>
-          `;
-        }).join('');
-      } else {
-        movementsTbody.innerHTML = `<tr><td colspan="5" style="text-align:center; padding: 28px; color: var(--text-secondary);">No movements recorded yet</td></tr>`;
+      if (movementsTbody) {
+        if (data.movements && data.movements.length > 0) {
+          movementsTbody.innerHTML = data.movements.map(m => {
+            const isPos = m.change > 0;
+            const changeBadge = isPos 
+              ? `<span style="color:var(--success-green); font-weight:700;">+${m.change}</span>` 
+              : `<span style="color:var(--danger-red); font-weight:700;">${m.change}</span>`;
+            return `
+              <tr>
+                <td>${m.when}</td>
+                <td><strong>${m.flavour}</strong></td>
+                <td><span class="badge ${m.type === 'Stock Added' ? 'badge-paid' : m.type === 'Sold' ? 'badge-placed' : 'badge-cod'}">${m.type}</span></td>
+                <td>${changeBadge}</td>
+                <td>${m.reference}</td>
+              </tr>
+            `;
+          }).join('');
+        } else {
+          movementsTbody.innerHTML = `<tr><td colspan="5" style="text-align:center; padding: 28px; color: var(--text-secondary);">No movements recorded yet</td></tr>`;
+        }
       }
 
     } catch (err) {
       console.error('Error loading inventory:', err);
+      if (!api.getToken() || (err.message && (err.message.includes('Session expired') || err.message.includes('unauthorized') || err.message.includes('401')))) {
+        return;
+      }
       showToast('Failed to load inventory', 'danger');
     }
   }
@@ -1582,6 +1644,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
 
   async function loadAnalytics() {
+    if (!api.getToken()) return;
     try {
       const year = state.analyticsYear;
       const data = await api.getAnalytics(year, state.analyticsMonth);
@@ -1589,15 +1652,17 @@ document.addEventListener('DOMContentLoaded', async () => {
 
       // Populate year selector
       const yearSelect = document.getElementById('analytics-year-select');
-      yearSelect.innerHTML = data.available_years.map(y => 
-        `<option value="${y}" ${y === year ? 'selected' : ''}>${y}</option>`
-      ).join('');
+      if (yearSelect && data && data.available_years) {
+        yearSelect.innerHTML = data.available_years.map(y => 
+          `<option value="${y}" ${y === year ? 'selected' : ''}>${y}</option>`
+        ).join('');
 
-      yearSelect.onchange = () => {
-        state.analyticsYear = parseInt(yearSelect.value);
-        updateAnalyticsExportLabel();
-        loadAnalytics();
-      };
+        yearSelect.onchange = () => {
+          state.analyticsYear = parseInt(yearSelect.value);
+          updateAnalyticsExportLabel();
+          loadAnalytics();
+        };
+      }
 
       const monthSelect = document.getElementById('analytics-month-select');
       if (monthSelect) monthSelect.value = state.analyticsMonth;
@@ -1607,6 +1672,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     } catch (err) {
       console.error('Error loading analytics:', err);
+      if (!api.getToken() || (err.message && (err.message.includes('Session expired') || err.message.includes('unauthorized') || err.message.includes('401')))) {
+        return;
+      }
       showToast('Failed to load analytics data', 'danger');
     }
   }

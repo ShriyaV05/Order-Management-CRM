@@ -701,35 +701,72 @@ body {
 .flavour-qty-control {
   display: flex;
   align-items: center;
-  gap: 8px;
+  justify-content: center;
+  gap: 12px;
+  width: 100%;
 }
 
 .btn-qty {
   width: 36px;
   height: 36px;
-  display: flex;
+  min-width: 36px;
+  min-height: 36px;
+  flex: 0 0 36px;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
   border-radius: var(--radius-md);
   border: 1px solid var(--border-light);
   background: var(--bg-app);
-  font-size: 18px;
+  color: var(--primary-blue);
+  font-size: 20px;
   font-weight: 700;
+  line-height: 1;
   cursor: pointer;
+  user-select: none;
   transition: all var(--transition-fast);
 }
 
 .btn-qty:hover {
   background: var(--primary-blue-subtle);
   border-color: var(--primary-blue);
-  color: var(--primary-blue);
+  color: var(--primary-blue-hover);
+}
+
+.btn-qty:active {
+  transform: scale(0.95);
+  background: #DBEAFE;
 }
 
 .qty-input {
-  flex: 1;
+  width: 54px !important;
+  min-width: 48px !important;
+  max-width: 60px !important;
+  height: 36px !important;
+  padding: 4px 6px !important;
   text-align: center;
   font-weight: 700;
   font-size: 16px;
+  color: var(--text-main);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-md);
+  background-color: #FFFFFF;
+  box-sizing: border-box;
+  flex: 0 0 54px !important;
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+.qty-input::-webkit-outer-spin-button,
+.qty-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.qty-input:focus {
+  outline: none;
+  border-color: var(--primary-blue);
+  box-shadow: 0 0 0 2px rgba(13, 71, 161, 0.15);
 }
 
 /* ---------------- Pricing Summary Card ---------------- */

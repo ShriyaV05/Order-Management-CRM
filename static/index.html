@@ -8,7 +8,7 @@
   <meta http-equiv="Expires" content="0">
   <title>POPCONE Orders & Sales CRM</title>
   <meta name="description" content="Production-ready Order Management, Inventory Tracking, and Sales Analytics CRM for POPCONE.">
-  <link rel="stylesheet" href="/static/css/styles.css?v=20261011_02">
+  <link rel="stylesheet" href="/static/css/styles.css?v=20261011_03">
   <link rel="icon" href="/logo.jpg" type="image/jpeg">
   <link rel="shortcut icon" href="/logo.jpg" type="image/jpeg">
   <link rel="apple-touch-icon" href="/logo.jpg">
@@ -253,9 +253,9 @@
                     <span class="flavour-stock-tag">100g</span>
                   </div>
                   <div class="flavour-qty-control">
-                    <button type="button" class="btn-qty" onclick="adjustFlavourQty('Tomato', -1)" aria-label="Decrease Tomato">&minus;</button>
-                    <input type="number" id="qty-tomato" class="form-control qty-input" value="0" min="0">
-                    <button type="button" class="btn-qty" onclick="adjustFlavourQty('Tomato', 1)" aria-label="Increase Tomato">&plus;</button>
+                    <button type="button" class="btn-qty" onclick="adjustFlavourQty('Tomato', -1)" aria-label="Decrease Tomato" title="Decrease">−</button>
+                    <input type="number" id="qty-tomato" class="form-control qty-input" value="0" min="0" max="999">
+                    <button type="button" class="btn-qty" onclick="adjustFlavourQty('Tomato', 1)" aria-label="Increase Tomato" title="Increase">+</button>
                   </div>
                 </div>
 
@@ -266,9 +266,9 @@
                     <span class="flavour-stock-tag">100g</span>
                   </div>
                   <div class="flavour-qty-control">
-                    <button type="button" class="btn-qty" onclick="adjustFlavourQty('Cheese', -1)" aria-label="Decrease Cheese">&minus;</button>
-                    <input type="number" id="qty-cheese" class="form-control qty-input" value="0" min="0">
-                    <button type="button" class="btn-qty" onclick="adjustFlavourQty('Cheese', 1)" aria-label="Increase Cheese">&plus;</button>
+                    <button type="button" class="btn-qty" onclick="adjustFlavourQty('Cheese', -1)" aria-label="Decrease Cheese" title="Decrease">−</button>
+                    <input type="number" id="qty-cheese" class="form-control qty-input" value="0" min="0" max="999">
+                    <button type="button" class="btn-qty" onclick="adjustFlavourQty('Cheese', 1)" aria-label="Increase Cheese" title="Increase">+</button>
                   </div>
                 </div>
 
@@ -279,9 +279,9 @@
                     <span class="flavour-stock-tag">100g</span>
                   </div>
                   <div class="flavour-qty-control">
-                    <button type="button" class="btn-qty" onclick="adjustFlavourQty('Sour Cream', -1)" aria-label="Decrease Sour Cream">&minus;</button>
-                    <input type="number" id="qty-sour-cream" class="form-control qty-input" value="0" min="0">
-                    <button type="button" class="btn-qty" onclick="adjustFlavourQty('Sour Cream', 1)" aria-label="Increase Sour Cream">&plus;</button>
+                    <button type="button" class="btn-qty" onclick="adjustFlavourQty('Sour Cream', -1)" aria-label="Decrease Sour Cream" title="Decrease">−</button>
+                    <input type="number" id="qty-sour-cream" class="form-control qty-input" value="0" min="0" max="999">
+                    <button type="button" class="btn-qty" onclick="adjustFlavourQty('Sour Cream', 1)" aria-label="Increase Sour Cream" title="Increase">+</button>
                   </div>
                 </div>
 
@@ -292,9 +292,9 @@
                     <span class="flavour-stock-tag">100g</span>
                   </div>
                   <div class="flavour-qty-control">
-                    <button type="button" class="btn-qty" onclick="adjustFlavourQty('Peri Peri', -1)" aria-label="Decrease Peri Peri">&minus;</button>
-                    <input type="number" id="qty-peri-peri" class="form-control qty-input" value="0" min="0">
-                    <button type="button" class="btn-qty" onclick="adjustFlavourQty('Peri Peri', 1)" aria-label="Increase Peri Peri">&plus;</button>
+                    <button type="button" class="btn-qty" onclick="adjustFlavourQty('Peri Peri', -1)" aria-label="Decrease Peri Peri" title="Decrease">−</button>
+                    <input type="number" id="qty-peri-peri" class="form-control qty-input" value="0" min="0" max="999">
+                    <button type="button" class="btn-qty" onclick="adjustFlavourQty('Peri Peri', 1)" aria-label="Increase Peri Peri" title="Increase">+</button>
                   </div>
                 </div>
               </div>
@@ -1202,7 +1202,7 @@
   </div>
 
   <!-- Scripts (Cache-busted) -->
-  <script src="/static/js/api.js?v=20261011_02"></script>
-  <script src="/static/js/app.js?v=20261011_02"></script>
+  <script src="/static/js/api.js?v=20261011_03"></script>
+  <script src="/static/js/app.js?v=20261011_03"></script>
 </body>
 </html>

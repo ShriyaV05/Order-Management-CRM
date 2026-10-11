@@ -603,6 +603,13 @@ document.addEventListener('DOMContentLoaded', async () => {
           state.newOrderState.flavours[flv] = Math.max(0, parseInt(input.value) || 0);
           recalcNewOrderPricing();
         };
+        input.onblur = () => {
+          if (input.value === '' || isNaN(parseInt(input.value))) {
+            input.value = 0;
+            state.newOrderState.flavours[flv] = 0;
+            recalcNewOrderPricing();
+          }
+        };
       }
     });
 

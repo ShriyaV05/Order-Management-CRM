@@ -14,7 +14,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       bottle_price: 160, 
       discount_per_bottle: 11, 
       effective_bottle_price: 149, 
-      low_stock_threshold: 20 
+      low_stock_threshold: 10 
     },
     orders: [],
     availableDistricts: [],
@@ -1235,7 +1235,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     loadOrders();
   });
 
-  // Order CSV Export
+  // Order Google Sheets Export
   document.getElementById('btn-export-orders-csv').addEventListener('click', () => {
     if (!state.orders || state.orders.length === 0) {
       showToast('No orders to export', 'warning');
@@ -1244,29 +1244,29 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     const headers = [
       'Order ID', 'Date', 'Customer', 'Phone', 'District', 'State',
-      'Bottles', 'Weight', 'Product', 'Delivery', 'Final', 'Payment',
-      'Dispatch', 'Created By', 'Edited By'
+      'Bottles', 'Weight', 'Product Amount (₹)', 'Delivery Fee (₹)', 'Final Amount (₹)', 'Payment Mode',
+      'Dispatch Status', 'Created By', 'Edited By'
     ];
 
     const rows = state.orders.map(o => [
-      `"${o.order_id}"`,
-      `"${o.date}"`,
-      `"${o.customer.replace(/"/g, '""')}"`,
-      `"${o.phone}"`,
-      `"${o.district}"`,
-      `"${o.state}"`,
-      o.bottles,
-      `"${o.weight}"`,
-      o.product,
-      o.delivery,
-      o.final,
-      `"${o.payment}"`,
-      `"${o.dispatch}"`,
-      `"${o.created_by}"`,
-      `"${o.edited_by}"`
+      o.order_id,
+      o.date,
+      o.customer,
+      o.phone,
+      o.district,
+      o.state,
+      Number(o.bottles) || 0,
+      o.weight,
+      Number(o.product) || 0,
+      Number(o.delivery) || 0,
+      Number(o.final) || 0,
+      o.payment,
+      o.dispatch,
+      o.created_by,
+      o.edited_by
     ]);
 
-    downloadCSV(`POPCONE_Orders_Export_${new Date().toISOString().slice(0, 10)}.csv`, headers, rows);
+    exportToGoogleSheets(`POPCONE_Orders_Export_${new Date().toISOString().slice(0, 10)}.xlsx`, 'Orders', headers, rows);
   });
 
   // ---------------- 4. ORDER DETAILS MODAL ----------------
@@ -1760,12 +1760,13 @@ document.addEventListener('DOMContentLoaded', async () => {
       const data = await api.getInventory();
       const stockGrid = document.getElementById('inventory-stock-grid');
       
-      // Stock Cards (Requirement 6: 0 stock on reset, low stock <= 20)
+      // Stock Cards (Requirement: low stock <= 10, warning ONLY in Inventory page)
       if (stockGrid && data.stocks) {
         stockGrid.innerHTML = data.stocks.map(s => {
-          const isLow = s.current_stock <= s.low_stock_threshold;
+          const threshold = Number(s.low_stock_threshold) || 10;
+          const isLow = s.current_stock <= threshold;
           const statusHtml = isLow
-            ? `<span class="stock-card-status danger"><svg class="icon-svg" style="width:14px;height:14px;" viewBox="0 0 24 24"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" x2="12" y1="9" y2="13"/><line x1="12" x2="12.01" y1="17" y2="17"/></svg> Low Stock (&le; 20)</span>`
+            ? `<span class="stock-card-status danger"><svg class="icon-svg" style="width:14px;height:14px;" viewBox="0 0 24 24"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" x2="12" y1="9" y2="13"/><line x1="12" x2="12.01" y1="17" y2="17"/></svg> Low Stock (&le; 10)</span>`
             : `<span class="stock-card-status safe"><svg class="icon-svg" style="width:14px;height:14px;" viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg> In Stock</span>`;
 
           return `
@@ -1897,11 +1898,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (!label) return;
     if (state.analyticsMode === 'monthly') {
       const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-      label.textContent = `Export ${monthNames[state.analyticsMonth - 1]} ${state.analyticsYear} CSV`;
+      label.textContent = `Export ${monthNames[state.analyticsMonth - 1]} ${state.analyticsYear} (Google Sheets)`;
     } else if (state.analyticsMode === 'annual') {
-      label.textContent = `Export ${state.analyticsYear} Annual CSV`;
+      label.textContent = `Export ${state.analyticsYear} Annual (Google Sheets)`;
     } else {
-      label.textContent = `Export Weekly CSV (${state.analyticsYear})`;
+      label.textContent = `Export Weekly (Google Sheets)`;
     }
   }
 
@@ -2113,7 +2114,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     `;
   }
 
-  // Unified CSV Export for active analytics view (Requirement 11)
+  // Unified Google Sheets Export for active analytics view
   document.getElementById('btn-export-analytics-csv')?.addEventListener('click', () => {
     const data = state.analyticsData;
     if (!data) return;
@@ -2122,38 +2123,82 @@ document.addEventListener('DOMContentLoaded', async () => {
       const monthIdx = state.analyticsMonth;
       const m = data.monthly_report.find(x => x.month_num === monthIdx);
       if (!m) return;
-      const headers = ['Month', 'Year', 'Total Orders', 'Tomato Bottles', 'Tomato Revenue', 'Cheese Bottles', 'Cheese Revenue', 'Sour Cream Bottles', 'Sour Cream Revenue', 'Peri Peri Bottles', 'Peri Peri Revenue', 'Total Bottles', 'Product Revenue', 'Shipping Costs', 'Top Flavour'];
+      const headers = ['Month', 'Year', 'Total Orders', 'Tomato Bottles', 'Tomato Revenue (₹)', 'Cheese Bottles', 'Cheese Revenue (₹)', 'Sour Cream Bottles', 'Sour Cream Revenue (₹)', 'Peri Peri Bottles', 'Peri Peri Revenue (₹)', 'Total Bottles', 'Product Revenue (₹)', 'Shipping Costs (₹)', 'Top Flavour'];
       const rows = [[
-        `"${m.month_name}"`, state.analyticsYear, m.total_orders,
+        m.month_name, state.analyticsYear, m.total_orders,
         m.tomato, m.tomato_revenue, m.cheese, m.cheese_revenue,
         m.sour_cream, m.sour_cream_revenue, m.peri_peri, m.peri_peri_revenue,
-        m.total_bottles, m.revenue, m.shipping_costs, `"${m.most_purchased_flavour}"`
+        m.total_bottles, m.revenue, m.shipping_costs, m.most_purchased_flavour
       ]];
-      downloadCSV(`POPCONE_${m.month_name}_${state.analyticsYear}_Report.csv`, headers, rows);
+      exportToGoogleSheets(`POPCONE_${m.month_name}_${state.analyticsYear}_Report.xlsx`, `${m.month_name} ${state.analyticsYear}`, headers, rows);
     } else if (state.analyticsMode === 'annual') {
       const ann = data.annual_report;
-      const headers = ['Year', 'Total Orders', 'Tomato Bottles', 'Tomato Revenue', 'Cheese Bottles', 'Cheese Revenue', 'Sour Cream Bottles', 'Sour Cream Revenue', 'Peri Peri Bottles', 'Peri Peri Revenue', 'Total Bottles', 'Product Revenue', 'Shipping Costs', 'Top Flavour'];
+      const headers = ['Year', 'Total Orders', 'Tomato Bottles', 'Tomato Revenue (₹)', 'Cheese Bottles', 'Cheese Revenue (₹)', 'Sour Cream Bottles', 'Sour Cream Revenue (₹)', 'Peri Peri Bottles', 'Peri Peri Revenue (₹)', 'Total Bottles', 'Product Revenue (₹)', 'Shipping Costs (₹)', 'Top Flavour'];
       const rows = [[
         ann.year, ann.total_orders,
         ann.tomato_bottles, ann.tomato_revenue, ann.cheese_bottles, ann.cheese_revenue,
         ann.sour_cream_bottles, ann.sour_cream_revenue, ann.peri_peri_bottles, ann.peri_peri_revenue,
-        ann.total_bottles, ann.total_revenue, ann.shipping_costs, `"${ann.most_purchased_flavour}"`
+        ann.total_bottles, ann.total_revenue, ann.shipping_costs, ann.most_purchased_flavour
       ]];
-      downloadCSV(`POPCONE_Annual_Report_${state.analyticsYear}.csv`, headers, rows);
+      exportToGoogleSheets(`POPCONE_Annual_Report_${state.analyticsYear}.xlsx`, `Annual ${state.analyticsYear}`, headers, rows);
     } else {
       // Weekly export
-      const headers = ['Week', 'Tomato Bottles', 'Tomato Revenue', 'Cheese Bottles', 'Cheese Revenue', 'Sour Cream Bottles', 'Sour Cream Revenue', 'Peri Peri Bottles', 'Peri Peri Revenue', 'Total Bottles', 'Product Revenue', 'Shipping Costs', 'Top Flavour'];
+      const headers = ['Week', 'Tomato Bottles', 'Tomato Revenue (₹)', 'Cheese Bottles', 'Cheese Revenue (₹)', 'Sour Cream Bottles', 'Sour Cream Revenue (₹)', 'Peri Peri Bottles', 'Peri Peri Revenue (₹)', 'Total Bottles', 'Product Revenue (₹)', 'Shipping Costs (₹)', 'Top Flavour'];
       const rows = data.weekly_report.map(w => [
-        `"${w.week_label}"`, w.tomato, w.tomato_revenue, w.cheese, w.cheese_revenue,
+        w.week_label, w.tomato, w.tomato_revenue, w.cheese, w.cheese_revenue,
         w.sour_cream, w.sour_cream_revenue, w.peri_peri, w.peri_peri_revenue,
-        w.total_bottles, w.revenue, w.shipping_costs, `"${w.most_purchased_flavour}"`
+        w.total_bottles, w.revenue, w.shipping_costs, w.most_purchased_flavour
       ]);
-      downloadCSV(`POPCONE_Weekly_Report_${state.analyticsYear}.csv`, headers, rows);
+      exportToGoogleSheets(`POPCONE_Weekly_Report_${state.analyticsYear}.xlsx`, `Weekly ${state.analyticsYear}`, headers, rows);
     }
   });
 
+  function exportToGoogleSheets(filename, sheetName, headers, rows) {
+    const cleanFilename = filename.endsWith('.xlsx') ? filename : filename.replace(/\.csv$/i, '') + '.xlsx';
+
+    const cleanRows = rows.map(r => r.map(cell => {
+      if (typeof cell === 'string') {
+        let trimmed = cell.trim();
+        if (trimmed.startsWith('"') && trimmed.endsWith('"')) {
+          trimmed = trimmed.slice(1, -1).replace(/""/g, '"');
+        }
+        return trimmed;
+      }
+      return cell;
+    }));
+
+    if (window.XLSX && XLSX.utils) {
+      try {
+        const aoa = [headers, ...cleanRows];
+        const ws = XLSX.utils.aoa_to_sheet(aoa);
+
+        // Auto-fit column widths for Google Sheets
+        const colWidths = headers.map((h, i) => {
+          let maxLen = String(h).length;
+          for (const r of cleanRows) {
+            const valStr = String(r[i] !== undefined && r[i] !== null ? r[i] : '');
+            if (valStr.length > maxLen) maxLen = Math.min(valStr.length, 35);
+          }
+          return { wch: Math.max(maxLen + 3, 10) };
+        });
+        ws['!cols'] = colWidths;
+
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, sheetName || 'POPCONE');
+        XLSX.writeFile(wb, cleanFilename);
+        showToast(`Exported ${cleanFilename} (Ready for Google Sheets!)`);
+        return;
+      } catch (err) {
+        console.error('XLSX export failed, fallback to CSV:', err);
+      }
+    }
+
+    // Fallback if XLSX library unavailable
+    downloadCSV(cleanFilename.replace('.xlsx', '.csv'), headers, cleanRows);
+  }
+
   function downloadCSV(filename, headers, rows) {
-    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(','))].join('\n');
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement('a');
     link.setAttribute('href', encodedUri);

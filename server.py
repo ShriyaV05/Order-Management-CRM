@@ -249,7 +249,7 @@ def get_settings(current_user: Dict[str, Any] = Depends(get_current_user)):
         "bottle_price": ORIGINAL_BOTTLE_PRICE,
         "discount_per_bottle": discount,
         "effective_bottle_price": ORIGINAL_BOTTLE_PRICE - discount,
-        "low_stock_threshold": int(settings.get("low_stock_threshold", 20))
+        "low_stock_threshold": int(settings.get("low_stock_threshold", 10))
     }
 
 @app.post("/api/settings/discount")

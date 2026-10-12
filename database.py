@@ -159,7 +159,7 @@ def init_db():
     CREATE TABLE IF NOT EXISTS inventory (
         flavour TEXT PRIMARY KEY,
         current_stock INTEGER NOT NULL DEFAULT 0,
-        low_stock_threshold INTEGER NOT NULL DEFAULT 20,
+        low_stock_threshold INTEGER NOT NULL DEFAULT 10,
         updated_at TEXT NOT NULL
     );
     """)
@@ -275,7 +275,7 @@ def init_db():
         initial_settings = [
             ("bottle_price", "160", now_str),
             ("discount_per_bottle", "11", now_str),
-            ("low_stock_threshold", "20", now_str),
+            ("low_stock_threshold", "10", now_str),
         ]
         cursor.executemany("INSERT INTO settings (key, value, updated_at) VALUES (?, ?, ?);", initial_settings)
         conn.commit()
@@ -286,16 +286,19 @@ def init_db():
             cursor.execute("INSERT INTO settings (key, value, updated_at) VALUES ('discount_per_bottle', '11', ?);", (now_str,))
         # Update bottle_price setting to 160
         cursor.execute("UPDATE settings SET value = '160', updated_at = ? WHERE key = 'bottle_price';", (now_str,))
+        # Update low_stock_threshold to 10
+        cursor.execute("UPDATE settings SET value = '10', updated_at = ? WHERE key = 'low_stock_threshold';", (now_str,))
+        cursor.execute("UPDATE inventory SET low_stock_threshold = 10, updated_at = ? WHERE low_stock_threshold = 20;", (now_str,))
         conn.commit()
 
     # Check inventory
     cursor.execute("SELECT COUNT(*) FROM inventory;")
     if cursor.fetchone()[0] == 0:
         initial_inventory = [
-            ("Tomato", 0, 20, now_str),
-            ("Cheese", 0, 20, now_str),
-            ("Sour Cream", 0, 20, now_str),
-            ("Peri Peri", 0, 20, now_str),
+            ("Tomato", 0, 10, now_str),
+            ("Cheese", 0, 10, now_str),
+            ("Sour Cream", 0, 10, now_str),
+            ("Peri Peri", 0, 10, now_str),
         ]
         cursor.executemany("INSERT INTO inventory (flavour, current_stock, low_stock_threshold, updated_at) VALUES (?, ?, ?, ?);", initial_inventory)
         conn.commit()

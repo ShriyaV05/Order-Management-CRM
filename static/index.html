@@ -429,9 +429,9 @@
                   <option value="District">District (A-Z)</option>
                 </select>
 
-                <button id="btn-export-orders-csv" class="btn btn-accent btn-sm">
+                <button id="btn-export-orders-csv" class="btn btn-accent btn-sm" title="Export orders directly to Google Sheets / Excel">
                   <svg class="icon-svg" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
-                  <span>Export CSV</span>
+                  <span>Export Google Sheets</span>
                 </button>
               </div>
             </div>
@@ -471,7 +471,7 @@
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
             <div>
               <h3 style="font-size: 18px; font-weight: 700; color: var(--primary-blue);">Warehouse Stock Levels</h3>
-              <p style="font-size: 13px; color: var(--text-secondary);">Threshold: ≤ 20 bottles triggers low stock warning</p>
+              <p style="font-size: 13px; color: var(--text-secondary);">Threshold: ≤ 10 bottles triggers low stock warning</p>
             </div>
             <div style="display: flex; gap: 10px;">
               <button id="btn-open-stock-movement" class="btn btn-primary btn-sm admin-only">
@@ -558,10 +558,10 @@
                   </select>
                 </div>
 
-                <!-- Single Unified CSV Export for active period -->
-                <button id="btn-export-analytics-csv" class="btn btn-accent btn-sm">
+                <!-- Single Unified Google Sheets Export for active period -->
+                <button id="btn-export-analytics-csv" class="btn btn-accent btn-sm" title="Export report directly to Google Sheets / Excel">
                   <svg class="icon-svg" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
-                  <span id="btn-export-analytics-csv-label">Export CSV</span>
+                  <span id="btn-export-analytics-csv-label">Export Google Sheets</span>
                 </button>
               </div>
             </div>
@@ -1362,7 +1362,8 @@
   </div>
 
   <!-- Scripts (Cache-busted) -->
-  <script src="/static/js/api.js?v=20261012_05"></script>
-  <script src="/static/js/app.js?v=20261012_05"></script>
+  <script src="/static/js/xlsx.full.min.js?v=20261012_06"></script>
+  <script src="/static/js/api.js?v=20261012_06"></script>
+  <script src="/static/js/app.js?v=20261012_06"></script>
 </body>
 </html>

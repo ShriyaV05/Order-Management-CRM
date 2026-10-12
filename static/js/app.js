@@ -614,26 +614,37 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
 
     // Optional Combo Offer Buttons (Requirement 4)
+    window.toggleNewOrderCombo = function(type) {
+      if (state.newOrderState.comboSelected === type) {
+        state.newOrderState.comboSelected = null;
+      } else {
+        state.newOrderState.comboSelected = type;
+      }
+      recalcNewOrderPricing();
+    };
+
     const btnCombo2 = document.getElementById('btn-combo-2');
     const btnCombo4 = document.getElementById('btn-combo-4');
 
-    btnCombo2?.addEventListener('click', () => {
-      if (state.newOrderState.comboSelected === '2_BOTTLE') {
-        state.newOrderState.comboSelected = null;
-      } else {
-        state.newOrderState.comboSelected = '2_BOTTLE';
-      }
-      recalcNewOrderPricing();
-    });
+    if (btnCombo2) {
+      btnCombo2.onclick = (e) => {
+        if (e) {
+          e.preventDefault();
+          e.stopPropagation();
+        }
+        window.toggleNewOrderCombo('2_BOTTLE');
+      };
+    }
 
-    btnCombo4?.addEventListener('click', () => {
-      if (state.newOrderState.comboSelected === '4_BOTTLE') {
-        state.newOrderState.comboSelected = null;
-      } else {
-        state.newOrderState.comboSelected = '4_BOTTLE';
-      }
-      recalcNewOrderPricing();
-    });
+    if (btnCombo4) {
+      btnCombo4.onclick = (e) => {
+        if (e) {
+          e.preventDefault();
+          e.stopPropagation();
+        }
+        window.toggleNewOrderCombo('4_BOTTLE');
+      };
+    }
 
     // Manual delivery fee edit listener
     const deliveryFeeInput = document.getElementById('new-order-delivery-fee');
@@ -793,27 +804,45 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     if (totalBottles === 2) {
       if (comboContainer) comboContainer.style.display = 'block';
-      if (btnCombo2) btnCombo2.style.display = 'inline-flex';
+      if (btnCombo2) {
+        btnCombo2.style.display = 'inline-flex';
+        const isApplied = (state.newOrderState.comboSelected === '2_BOTTLE');
+        btnCombo2.classList.toggle('active', isApplied);
+        btnCombo2.innerHTML = isApplied 
+          ? '2-Bottle Combo Applied — ₹289 <span style="font-size:11px; opacity:0.85; margin-left:6px; font-weight:normal;">(Click to remove)</span>' 
+          : 'Apply 2-Bottle Combo — ₹289';
+      }
       if (btnCombo4) btnCombo4.style.display = 'none';
       if (state.newOrderState.comboSelected === '4_BOTTLE') {
         state.newOrderState.comboSelected = null;
       }
-      if (btnCombo2) btnCombo2.classList.toggle('active', state.newOrderState.comboSelected === '2_BOTTLE');
     } else if (totalBottles === 4) {
       if (comboContainer) comboContainer.style.display = 'block';
-      if (btnCombo4) btnCombo4.style.display = 'inline-flex';
+      if (btnCombo4) {
+        btnCombo4.style.display = 'inline-flex';
+        const isApplied = (state.newOrderState.comboSelected === '4_BOTTLE');
+        btnCombo4.classList.toggle('active', isApplied);
+        btnCombo4.innerHTML = isApplied 
+          ? '4-Bottle Combo Applied — ₹559 <span style="font-size:11px; opacity:0.85; margin-left:6px; font-weight:normal;">(Click to remove)</span>' 
+          : 'Apply 4-Bottle Combo — ₹559';
+      }
       if (btnCombo2) btnCombo2.style.display = 'none';
       if (state.newOrderState.comboSelected === '2_BOTTLE') {
         state.newOrderState.comboSelected = null;
       }
-      if (btnCombo4) btnCombo4.classList.toggle('active', state.newOrderState.comboSelected === '4_BOTTLE');
     } else {
       if (comboContainer) comboContainer.style.display = 'none';
-      if (btnCombo2) btnCombo2.style.display = 'none';
-      if (btnCombo4) btnCombo4.style.display = 'none';
+      if (btnCombo2) {
+        btnCombo2.style.display = 'none';
+        btnCombo2.classList.remove('active');
+        btnCombo2.innerHTML = 'Apply 2-Bottle Combo — ₹289';
+      }
+      if (btnCombo4) {
+        btnCombo4.style.display = 'none';
+        btnCombo4.classList.remove('active');
+        btnCombo4.innerHTML = 'Apply 4-Bottle Combo — ₹559';
+      }
       state.newOrderState.comboSelected = null;
-      if (btnCombo2) btnCombo2.classList.remove('active');
-      if (btnCombo4) btnCombo4.classList.remove('active');
     }
 
     let isComboApplied = false;

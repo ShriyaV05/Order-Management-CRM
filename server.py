@@ -1558,7 +1558,44 @@ def get_analytics(year: Optional[int] = None, month: Optional[int] = None, curre
 
 # ----------------- Static Files & Frontend -----------------
 STATIC_DIR = os.path.join(os.path.dirname(__file__), "static")
-app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+
+@app.api_route("/static/{file_path:path}", methods=["GET", "HEAD"])
+def serve_static(file_path: str):
+    real_static_dir = os.path.realpath(STATIC_DIR)
+    full_path = os.path.realpath(os.path.join(STATIC_DIR, file_path))
+    
+    # Path traversal safety check
+    if not full_path.startswith(real_static_dir):
+        raise HTTPException(status_code=403, detail="Forbidden")
+        
+    if not os.path.isfile(full_path):
+        raise HTTPException(status_code=404, detail="Static file not found")
+        
+    media_type = None
+    if file_path.endswith(".css"):
+        media_type = "text/css"
+    elif file_path.endswith(".js"):
+        media_type = "application/javascript"
+    elif file_path.endswith(".png"):
+        media_type = "image/png"
+    elif file_path.endswith(".jpg") or file_path.endswith(".jpeg"):
+        media_type = "image/jpeg"
+    elif file_path.endswith(".svg"):
+        media_type = "image/svg+xml"
+    elif file_path.endswith(".json"):
+        media_type = "application/json"
+    elif file_path.endswith(".ico"):
+        media_type = "image/x-icon"
+        
+    return FileResponse(full_path, media_type=media_type)
+
+@app.api_route("/css/{file_path:path}", methods=["GET", "HEAD"])
+def serve_css(file_path: str):
+    return serve_static(f"css/{file_path}")
+
+@app.api_route("/js/{file_path:path}", methods=["GET", "HEAD"])
+def serve_js(file_path: str):
+    return serve_static(f"js/{file_path}")
 
 # Directly serve logo.jpg from workspace or static/assets
 @app.get("/logo.jpg")

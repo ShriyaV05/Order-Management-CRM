@@ -451,17 +451,22 @@ document.addEventListener('DOMContentLoaded', async () => {
   document.getElementById('btn-dashboard-new-order')?.addEventListener('click', () => switchTab('new-order'));
   document.getElementById('btn-dashboard-view-all-orders')?.addEventListener('click', () => switchTab('orders'));
 
+  async function ensureLocationsLoaded() {
+    if (!state.locations || Object.keys(state.locations).length === 0) {
+      try {
+        const res = await api.getLocations();
+        state.locations = res.locations || {};
+      } catch (e) {
+        console.warn('Locations load error:', e);
+      }
+    }
+    return state.locations;
+  }
+
   // ---------------- 2. NEW ORDER PAGE ----------------
   async function initNewOrderPage() {
     await refreshGlobalSettings();
-    if (Object.keys(state.locations).length === 0) {
-      try {
-        const res = await api.getLocations();
-        state.locations = res.locations;
-      } catch (e) {
-        console.warn('Locations error:', e);
-      }
-    }
+    await ensureLocationsLoaded();
 
     // Populate State Select
     const stateSelect = document.getElementById('new-order-state');
@@ -1394,6 +1399,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   async function openEditOrderModal(orderId) {
     try {
+      await ensureLocationsLoaded();
       const res = await api.getOrder(orderId);
       currentEditingOrder = res.order;
       const o = res.order;
@@ -1432,26 +1438,50 @@ document.addEventListener('DOMContentLoaded', async () => {
       document.getElementById('edit-info-created-by').textContent = `${o.created_by} (${o.created_at})`;
       document.getElementById('edit-info-edited-by').textContent = `${o.edited_by} (${o.edited_at})`;
 
-      // Populate States & Districts
+      // Populate States & Districts with robust selection preservation
       const stSelect = document.getElementById('edit-state');
       const distSelect = document.getElementById('edit-district');
-      stSelect.innerHTML = '';
-      Object.keys(state.locations).sort().forEach(st => {
-        stSelect.innerHTML += `<option value="${st}" ${st === o.state ? 'selected' : ''}>${st}</option>`;
-      });
 
-      const distList = state.locations[o.state] || [];
-      distSelect.innerHTML = '';
-      distList.sort().forEach(d => {
-        distSelect.innerHTML += `<option value="${d}" ${d === o.district ? 'selected' : ''}>${d}</option>`;
-      });
+      function populateEditDistricts(selectedState, targetDistrict) {
+        distSelect.innerHTML = '<option value="">-- Select District --</option>';
+        const distList = (selectedState && state.locations[selectedState]) ? [...state.locations[selectedState]] : [];
+        let matchedDist = null;
+
+        distList.sort().forEach(d => {
+          const isMatch = (targetDistrict && d.toLowerCase() === targetDistrict.toLowerCase());
+          if (isMatch) matchedDist = d;
+          distSelect.innerHTML += `<option value="${d}" ${isMatch ? 'selected' : ''}>${d}</option>`;
+        });
+
+        // Ensure order's existing district is always present even if not in standard list
+        if (targetDistrict && !matchedDist) {
+          distSelect.innerHTML += `<option value="${targetDistrict}" selected>${targetDistrict}</option>`;
+        }
+      }
+
+      function populateEditStatesAndDistricts(targetState, targetDistrict) {
+        stSelect.innerHTML = '<option value="">-- Select State --</option>';
+        let matchedStateKey = null;
+
+        Object.keys(state.locations).sort().forEach(st => {
+          const isMatch = (targetState && st.toLowerCase() === targetState.toLowerCase());
+          if (isMatch) matchedStateKey = st;
+          stSelect.innerHTML += `<option value="${st}" ${isMatch ? 'selected' : ''}>${st}</option>`;
+        });
+
+        // Ensure order's existing state is always present
+        if (targetState && !matchedStateKey) {
+          stSelect.innerHTML += `<option value="${targetState}" selected>${targetState}</option>`;
+          matchedStateKey = targetState;
+        }
+
+        populateEditDistricts(matchedStateKey || stSelect.value, targetDistrict);
+      }
+
+      populateEditStatesAndDistricts(o.state, o.district);
 
       stSelect.onchange = () => {
-        const newDists = state.locations[stSelect.value] || [];
-        distSelect.innerHTML = '';
-        newDists.sort().forEach(d => {
-          distSelect.innerHTML += `<option value="${d}">${d}</option>`;
-        });
+        populateEditDistricts(stSelect.value, null);
         editOrderState.isManualDeliveryFee = false;
         recalcEditOrderPricing();
       };
@@ -1460,6 +1490,66 @@ document.addEventListener('DOMContentLoaded', async () => {
         editOrderState.isManualDeliveryFee = false;
         recalcEditOrderPricing();
       };
+
+      // Automatic Indian PIN Code Lookup in Edit Order Modal
+      const editPincodeInput = document.getElementById('edit-pincode');
+      const editPincodeSpinner = document.getElementById('edit-pincode-spinner');
+      const editPincodeFeedback = document.getElementById('edit-pincode-feedback');
+      let editLastLookedUpPincode = o.pin_code || '';
+      let editPincodeLookupSeq = 0;
+
+      if (editPincodeFeedback) {
+        editPincodeFeedback.style.display = 'none';
+        editPincodeFeedback.className = 'pincode-feedback';
+      }
+
+      if (editPincodeInput) {
+        editPincodeInput.oninput = async () => {
+          const pin = editPincodeInput.value.trim();
+          if (editPincodeFeedback) {
+            editPincodeFeedback.style.display = 'none';
+            editPincodeFeedback.className = 'pincode-feedback';
+          }
+
+          if (pin.length === 6 && /^\d{6}$/.test(pin)) {
+            if (pin === editLastLookedUpPincode) return;
+            const currentSeq = ++editPincodeLookupSeq;
+            if (editPincodeSpinner) editPincodeSpinner.style.display = 'inline';
+
+            try {
+              const res = await api.lookupPincode(pin);
+              if (currentSeq !== editPincodeLookupSeq) return;
+              if (editPincodeSpinner) editPincodeSpinner.style.display = 'none';
+
+              if (res && res.status === 'success' && res.state) {
+                editLastLookedUpPincode = pin;
+                populateEditStatesAndDistricts(res.state, res.district);
+                if (editPincodeFeedback) {
+                  editPincodeFeedback.textContent = `Auto-detected: ${distSelect.value || res.district}, ${stSelect.value || res.state}`;
+                  editPincodeFeedback.className = 'pincode-feedback success';
+                  editPincodeFeedback.style.display = 'block';
+                }
+                editOrderState.isManualDeliveryFee = false;
+                recalcEditOrderPricing();
+              } else {
+                if (editPincodeFeedback) {
+                  editPincodeFeedback.textContent = 'Postal information not found for this PIN code.';
+                  editPincodeFeedback.className = 'pincode-feedback error';
+                  editPincodeFeedback.style.display = 'block';
+                }
+              }
+            } catch (err) {
+              if (currentSeq !== editPincodeLookupSeq) return;
+              if (editPincodeSpinner) editPincodeSpinner.style.display = 'none';
+              if (editPincodeFeedback) {
+                editPincodeFeedback.textContent = 'Postal lookup unavailable. Please select District & State manually.';
+                editPincodeFeedback.className = 'pincode-feedback error';
+                editPincodeFeedback.style.display = 'block';
+              }
+            }
+          }
+        };
+      }
 
       // Section B: Flavour Quantities
       const itemsMap = {};
@@ -2217,5 +2307,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   // Initial Setup on Page Load
+  ensureLocationsLoaded();
   updateAuthUI();
 });

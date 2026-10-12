@@ -881,7 +881,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (isComboApplied) {
       if (rowSelectedCombo) rowSelectedCombo.style.display = 'flex';
       if (comboDisplay) {
-        comboDisplay.textContent = (comboType === '2_BOTTLE' ? '2 Bottles for ₹289' : '4 Bottles for ₹559');
+        comboDisplay.textContent = (String(comboType).includes('2') || totalBottles === 2) ? '2 Bottles for ₹289' : '4 Bottles for ₹559';
       }
     } else {
       if (rowSelectedCombo) rowSelectedCombo.style.display = 'none';
@@ -1299,7 +1299,14 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
         if (rowSelectedCombo) rowSelectedCombo.style.display = 'flex';
         if (selectedComboEl) {
-          selectedComboEl.textContent = o.combo_type === '2_BOTTLE' ? '2 Bottles for ₹289' : '4 Bottles for ₹559';
+          const ct = String(o.combo_type || '').trim().toUpperCase();
+          if (ct.includes('2') || o.total_bottles === 2) {
+            selectedComboEl.textContent = '2 Bottles for ₹289';
+          } else if (ct.includes('4') || o.total_bottles === 4) {
+            selectedComboEl.textContent = '4 Bottles for ₹559';
+          } else {
+            selectedComboEl.textContent = o.combo_type || 'Combo Applied';
+          }
         }
         if (prodAmtLabelEl) prodAmtLabelEl.textContent = 'Combo Product Amount';
         document.getElementById('detail-product-amount').textContent = `₹${(o.combo_price || o.product_amount).toLocaleString('en-IN')}`;

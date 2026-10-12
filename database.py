@@ -33,7 +33,85 @@ def resolve_db_path() -> str:
 
 DB_PATH = resolve_db_path()
 
+class TursoRow(dict):
+    def __init__(self, cols, values):
+        super().__init__()
+        self._values = list(values)
+        self._cols = list(cols)
+        for c, v in zip(cols, values):
+            self[c] = v
+
+    def __getitem__(self, key):
+        if isinstance(key, int):
+            return self._values[key]
+        return super().__getitem__(key)
+
+    def keys(self):
+        return self._cols
+
+class TursoCursor:
+    def __init__(self, client):
+        self.client = client
+        self.results = []
+        self._pos = 0
+
+    def execute(self, sql, params=None):
+        clean_sql = sql.strip().rstrip(";")
+        if clean_sql.upper().startswith("PRAGMA FOREIGN_KEYS"):
+            return self
+        
+        args = list(params) if params is not None else []
+        res = self.client.execute(sql, args)
+        cols = res.columns
+        self.results = [TursoRow(cols, row) for row in res.rows]
+        self._pos = 0
+        return self
+
+    def executemany(self, sql, seq_of_params):
+        for params in seq_of_params:
+            self.execute(sql, params)
+        return self
+
+    def fetchone(self):
+        if self._pos < len(self.results):
+            row = self.results[self._pos]
+            self._pos += 1
+            return row
+        return None
+
+    def fetchall(self):
+        remaining = self.results[self._pos:]
+        self._pos = len(self.results)
+        return remaining
+
+class TursoConnection:
+    def __init__(self, url, token):
+        import libsql_client
+        clean_url = url.replace("libsql://", "https://")
+        self.client = libsql_client.create_client_sync(clean_url, auth_token=token)
+
+    def cursor(self):
+        return TursoCursor(self.client)
+
+    def execute(self, sql, params=None):
+        cur = self.cursor()
+        return cur.execute(sql, params)
+
+    def commit(self):
+        pass
+
+    def rollback(self):
+        pass
+
+    def close(self):
+        self.client.close()
+
 def get_db():
+    turso_url = os.environ.get("TURSO_DATABASE_URL")
+    turso_token = os.environ.get("TURSO_AUTH_TOKEN")
+    if turso_url and turso_token:
+        return TursoConnection(turso_url, turso_token)
+
     conn = sqlite3.connect(resolve_db_path())
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON;")

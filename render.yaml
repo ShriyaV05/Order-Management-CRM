@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: popcone-crm
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn server:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.0
+      - key: DB_PATH
+        value: /var/data/popcone.db
+    disk:
+      name: popcone-data
+      mountPath: /var/data
+      sizeGB: 1

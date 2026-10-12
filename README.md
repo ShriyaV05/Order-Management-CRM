@@ -73,6 +73,25 @@ The system uses transactional operations to maintain consistency between orders,
 * Secure session handling
 * No plaintext passwords
 
+## Render Deployment & Persistent Storage
+
+POPCONE CRM stores its data in a SQLite database. On Render web services, the container filesystem is ephemeral by default, meaning redeployments or container sleep/restarts reset files in `/app`.
+
+To ensure permanent database persistence across restarts and redeployments:
+
+1. **Persistent Disk on Render**:
+   - In the Render Dashboard, navigate to your Web Service -> **Disks**.
+   - Click **Add Disk**:
+     - **Name**: `popcone-data`
+     - **Mount Path**: `/var/data`
+     - **Size**: `1 GB` (or higher)
+   - In **Environment Variables**, ensure:
+     - `DB_PATH`: `/var/data/popcone.db`
+
+2. **Automatic Blueprint Deployment**:
+   - `render.yaml` is pre-configured with a persistent disk mounted at `/var/data` and sets `DB_PATH=/var/data/popcone.db`.
+   - On initial mount, `database.py` automatically initializes or copies the initial database to `/var/data/popcone.db` if it doesn't already exist.
+
 ## Purpose
 
 POPCONE CRM provides a centralized system to manage **orders, customers, inventory, sales analytics and operational history** with accurate real-time data.

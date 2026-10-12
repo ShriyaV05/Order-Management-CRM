@@ -37,6 +37,8 @@ async def add_no_cache_headers(request: Request, call_next):
 
 # Constant original bottle price (Requirement 2: Fixed at ₹160)
 ORIGINAL_BOTTLE_PRICE = 160.0
+# Constant bottle price for Analytics revenue metric (Requirement 3: Fixed at ₹149)
+ANALYTICS_BOTTLE_PRICE = 149.0
 
 # ----------------- Models -----------------
 class LoginRequest(BaseModel):
@@ -67,6 +69,7 @@ class CreateOrderRequest(BaseModel):
     payment: str
     delivery_fee: Optional[float] = 0.0
     apply_combo: Optional[bool] = False
+    combo_type: Optional[str] = ""
     items: List[OrderItemInput]
 
 class EditOrderRequest(BaseModel):
@@ -79,6 +82,7 @@ class EditOrderRequest(BaseModel):
     payment: str
     delivery_fee: Optional[float] = 0.0
     apply_combo: Optional[bool] = False
+    combo_type: Optional[str] = ""
     items: List[OrderItemInput]
 
 class StockMovementRequest(BaseModel):
@@ -397,16 +401,18 @@ def get_dashboard_stats(current_user: Dict[str, Any] = Depends(get_current_user)
     cursor.execute("""
     SELECT 
         COUNT(*) as total_orders,
-        COALESCE(SUM(final_amount), 0) as total_revenue,
         COALESCE(SUM(total_bottles), 0) as bottles_sold,
+        COALESCE(SUM(delivery_fee), 0) as total_shipping,
         SUM(CASE WHEN payment = 'Paid' THEN 1 ELSE 0 END) as paid_orders,
         SUM(CASE WHEN payment = 'COD' THEN 1 ELSE 0 END) as cod_orders
     FROM orders;
     """)
     stats_row = cursor.fetchone()
     total_orders = stats_row["total_orders"] or 0
-    total_revenue = stats_row["total_revenue"] or 0.0
     bottles_sold = stats_row["bottles_sold"] or 0
+    total_shipping = stats_row["total_shipping"] or 0.0
+    # Rule 3: Product Revenue = Total Bottles Sold * ₹149 (Delivery fees excluded)
+    total_revenue = bottles_sold * ANALYTICS_BOTTLE_PRICE
     paid_orders = stats_row["paid_orders"] or 0
     cod_orders = stats_row["cod_orders"] or 0
 
@@ -462,6 +468,8 @@ def get_dashboard_stats(current_user: Dict[str, Any] = Depends(get_current_user)
     return {
         "kpis": {
             "total_revenue": total_revenue,
+            "product_revenue": total_revenue,
+            "shipping_costs": total_shipping,
             "total_orders": total_orders,
             "bottles_sold": bottles_sold,
             "paid_orders": paid_orders,
@@ -710,23 +718,36 @@ def create_order(req: CreateOrderRequest, current_user: Dict[str, Any] = Depends
     total_discount = total_bottles * discount_per_bottle
     normal_product_amount = original_product_amount - total_discount
 
-    # Requirement 4: Optional Combo Offers
-    # Combo A: Exactly 2 bottles for Rs.289
-    # Combo B: Exactly 4 bottles for Rs.559
+    # Requirement 2 & 5: Optional Combo Offers (Must be explicitly selected and validated)
+    # Exactly 2 bottles = ₹289
+    # Exactly 4 bottles = ₹559
     is_combo = 0
     combo_type = ""
     combo_price = 0.0
 
-    if req.apply_combo and total_bottles == 2:
-        is_combo = 1
-        combo_type = "2_BOTTLE"
-        combo_price = 289.0
-        applicable_product_amount = 289.0
-    elif req.apply_combo and total_bottles == 4:
-        is_combo = 1
-        combo_type = "4_BOTTLE"
-        combo_price = 559.0
-        applicable_product_amount = 559.0
+    has_combo_selected = bool(req.apply_combo or (req.combo_type and str(req.combo_type).strip() and str(req.combo_type).strip().lower() not in ("none", "false", "", "0")))
+
+    if has_combo_selected:
+        ctype = str(req.combo_type or "").strip().upper()
+        if ctype in ("2_BOTTLES", "2_BOTTLE", "2") or (not ctype and total_bottles == 2):
+            if total_bottles != 2:
+                raise HTTPException(status_code=400, detail="The 2-bottle combo requires exactly 2 bottles.")
+            is_combo = 1
+            combo_type = "2_BOTTLES"
+            combo_price = 289.0
+            applicable_product_amount = 289.0
+        elif ctype in ("4_BOTTLES", "4_BOTTLE", "4") or (not ctype and total_bottles == 4):
+            if total_bottles != 4:
+                raise HTTPException(status_code=400, detail="The 4-bottle combo requires exactly 4 bottles.")
+            is_combo = 1
+            combo_type = "4_BOTTLES"
+            combo_price = 559.0
+            applicable_product_amount = 559.0
+        else:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Cannot apply combo offer: Total quantity is {total_bottles} bottles. A 2-bottle combo requires exactly 2 bottles (₹289) and a 4-bottle combo requires exactly 4 bottles (₹559). Please adjust the quantity or deselect the combo offer."
+            )
     else:
         applicable_product_amount = normal_product_amount
 
@@ -821,6 +842,12 @@ def create_order(req: CreateOrderRequest, current_user: Dict[str, Any] = Depends
         "applicable_product_amount": applicable_product_amount,
         "delivery_fee": delivery_fee,
         "final_amount": final_amount,
+        "total_amount": final_amount,
+        "is_combo": is_combo,
+        "combo_type": combo_type,
+        "combo_price": combo_price,
+        "original_product_amount": original_product_amount,
+        "total_discount": total_discount if not is_combo else 0.0,
         "message": f"Order {new_order_id} created successfully"
     }
 
@@ -943,21 +970,34 @@ def edit_order(order_id: str, req: EditOrderRequest, current_user: Dict[str, Any
     total_discount = total_bottles * historical_discount
     normal_product_amount = original_product_amount - total_discount
 
-    # Combo handling
+    # Requirement 2 & 5: Combo handling in Edit Order
     is_combo = 0
     combo_type = ""
     combo_price = 0.0
 
-    if req.apply_combo and total_bottles == 2:
-        is_combo = 1
-        combo_type = "2_BOTTLE"
-        combo_price = 289.0
-        applicable_product_amount = 289.0
-    elif req.apply_combo and total_bottles == 4:
-        is_combo = 1
-        combo_type = "4_BOTTLE"
-        combo_price = 559.0
-        applicable_product_amount = 559.0
+    has_combo_selected = bool(req.apply_combo or (req.combo_type and str(req.combo_type).strip() and str(req.combo_type).strip().lower() not in ("none", "false", "", "0")))
+
+    if has_combo_selected:
+        ctype = str(req.combo_type or "").strip().upper()
+        if ctype in ("2_BOTTLES", "2_BOTTLE", "2") or (not ctype and total_bottles == 2):
+            if total_bottles != 2:
+                raise HTTPException(status_code=400, detail="The 2-bottle combo requires exactly 2 bottles.")
+            is_combo = 1
+            combo_type = "2_BOTTLES"
+            combo_price = 289.0
+            applicable_product_amount = 289.0
+        elif ctype in ("4_BOTTLES", "4_BOTTLE", "4") or (not ctype and total_bottles == 4):
+            if total_bottles != 4:
+                raise HTTPException(status_code=400, detail="The 4-bottle combo requires exactly 4 bottles.")
+            is_combo = 1
+            combo_type = "4_BOTTLES"
+            combo_price = 559.0
+            applicable_product_amount = 559.0
+        else:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Cannot apply combo offer: Total quantity is {total_bottles} bottles. A 2-bottle combo requires exactly 2 bottles (₹289) and a 4-bottle combo requires exactly 4 bottles (₹559). Please adjust the bottle quantities or deselect the combo offer before saving."
+            )
     else:
         applicable_product_amount = normal_product_amount
 
@@ -1290,25 +1330,28 @@ def get_analytics(year: Optional[int] = None, month: Optional[int] = None, curre
     available_years.sort(reverse=True)
 
     # 1. Total Overview for selected year
+    # Rule 3: PRODUCT REVENUE = TOTAL BOTTLES SOLD × ₹149 (Delivery fees excluded)
+    # Rule 4: SHIPPING COSTS = SUM OF RECORDED DELIVERY FEES FOR ELIGIBLE ORDERS IN THE SELECTED PERIOD
     cursor.execute("""
     SELECT 
         COUNT(*) as total_orders,
         COALESCE(SUM(total_bottles), 0) as total_bottles,
-        COALESCE(SUM(product_amount), 0) as total_revenue
+        COALESCE(SUM(delivery_fee), 0) as total_shipping
     FROM orders
     WHERE strftime('%Y', created_at) = ?;
     """, (str(target_year),))
     overview_row = cursor.fetchone()
     year_total_orders = overview_row["total_orders"] or 0
     year_total_bottles = overview_row["total_bottles"] or 0
-    year_total_revenue = overview_row["total_revenue"] or 0.0
+    year_total_shipping = overview_row["total_shipping"] or 0.0
+    year_total_revenue = year_total_bottles * ANALYTICS_BOTTLE_PRICE
 
     # 2. Flavour Breakdown for selected year
     flavours = ["Tomato", "Cheese", "Sour Cream", "Peri Peri"]
     flavour_stats = {f: {"bottles": 0, "revenue": 0.0} for f in flavours}
 
     cursor.execute("""
-    SELECT oi.flavour, SUM(oi.quantity) as bottles, SUM(oi.line_amount) as revenue
+    SELECT oi.flavour, COALESCE(SUM(oi.quantity), 0) as bottles
     FROM order_items oi
     JOIN orders o ON oi.order_id = o.order_id
     WHERE strftime('%Y', o.created_at) = ?
@@ -1316,8 +1359,9 @@ def get_analytics(year: Optional[int] = None, month: Optional[int] = None, curre
     """, (str(target_year),))
     for r in cursor.fetchall():
         if r["flavour"] in flavour_stats:
-            flavour_stats[r["flavour"]]["bottles"] = r["bottles"] or 0
-            flavour_stats[r["flavour"]]["revenue"] = r["revenue"] or 0.0
+            flv_qty = r["bottles"] or 0
+            flavour_stats[r["flavour"]]["bottles"] = flv_qty
+            flavour_stats[r["flavour"]]["revenue"] = flv_qty * ANALYTICS_BOTTLE_PRICE
 
     has_sales = any(s["bottles"] > 0 for s in flavour_stats.values())
     most_purchased = max(flavour_stats.items(), key=lambda x: x[1]["bottles"]) if has_sales else ("None", {"bottles": 0, "revenue": 0.0})
@@ -1333,11 +1377,26 @@ def get_analytics(year: Optional[int] = None, month: Optional[int] = None, curre
         m_str = f"{month_idx:02d}"
         month_label = months_labels[month_idx - 1]
 
+        # Order totals and shipping costs for this month
+        cursor.execute("""
+        SELECT 
+            COUNT(*) as month_orders,
+            COALESCE(SUM(total_bottles), 0) as month_bottles,
+            COALESCE(SUM(delivery_fee), 0) as month_shipping
+        FROM orders
+        WHERE strftime('%Y', created_at) = ? AND strftime('%m', created_at) = ?;
+        """, (str(target_year), m_str))
+        m_orders_row = cursor.fetchone()
+        month_orders_count = m_orders_row["month_orders"] if m_orders_row else 0
+        month_total_bottles = m_orders_row["month_bottles"] if m_orders_row else 0
+        month_shipping = m_orders_row["month_shipping"] if m_orders_row else 0.0
+        month_revenue = month_total_bottles * ANALYTICS_BOTTLE_PRICE
+
+        # Flavour quantities for this month
         cursor.execute("""
         SELECT 
             oi.flavour,
-            COALESCE(SUM(oi.quantity), 0) as qty,
-            COALESCE(SUM(oi.line_amount), 0) as rev
+            COALESCE(SUM(oi.quantity), 0) as qty
         FROM order_items oi
         JOIN orders o ON oi.order_id = o.order_id
         WHERE strftime('%Y', o.created_at) = ? AND strftime('%m', o.created_at) = ?
@@ -1346,25 +1405,13 @@ def get_analytics(year: Optional[int] = None, month: Optional[int] = None, curre
 
         month_flavour_map = {f: 0 for f in flavours}
         month_rev_map = {f: 0.0 for f in flavours}
-        month_revenue = 0.0
-        month_total_bottles = 0
 
         for r in cursor.fetchall():
             flv = r["flavour"]
             if flv in month_flavour_map:
-                month_flavour_map[flv] = r["qty"]
-                month_rev_map[flv] = r["rev"]
-            month_revenue += r["rev"]
-            month_total_bottles += r["qty"]
-
-        # Count orders in this month
-        cursor.execute("""
-        SELECT COUNT(*) as month_orders
-        FROM orders
-        WHERE strftime('%Y', created_at) = ? AND strftime('%m', created_at) = ?;
-        """, (str(target_year), m_str))
-        m_orders_row = cursor.fetchone()
-        month_orders_count = m_orders_row["month_orders"] if m_orders_row else 0
+                flv_qty = r["qty"] or 0
+                month_flavour_map[flv] = flv_qty
+                month_rev_map[flv] = flv_qty * ANALYTICS_BOTTLE_PRICE
 
         # Most purchased flavour of this month
         has_m_sales = any(month_flavour_map.values())
@@ -1384,6 +1431,7 @@ def get_analytics(year: Optional[int] = None, month: Optional[int] = None, curre
             "peri_peri_revenue": month_rev_map["Peri Peri"],
             "total_bottles": month_total_bottles,
             "revenue": month_revenue,
+            "shipping_costs": month_shipping,
             "most_purchased_flavour": m_most[0] if m_most[1] > 0 else "None"
         })
 
@@ -1395,50 +1443,64 @@ def get_analytics(year: Optional[int] = None, month: Optional[int] = None, curre
     # 4. Weekly Report for the selected year
     cursor.execute("""
     SELECT 
+        strftime('%W', created_at) as week_num,
+        MIN(strftime('%Y-%m-%d', created_at)) as week_start,
+        COUNT(*) as week_orders,
+        COALESCE(SUM(total_bottles), 0) as week_bottles,
+        COALESCE(SUM(delivery_fee), 0) as week_shipping
+    FROM orders
+    WHERE strftime('%Y', created_at) = ?
+    GROUP BY week_num
+    ORDER BY CAST(week_num AS INTEGER) ASC;
+    """, (str(target_year),))
+    week_summary_rows = cursor.fetchall()
+
+    weekly_dict = {}
+    for wr in week_summary_rows:
+        wn = int(wr["week_num"] or 0)
+        w_bottles = wr["week_bottles"] or 0
+        weekly_dict[wn] = {
+            "week_num": wn,
+            "week_label": f"Week {wn + 1} ({wr['week_start']})",
+            "total_orders": wr["week_orders"] or 0,
+            "tomato": 0, "tomato_revenue": 0.0,
+            "cheese": 0, "cheese_revenue": 0.0,
+            "sour_cream": 0, "sour_cream_revenue": 0.0,
+            "peri_peri": 0, "peri_peri_revenue": 0.0,
+            "total_bottles": w_bottles,
+            "revenue": w_bottles * ANALYTICS_BOTTLE_PRICE,
+            "shipping_costs": wr["week_shipping"] or 0.0
+        }
+
+    cursor.execute("""
+    SELECT 
         strftime('%W', o.created_at) as week_num,
-        MIN(strftime('%Y-%m-%d', o.created_at)) as week_start,
         oi.flavour,
-        SUM(oi.quantity) as qty,
-        SUM(oi.line_amount) as rev
+        COALESCE(SUM(oi.quantity), 0) as qty
     FROM order_items oi
     JOIN orders o ON oi.order_id = o.order_id
     WHERE strftime('%Y', o.created_at) = ?
     GROUP BY week_num, oi.flavour
     ORDER BY CAST(week_num AS INTEGER) ASC;
     """, (str(target_year),))
-    weekly_rows = cursor.fetchall()
-
-    weekly_dict = {}
-    for r in weekly_rows:
+    for r in cursor.fetchall():
         wn = int(r["week_num"] or 0)
-        if wn not in weekly_dict:
-            weekly_dict[wn] = {
-                "week_num": wn,
-                "week_label": f"Week {wn + 1} ({r['week_start']})",
-                "tomato": 0, "tomato_revenue": 0.0,
-                "cheese": 0, "cheese_revenue": 0.0,
-                "sour_cream": 0, "sour_cream_revenue": 0.0,
-                "peri_peri": 0, "peri_peri_revenue": 0.0,
-                "total_bottles": 0,
-                "revenue": 0.0
-            }
-        flv = r["flavour"]
-        qty = r["qty"] or 0
-        rev = r["rev"] or 0.0
-        weekly_dict[wn]["total_bottles"] += qty
-        weekly_dict[wn]["revenue"] += rev
-        if flv == "Tomato":
-            weekly_dict[wn]["tomato"] += qty
-            weekly_dict[wn]["tomato_revenue"] += rev
-        elif flv == "Cheese":
-            weekly_dict[wn]["cheese"] += qty
-            weekly_dict[wn]["cheese_revenue"] += rev
-        elif flv == "Sour Cream":
-            weekly_dict[wn]["sour_cream"] += qty
-            weekly_dict[wn]["sour_cream_revenue"] += rev
-        elif flv == "Peri Peri":
-            weekly_dict[wn]["peri_peri"] += qty
-            weekly_dict[wn]["peri_peri_revenue"] += rev
+        if wn in weekly_dict:
+            flv = r["flavour"]
+            qty = r["qty"] or 0
+            rev = qty * ANALYTICS_BOTTLE_PRICE
+            if flv == "Tomato":
+                weekly_dict[wn]["tomato"] += qty
+                weekly_dict[wn]["tomato_revenue"] += rev
+            elif flv == "Cheese":
+                weekly_dict[wn]["cheese"] += qty
+                weekly_dict[wn]["cheese_revenue"] += rev
+            elif flv == "Sour Cream":
+                weekly_dict[wn]["sour_cream"] += qty
+                weekly_dict[wn]["sour_cream_revenue"] += rev
+            elif flv == "Peri Peri":
+                weekly_dict[wn]["peri_peri"] += qty
+                weekly_dict[wn]["peri_peri_revenue"] += rev
 
     weekly_data = []
     for wn in sorted(weekly_dict.keys()):
@@ -1459,6 +1521,7 @@ def get_analytics(year: Optional[int] = None, month: Optional[int] = None, curre
         "total_orders": year_total_orders,
         "total_bottles": year_total_bottles,
         "total_revenue": year_total_revenue,
+        "shipping_costs": year_total_shipping,
         "tomato_bottles": flavour_stats["Tomato"]["bottles"],
         "tomato_revenue": flavour_stats["Tomato"]["revenue"],
         "cheese_bottles": flavour_stats["Cheese"]["bottles"],
@@ -1480,7 +1543,10 @@ def get_analytics(year: Optional[int] = None, month: Optional[int] = None, curre
         "overview": {
             "total_orders": year_total_orders,
             "total_bottles": year_total_bottles,
+            "bottles_sold": year_total_bottles,
             "total_revenue": year_total_revenue,
+            "product_revenue": year_total_revenue,
+            "shipping_costs": year_total_shipping,
             "most_purchased_flavour": most_purchased[0] if most_purchased[1]["bottles"] > 0 else "None",
             "most_purchased_bottles": most_purchased[1]["bottles"],
             "flavour_breakdown": flavour_stats

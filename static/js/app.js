@@ -934,6 +934,8 @@ document.addEventListener('DOMContentLoaded', async () => {
       return;
     }
 
+    if (state.newOrderState.isSubmitting) return;
+
     const payload = {
       customer_name: customerName,
       phone,
@@ -944,10 +946,16 @@ document.addEventListener('DOMContentLoaded', async () => {
       payment,
       delivery_fee: deliveryFee,
       apply_combo: !!state.newOrderState.comboSelected,
+      combo_type: state.newOrderState.comboSelected || '',
       items
     };
 
+    const submitBtn = document.querySelector('#form-new-order button[type="submit"]');
+
     try {
+      state.newOrderState.isSubmitting = true;
+      if (submitBtn) submitBtn.disabled = true;
+
       const res = await api.createOrder(payload);
       showToast(`Order ${res.order_id} created successfully!`);
 
@@ -974,6 +982,9 @@ document.addEventListener('DOMContentLoaded', async () => {
       } else {
         showToast(err.message || 'Failed to create order', 'danger');
       }
+    } finally {
+      state.newOrderState.isSubmitting = false;
+      if (submitBtn) submitBtn.disabled = false;
     }
   });
 
@@ -1246,17 +1257,38 @@ document.addEventListener('DOMContentLoaded', async () => {
 
       document.getElementById('detail-total-bottles').textContent = o.total_bottles;
       document.getElementById('detail-total-weight').textContent = o.total_weight;
-      const prodAmtDisplay = o.is_combo 
-        ? `₹${o.product_amount.toLocaleString('en-IN')} (${o.combo_type === '2_BOTTLE' ? '2-Bottle Combo' : '4-Bottle Combo'})`
-        : (o.total_discount > 0 
-          ? `₹${o.product_amount.toLocaleString('en-IN')} (Discount: -₹${o.total_discount})`
-          : `₹${o.product_amount.toLocaleString('en-IN')}`);
-      document.getElementById('detail-product-amount').textContent = prodAmtDisplay;
+
+      // Requirement 2.B: Display actual saved combo information
+      const comboStatusEl = document.getElementById('detail-combo-status');
+      const rowSelectedCombo = document.getElementById('detail-row-selected-combo');
+      const selectedComboEl = document.getElementById('detail-selected-combo');
+      const prodAmtLabelEl = document.getElementById('detail-product-amount-label');
+
+      if (o.is_combo) {
+        if (comboStatusEl) {
+          comboStatusEl.innerHTML = '<span class="badge badge-paid" style="background:#10B981; color:#fff; font-weight:700;">Applied</span>';
+        }
+        if (rowSelectedCombo) rowSelectedCombo.style.display = 'flex';
+        if (selectedComboEl) {
+          selectedComboEl.textContent = o.combo_type === '2_BOTTLE' ? '2 Bottles for ₹289' : '4 Bottles for ₹559';
+        }
+        if (prodAmtLabelEl) prodAmtLabelEl.textContent = 'Combo Product Amount';
+        document.getElementById('detail-product-amount').textContent = `₹${(o.combo_price || o.product_amount).toLocaleString('en-IN')}`;
+      } else {
+        if (comboStatusEl) {
+          comboStatusEl.innerHTML = '<span class="badge badge-secondary" style="background:#E2E8F0; color:#475569;">Not Applied</span>';
+        }
+        if (rowSelectedCombo) rowSelectedCombo.style.display = 'none';
+        if (prodAmtLabelEl) prodAmtLabelEl.textContent = 'Normal Discounted Amount';
+        const discNote = (o.total_discount > 0) ? ` (Discount: -₹${o.total_discount})` : '';
+        document.getElementById('detail-product-amount').textContent = `₹${o.product_amount.toLocaleString('en-IN')}${discNote}`;
+      }
+
       document.getElementById('detail-delivery-fee').textContent = o.delivery_fee === 0 ? '₹0 (Free Delivery)' : `₹${o.delivery_fee.toLocaleString('en-IN')}`;
       document.getElementById('detail-final-amount').textContent = `₹${o.final_amount.toLocaleString('en-IN')}`;
       document.getElementById('detail-payment-method').textContent = o.payment;
 
-      // Requirement 13 & 14: Inside Order Details card, show small but noticeable audit information
+      // Audit Information
       document.getElementById('detail-created-info').textContent = `${o.created_by} (${o.created_at})`;
       document.getElementById('detail-edited-info').textContent = `${o.edited_by} (${o.edited_at})`;
 
@@ -1310,9 +1342,19 @@ document.addEventListener('DOMContentLoaded', async () => {
     orderDetailsModal.classList.remove('show');
   });
 
-  // ---------------- 5. EDIT ORDER MODAL ----------------
+  // ---------------- 5. EDIT ORDER MODAL (Requirement 1 & 2) ----------------
   const editOrderModal = document.getElementById('modal-edit-order');
   let currentEditingOrder = null;
+  const editOrderState = {
+    comboSelected: null, // null, '2_BOTTLE', or '4_BOTTLE'
+    isManualDeliveryFee: false,
+    isSubmitting: false
+  };
+
+  window.setEditOrderCombo = function(type) {
+    editOrderState.comboSelected = type ? type : null;
+    recalcEditOrderPricing();
+  };
 
   async function openEditOrderModal(orderId) {
     try {
@@ -1320,13 +1362,39 @@ document.addEventListener('DOMContentLoaded', async () => {
       currentEditingOrder = res.order;
       const o = res.order;
 
+      // Persistence rule: Load combo selection saved with that specific order
+      let loadedCombo = null;
+      if (o.is_combo) {
+        const ct = String(o.combo_type || '').trim().toUpperCase();
+        if (ct.includes('4') || o.total_bottles === 4) {
+          loadedCombo = '4_BOTTLE';
+        } else if (ct.includes('2') || o.total_bottles === 2) {
+          loadedCombo = '2_BOTTLE';
+        }
+      }
+      editOrderState.comboSelected = loadedCombo;
+      editOrderState.isManualDeliveryFee = false;
+      editOrderState.isSubmitting = false;
+
+      // Section A: Customer Information
       document.getElementById('edit-order-id-display').textContent = o.order_id;
       document.getElementById('edit-customer-name').value = o.customer;
       document.getElementById('edit-phone').value = o.phone;
       document.getElementById('edit-address').value = o.address;
       document.getElementById('edit-pincode').value = o.pin_code;
       document.getElementById('edit-delivery-fee').value = o.delivery_fee;
+
+      // Section D: Order Information
+      document.getElementById('edit-info-order-id').textContent = o.order_id;
+      document.getElementById('edit-info-order-date').textContent = o.date;
       document.getElementById('edit-payment').value = o.payment;
+      const dispatchBadge = document.getElementById('edit-info-dispatch-badge');
+      if (dispatchBadge) {
+        dispatchBadge.textContent = o.dispatch_state;
+        dispatchBadge.className = `badge ${o.dispatch_state === 'DISPATCHED' ? 'badge-dispatched' : 'badge-placed'}`;
+      }
+      document.getElementById('edit-info-created-by').textContent = `${o.created_by} (${o.created_at})`;
+      document.getElementById('edit-info-edited-by').textContent = `${o.edited_by} (${o.edited_at})`;
 
       // Populate States & Districts
       const stSelect = document.getElementById('edit-state');
@@ -1348,12 +1416,16 @@ document.addEventListener('DOMContentLoaded', async () => {
         newDists.sort().forEach(d => {
           distSelect.innerHTML += `<option value="${d}">${d}</option>`;
         });
+        editOrderState.isManualDeliveryFee = false;
         recalcEditOrderPricing();
       };
 
-      distSelect.onchange = () => recalcEditOrderPricing();
+      distSelect.onchange = () => {
+        editOrderState.isManualDeliveryFee = false;
+        recalcEditOrderPricing();
+      };
 
-      // Flavour Quantities
+      // Section B: Flavour Quantities
       const itemsMap = {};
       o.items.forEach(it => { itemsMap[it.flavour] = it.quantity; });
       ['Tomato', 'Cheese', 'Sour Cream', 'Peri Peri'].forEach(flv => {
@@ -1364,7 +1436,13 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
       });
 
-      document.getElementById('edit-delivery-fee').oninput = () => recalcEditOrderPricing();
+      const feeInput = document.getElementById('edit-delivery-fee');
+      if (feeInput) {
+        feeInput.oninput = () => {
+          editOrderState.isManualDeliveryFee = true;
+          recalcEditOrderPricing();
+        };
+      }
 
       recalcEditOrderPricing();
       editOrderModal.classList.add('show');
@@ -1393,25 +1471,151 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     document.getElementById('edit-total-bottles').textContent = totalBottles;
     document.getElementById('edit-total-weight').textContent = weightDisplay;
+    const summaryBottles = document.getElementById('edit-summary-bottles');
+    if (summaryBottles) summaryBottles.textContent = `${totalBottles} Bottles (${weightDisplay})`;
 
-    // Requirement 20: Maintain historical unit price
-    const histPrice = currentEditingOrder.unit_price;
-    const productAmount = totalBottles * histPrice;
+    // Historical pricing preservation (Requirement 1.C & 5)
+    const unitPrice = currentEditingOrder.unit_price || 160.0;
+    const discountPerBottle = (currentEditingOrder.discount_per_bottle !== undefined && currentEditingOrder.discount_per_bottle > 0)
+      ? currentEditingOrder.discount_per_bottle
+      : ((state.settings.discount_per_bottle !== undefined) ? Number(state.settings.discount_per_bottle) : 11.0);
+
+    const originalAmount = totalBottles * unitPrice;
+    const totalDiscount = totalBottles * discountPerBottle;
+    const normalDiscountedAmount = originalAmount - totalDiscount;
+
+    // Combo Handling & Validation (Requirement 2.C, 2.D, 2.E)
+    const comboBox = document.getElementById('edit-combo-box');
+    const comboValidationAlert = document.getElementById('edit-combo-validation-alert');
+    const comboValidationText = document.getElementById('edit-combo-validation-text');
+    const comboHelper = document.getElementById('edit-combo-box-helper');
+    const statusPill = document.getElementById('edit-combo-status-pill');
+    const saveBtn = document.getElementById('btn-save-edit-order');
+
+    const optNone = document.getElementById('btn-edit-opt-none');
+    const opt2 = document.getElementById('btn-edit-opt-2');
+    const opt4 = document.getElementById('btn-edit-opt-4');
+
+    let isComboApplied = false;
+    let comboPrice = 0.0;
+    let applicableProductAmount = normalDiscountedAmount;
+    let hasComboError = false;
+
+    // Reset option card classes
+    if (optNone) optNone.className = 'edit-combo-opt-card' + (!editOrderState.comboSelected ? ' active' : '');
+    if (opt2) opt2.className = 'edit-combo-opt-card' + (editOrderState.comboSelected === '2_BOTTLE' ? ' active' : '');
+    if (opt4) opt4.className = 'edit-combo-opt-card' + (editOrderState.comboSelected === '4_BOTTLE' ? ' active' : '');
+
+    if (editOrderState.comboSelected === '2_BOTTLE') {
+      if (totalBottles === 2) {
+        // Valid 2-bottle combo
+        isComboApplied = true;
+        comboPrice = 289.0;
+        applicableProductAmount = 289.0;
+        if (comboBox) comboBox.className = 'edit-combo-box active';
+        if (statusPill) statusPill.innerHTML = '<span class="badge" style="background:#10B981; color:#fff; font-weight:700; padding:4px 10px; border-radius:4px;">Applied: 2 Bottles for ₹289</span>';
+        if (comboHelper) comboHelper.textContent = '✓ 2-Bottle Combo active: ₹289 replaces normal ₹' + normalDiscountedAmount + ' product amount.';
+        if (comboValidationAlert) comboValidationAlert.style.display = 'none';
+        if (saveBtn) saveBtn.disabled = false;
+      } else {
+        // INVALID: quantity mismatch (Requirement 2.D)
+        hasComboError = true;
+        if (comboBox) comboBox.className = 'edit-combo-box invalid';
+        if (opt2) opt2.className = 'edit-combo-opt-card active invalid-combo';
+        if (statusPill) statusPill.innerHTML = `<span class="badge" style="background:#EF4444; color:#fff; font-weight:700; padding:4px 10px; border-radius:4px;">Quantity Mismatch (${totalBottles}/2)</span>`;
+        if (comboHelper) comboHelper.textContent = 'Selected 2-Bottle Combo requires exactly 2 bottles.';
+        if (comboValidationAlert) {
+          comboValidationAlert.style.display = 'flex';
+          comboValidationText.textContent = `The selected 2-Bottle Combo requires exactly 2 bottles (current: ${totalBottles} bottles). Adjust bottle quantities to 2 or select Regular Pricing before saving.`;
+        }
+        if (saveBtn) saveBtn.disabled = true;
+      }
+    } else if (editOrderState.comboSelected === '4_BOTTLE') {
+      if (totalBottles === 4) {
+        // Valid 4-bottle combo
+        isComboApplied = true;
+        comboPrice = 559.0;
+        applicableProductAmount = 559.0;
+        if (comboBox) comboBox.className = 'edit-combo-box active';
+        if (statusPill) statusPill.innerHTML = '<span class="badge" style="background:#10B981; color:#fff; font-weight:700; padding:4px 10px; border-radius:4px;">Applied: 4 Bottles for ₹559</span>';
+        if (comboHelper) comboHelper.textContent = '✓ 4-Bottle Combo active: ₹559 replaces normal ₹' + normalDiscountedAmount + ' product amount.';
+        if (comboValidationAlert) comboValidationAlert.style.display = 'none';
+        if (saveBtn) saveBtn.disabled = false;
+      } else {
+        // INVALID: quantity mismatch (Requirement 2.D)
+        hasComboError = true;
+        if (comboBox) comboBox.className = 'edit-combo-box invalid';
+        if (opt4) opt4.className = 'edit-combo-opt-card active invalid-combo';
+        if (statusPill) statusPill.innerHTML = `<span class="badge" style="background:#EF4444; color:#fff; font-weight:700; padding:4px 10px; border-radius:4px;">Quantity Mismatch (${totalBottles}/4)</span>`;
+        if (comboHelper) comboHelper.textContent = 'Selected 4-Bottle Combo requires exactly 4 bottles.';
+        if (comboValidationAlert) {
+          comboValidationAlert.style.display = 'flex';
+          comboValidationText.textContent = `The selected 4-Bottle Combo requires exactly 4 bottles (current: ${totalBottles} bottles). Adjust bottle quantities to 4 or select Regular Pricing before saving.`;
+        }
+        if (saveBtn) saveBtn.disabled = true;
+      }
+    } else {
+      // Regular pricing (No combo selected)
+      if (comboBox) comboBox.className = 'edit-combo-box';
+      if (statusPill) statusPill.innerHTML = '<span class="badge" style="background:#E2E8F0; color:#475569; font-weight:600; padding:4px 10px; border-radius:4px;">Regular Pricing</span>';
+      if (comboValidationAlert) comboValidationAlert.style.display = 'none';
+      if (saveBtn) saveBtn.disabled = false;
+      if (totalBottles === 2) {
+        if (comboHelper) comboHelper.innerHTML = '<strong style="color:#D97706;">💡 Eligible!</strong> Total is 2 bottles. Click "2-Bottle Combo — ₹289" above to apply combo offer.';
+      } else if (totalBottles === 4) {
+        if (comboHelper) comboHelper.innerHTML = '<strong style="color:#D97706;">💡 Eligible!</strong> Total is 4 bottles. Click "4-Bottle Combo — ₹559" above to apply combo offer.';
+      } else {
+        if (comboHelper) comboHelper.textContent = 'Combos are available for exactly 2 bottles (₹289) or 4 bottles (₹559).';
+      }
+    }
+
+    // Delivery calculation
+    const stVal = document.getElementById('edit-state').value;
+    const distVal = document.getElementById('edit-district').value;
     const feeInput = document.getElementById('edit-delivery-fee');
+    const freeDeliveryStatusEl = document.getElementById('edit-summary-free-delivery-status');
+    const zoneHintEl = document.getElementById('edit-delivery-zone-hint');
+
+    const calc = computeDeliveryFeeClient(stVal, distVal, totalBottles, applicableProductAmount);
 
     let deliveryFee = 0;
-    if (productAmount > 800.0) {
+    if (calc.isFree) {
       feeInput.value = 0;
       feeInput.disabled = true;
       deliveryFee = 0;
+      if (freeDeliveryStatusEl) freeDeliveryStatusEl.innerHTML = '<span class="badge badge-free-delivery" style="background:#10B981; color:#fff; font-weight:700;">FREE DELIVERY (Product > ₹800)</span>';
+      if (zoneHintEl) zoneHintEl.textContent = 'Free delivery applied';
     } else {
       feeInput.disabled = false;
-      deliveryFee = parseFloat(feeInput.value) || 0;
+      if (!editOrderState.isManualDeliveryFee) {
+        feeInput.value = calc.fee;
+        deliveryFee = calc.fee;
+      } else {
+        deliveryFee = parseFloat(feeInput.value) || 0;
+      }
+      if (freeDeliveryStatusEl) freeDeliveryStatusEl.textContent = 'Standard Delivery (Product ≤ ₹800)';
+      if (zoneHintEl) zoneHintEl.textContent = calc.zone !== 'Unknown' ? `Zone: ${calc.zone} (${calc.slab})` : 'Select location to calculate';
     }
-    const finalAmount = productAmount + deliveryFee;
 
-    document.getElementById('edit-product-amount').textContent = `₹${productAmount.toLocaleString('en-IN')}`;
+    const finalAmount = applicableProductAmount + deliveryFee;
+
+    // Update Pricing Summary UI (Requirement 1.C)
+    document.getElementById('edit-summary-original-amount').textContent = `₹${originalAmount.toLocaleString('en-IN')}`;
+    document.getElementById('edit-summary-discount-per-bottle').textContent = `-₹${discountPerBottle}`;
+    document.getElementById('edit-summary-total-discount').textContent = `-₹${totalDiscount.toLocaleString('en-IN')}`;
+    document.getElementById('edit-summary-discounted-product-amount').textContent = `₹${normalDiscountedAmount.toLocaleString('en-IN')}`;
+    
+    document.getElementById('edit-summary-combo-status').innerHTML = isComboApplied 
+      ? `<span class="badge badge-paid" style="background:#10B981; color:#fff; font-weight:700;">Applied (${editOrderState.comboSelected === '2_BOTTLE' ? '2 Bottles for ₹289' : '4 Bottles for ₹559'})</span>`
+      : '<span class="badge badge-secondary" style="background:#E2E8F0; color:#475569;">Not Applied</span>';
+    
+    document.getElementById('edit-summary-combo-price').textContent = isComboApplied ? `₹${comboPrice.toLocaleString('en-IN')}` : '—';
     document.getElementById('edit-final-amount').textContent = `₹${finalAmount.toLocaleString('en-IN')}`;
+
+    // Disable Save Changes if hasComboError or totalBottles <= 0
+    if (saveBtn) {
+      saveBtn.disabled = hasComboError || totalBottles <= 0;
+    }
   }
 
   window.adjustEditFlavourQty = (flavourName, delta) => {
@@ -1426,18 +1630,36 @@ document.addEventListener('DOMContentLoaded', async () => {
     editOrderModal.classList.remove('show');
   });
 
+  document.getElementById('btn-cancel-edit-order')?.addEventListener('click', () => {
+    editOrderModal.classList.remove('show');
+  });
+
   document.getElementById('form-edit-order').addEventListener('submit', async (e) => {
     e.preventDefault();
-    if (!currentEditingOrder) return;
+    if (!currentEditingOrder || editOrderState.isSubmitting) return;
     const oid = currentEditingOrder.order_id;
+    const saveBtn = document.getElementById('btn-save-edit-order');
+    const saveLabel = document.getElementById('btn-save-edit-order-label');
 
     const items = ['Tomato', 'Cheese', 'Sour Cream', 'Peri Peri'].map(flv => {
       const input = document.getElementById(`edit-qty-${flv.toLowerCase().replace(' ', '-')}`);
       return { flavour: flv, quantity: Math.max(0, parseInt(input.value) || 0) };
     }).filter(it => it.quantity > 0);
 
-    if (items.length === 0) {
+    const totalBottles = items.reduce((acc, it) => acc + it.quantity, 0);
+
+    if (totalBottles === 0) {
       showToast('Order must contain at least 1 bottle', 'warning');
+      return;
+    }
+
+    // Strict Combo Validation (Requirement 2.D)
+    if (editOrderState.comboSelected === '2_BOTTLE' && totalBottles !== 2) {
+      showToast(`Cannot save: 2-Bottle Combo requires exactly 2 bottles (current: ${totalBottles}). Please adjust quantities or deselect combo.`, 'warning');
+      return;
+    }
+    if (editOrderState.comboSelected === '4_BOTTLE' && totalBottles !== 4) {
+      showToast(`Cannot save: 4-Bottle Combo requires exactly 4 bottles (current: ${totalBottles}). Please adjust quantities or deselect combo.`, 'warning');
       return;
     }
 
@@ -1450,16 +1672,27 @@ document.addEventListener('DOMContentLoaded', async () => {
       district: document.getElementById('edit-district').value.trim(),
       payment: document.getElementById('edit-payment').value,
       delivery_fee: parseFloat(document.getElementById('edit-delivery-fee').value) || 0,
+      apply_combo: !!editOrderState.comboSelected,
+      combo_type: editOrderState.comboSelected || '',
       items
     };
 
     try {
+      editOrderState.isSubmitting = true;
+      if (saveBtn) saveBtn.disabled = true;
+      if (saveLabel) saveLabel.textContent = 'Saving Changes...';
+
       await api.editOrder(oid, payload);
       showToast(`Order ${oid} updated successfully!`);
       editOrderModal.classList.remove('show');
       await loadOrders();
+      await loadDashboardStats();
     } catch (err) {
       showToast(err.message || 'Failed to update order', 'danger');
+    } finally {
+      editOrderState.isSubmitting = false;
+      if (saveBtn) saveBtn.disabled = false;
+      if (saveLabel) saveLabel.textContent = 'Save Changes';
     }
   });
 
@@ -1700,10 +1933,18 @@ document.addEventListener('DOMContentLoaded', async () => {
     };
 
     // Update Top KPIs depending on Active Mode
+    let currentShipping = 0;
+    const shippingEl = document.getElementById('analytics-total-shipping');
+    const shippingLabel = document.getElementById('analytics-kpi-shipping-label');
+    const shippingSubtext = document.getElementById('analytics-kpi-shipping-subtext');
+
     if (mode === 'monthly') {
-      document.getElementById('analytics-kpi-revenue-label').textContent = `${selectedMonth.month_name} Revenue`;
-      document.getElementById('analytics-kpi-revenue-subtext').textContent = `${selectedMonth.month_name} ${state.analyticsYear}`;
+      currentShipping = selectedMonth.shipping_costs || 0;
+      document.getElementById('analytics-kpi-revenue-label').textContent = `${selectedMonth.month_name} Product Revenue`;
+      document.getElementById('analytics-kpi-revenue-subtext').textContent = `${selectedMonth.month_name} ${state.analyticsYear} (Bottles × ₹149)`;
       document.getElementById('analytics-total-revenue').textContent = `₹${selectedMonth.revenue.toLocaleString('en-IN')}`;
+      if (shippingLabel) shippingLabel.textContent = `${selectedMonth.month_name} Shipping Costs`;
+      if (shippingSubtext) shippingSubtext.textContent = `Recorded Delivery Fees (${selectedMonth.month_name})`;
       document.getElementById('analytics-total-bottles').textContent = selectedMonth.total_bottles;
       document.getElementById('analytics-total-orders').textContent = selectedMonth.total_orders;
       document.getElementById('analytics-most-purchased').textContent = selectedMonth.most_purchased_flavour !== 'None'
@@ -1711,9 +1952,12 @@ document.addEventListener('DOMContentLoaded', async () => {
         : 'None';
     } else if (mode === 'annual') {
       const ann = data.annual_report;
-      document.getElementById('analytics-kpi-revenue-label').textContent = 'Annual Revenue';
-      document.getElementById('analytics-kpi-revenue-subtext').textContent = `Full Year ${state.analyticsYear}`;
+      currentShipping = ann.shipping_costs || 0;
+      document.getElementById('analytics-kpi-revenue-label').textContent = 'Annual Product Revenue';
+      document.getElementById('analytics-kpi-revenue-subtext').textContent = `Full Year ${state.analyticsYear} (Bottles × ₹149)`;
       document.getElementById('analytics-total-revenue').textContent = `₹${ann.total_revenue.toLocaleString('en-IN')}`;
+      if (shippingLabel) shippingLabel.textContent = 'Annual Shipping Costs';
+      if (shippingSubtext) shippingSubtext.textContent = `Full Year ${state.analyticsYear} Delivery Fees`;
       document.getElementById('analytics-total-bottles').textContent = ann.total_bottles;
       document.getElementById('analytics-total-orders').textContent = ann.total_orders;
       document.getElementById('analytics-most-purchased').textContent = ann.most_purchased_flavour !== 'None'
@@ -1723,15 +1967,20 @@ document.addEventListener('DOMContentLoaded', async () => {
       // Weekly mode
       const totalWeeklyRev = data.weekly_report.reduce((acc, w) => acc + w.revenue, 0);
       const totalWeeklyBottles = data.weekly_report.reduce((acc, w) => acc + w.total_bottles, 0);
-      document.getElementById('analytics-kpi-revenue-label').textContent = 'Weekly Cumulative Revenue';
-      document.getElementById('analytics-kpi-revenue-subtext').textContent = `Weeks in ${state.analyticsYear}`;
+      currentShipping = data.weekly_report.reduce((acc, w) => acc + (w.shipping_costs || 0), 0);
+      document.getElementById('analytics-kpi-revenue-label').textContent = 'Weekly Product Revenue';
+      document.getElementById('analytics-kpi-revenue-subtext').textContent = `Weeks in ${state.analyticsYear} (Bottles × ₹149)`;
       document.getElementById('analytics-total-revenue').textContent = `₹${totalWeeklyRev.toLocaleString('en-IN')}`;
+      if (shippingLabel) shippingLabel.textContent = 'Weekly Shipping Costs';
+      if (shippingSubtext) shippingSubtext.textContent = `Weeks in ${state.analyticsYear} Delivery Fees`;
       document.getElementById('analytics-total-bottles').textContent = totalWeeklyBottles;
       document.getElementById('analytics-total-orders').textContent = data.overview.total_orders;
       document.getElementById('analytics-most-purchased').textContent = data.overview.most_purchased_flavour !== 'None'
         ? data.overview.most_purchased_flavour
         : 'None';
     }
+
+    if (shippingEl) shippingEl.textContent = `₹${currentShipping.toLocaleString('en-IN')}`;
 
     // 1. Monthly Section Content
     document.getElementById('analytics-month-detail-title').textContent = `${selectedMonth.month_name} ${state.analyticsYear} - Flavour Sales`;
@@ -1844,31 +2093,31 @@ document.addEventListener('DOMContentLoaded', async () => {
       const monthIdx = state.analyticsMonth;
       const m = data.monthly_report.find(x => x.month_num === monthIdx);
       if (!m) return;
-      const headers = ['Month', 'Year', 'Total Orders', 'Tomato Bottles', 'Tomato Revenue', 'Cheese Bottles', 'Cheese Revenue', 'Sour Cream Bottles', 'Sour Cream Revenue', 'Peri Peri Bottles', 'Peri Peri Revenue', 'Total Bottles', 'Total Revenue', 'Top Flavour'];
+      const headers = ['Month', 'Year', 'Total Orders', 'Tomato Bottles', 'Tomato Revenue', 'Cheese Bottles', 'Cheese Revenue', 'Sour Cream Bottles', 'Sour Cream Revenue', 'Peri Peri Bottles', 'Peri Peri Revenue', 'Total Bottles', 'Product Revenue', 'Shipping Costs', 'Top Flavour'];
       const rows = [[
         `"${m.month_name}"`, state.analyticsYear, m.total_orders,
         m.tomato, m.tomato_revenue, m.cheese, m.cheese_revenue,
         m.sour_cream, m.sour_cream_revenue, m.peri_peri, m.peri_peri_revenue,
-        m.total_bottles, m.revenue, `"${m.most_purchased_flavour}"`
+        m.total_bottles, m.revenue, m.shipping_costs, `"${m.most_purchased_flavour}"`
       ]];
       downloadCSV(`POPCONE_${m.month_name}_${state.analyticsYear}_Report.csv`, headers, rows);
     } else if (state.analyticsMode === 'annual') {
       const ann = data.annual_report;
-      const headers = ['Year', 'Total Orders', 'Tomato Bottles', 'Tomato Revenue', 'Cheese Bottles', 'Cheese Revenue', 'Sour Cream Bottles', 'Sour Cream Revenue', 'Peri Peri Bottles', 'Peri Peri Revenue', 'Total Bottles', 'Total Revenue', 'Top Flavour'];
+      const headers = ['Year', 'Total Orders', 'Tomato Bottles', 'Tomato Revenue', 'Cheese Bottles', 'Cheese Revenue', 'Sour Cream Bottles', 'Sour Cream Revenue', 'Peri Peri Bottles', 'Peri Peri Revenue', 'Total Bottles', 'Product Revenue', 'Shipping Costs', 'Top Flavour'];
       const rows = [[
         ann.year, ann.total_orders,
         ann.tomato_bottles, ann.tomato_revenue, ann.cheese_bottles, ann.cheese_revenue,
         ann.sour_cream_bottles, ann.sour_cream_revenue, ann.peri_peri_bottles, ann.peri_peri_revenue,
-        ann.total_bottles, ann.total_revenue, `"${ann.most_purchased_flavour}"`
+        ann.total_bottles, ann.total_revenue, ann.shipping_costs, `"${ann.most_purchased_flavour}"`
       ]];
       downloadCSV(`POPCONE_Annual_Report_${state.analyticsYear}.csv`, headers, rows);
     } else {
       // Weekly export
-      const headers = ['Week', 'Tomato Bottles', 'Tomato Revenue', 'Cheese Bottles', 'Cheese Revenue', 'Sour Cream Bottles', 'Sour Cream Revenue', 'Peri Peri Bottles', 'Peri Peri Revenue', 'Total Bottles', 'Total Revenue', 'Top Flavour'];
+      const headers = ['Week', 'Tomato Bottles', 'Tomato Revenue', 'Cheese Bottles', 'Cheese Revenue', 'Sour Cream Bottles', 'Sour Cream Revenue', 'Peri Peri Bottles', 'Peri Peri Revenue', 'Total Bottles', 'Product Revenue', 'Shipping Costs', 'Top Flavour'];
       const rows = data.weekly_report.map(w => [
         `"${w.week_label}"`, w.tomato, w.tomato_revenue, w.cheese, w.cheese_revenue,
         w.sour_cream, w.sour_cream_revenue, w.peri_peri, w.peri_peri_revenue,
-        w.total_bottles, w.revenue, `"${w.most_purchased_flavour}"`
+        w.total_bottles, w.revenue, w.shipping_costs, `"${w.most_purchased_flavour}"`
       ]);
       downloadCSV(`POPCONE_Weekly_Report_${state.analyticsYear}.csv`, headers, rows);
     }

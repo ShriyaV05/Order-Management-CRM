@@ -3,10 +3,38 @@ import os
 from datetime import datetime, timezone
 from auth import hash_password
 
-DB_PATH = os.environ.get("DB_PATH", os.path.join(os.path.dirname(__file__), "popcone.db"))
+DEFAULT_DB_PATH = os.path.join(os.path.dirname(__file__), "popcone.db")
+
+def resolve_db_path() -> str:
+    env_path = os.environ.get("DB_PATH")
+    if env_path:
+        parent_dir = os.path.dirname(env_path)
+        if parent_dir and not os.path.exists(parent_dir):
+            try:
+                os.makedirs(parent_dir, exist_ok=True)
+            except Exception:
+                pass
+        return env_path
+
+    # Check known persistent mount directories on Render or Docker
+    for mount_dir in ["/var/data", "/data", "/app/data"]:
+        if os.path.isdir(mount_dir) and os.access(mount_dir, os.W_OK):
+            persistent_path = os.path.join(mount_dir, "popcone.db")
+            # If persistent DB does not exist yet, safely seed from existing DB once
+            if not os.path.exists(persistent_path) and os.path.exists(DEFAULT_DB_PATH):
+                try:
+                    import shutil
+                    shutil.copy2(DEFAULT_DB_PATH, persistent_path)
+                except Exception:
+                    pass
+            return persistent_path
+
+    return DEFAULT_DB_PATH
+
+DB_PATH = resolve_db_path()
 
 def get_db():
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(resolve_db_path())
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON;")
     return conn

@@ -568,11 +568,16 @@
           </div>
 
           <!-- Active Period Summary Banner / KPIs -->
-          <div class="kpi-grid">
-            <div class="kpi-card accent-yellow">
-              <span class="kpi-label" id="analytics-kpi-revenue-label">Revenue</span>
+          <div class="kpi-grid analytics-kpi-grid">
+            <div class="kpi-card accent-yellow" id="card-analytics-revenue">
+              <span class="kpi-label" id="analytics-kpi-revenue-label">Product Revenue</span>
               <span id="analytics-total-revenue" class="kpi-value">₹0</span>
-              <span class="kpi-subtext" id="analytics-kpi-revenue-subtext">Selected Period</span>
+              <span class="kpi-subtext" id="analytics-kpi-revenue-subtext">Bottles Sold × ₹149</span>
+            </div>
+            <div class="kpi-card accent-blue" id="card-analytics-shipping">
+              <span class="kpi-label" id="analytics-kpi-shipping-label">Shipping Costs</span>
+              <span id="analytics-total-shipping" class="kpi-value">₹0</span>
+              <span class="kpi-subtext" id="analytics-kpi-shipping-subtext">Recorded Delivery Fees</span>
             </div>
             <div class="kpi-card accent-purple">
               <span class="kpi-label">Bottles Sold</span>
@@ -872,7 +877,15 @@
             <span id="detail-total-weight" class="detail-info-value">0g</span>
           </div>
           <div class="detail-info-item">
-            <span class="detail-info-label">Product Amount</span>
+            <span class="detail-info-label">Combo Offer</span>
+            <span id="detail-combo-status" class="detail-info-value"><span class="badge badge-secondary">Not Applied</span></span>
+          </div>
+          <div class="detail-info-item" id="detail-row-selected-combo" style="display: none;">
+            <span class="detail-info-label">Selected Combo</span>
+            <span id="detail-selected-combo" class="detail-info-value">—</span>
+          </div>
+          <div class="detail-info-item">
+            <span class="detail-info-label" id="detail-product-amount-label">Product Amount</span>
             <span id="detail-product-amount" class="detail-info-value">₹0</span>
           </div>
           <div class="detail-info-item">
@@ -884,8 +897,8 @@
             <span id="detail-payment-method" class="detail-info-value">Paid</span>
           </div>
           <div class="detail-info-item">
-            <span class="detail-info-label" style="color: var(--primary-blue);">Final Billed Amount</span>
-            <span id="detail-final-amount" class="detail-info-value" style="font-size: 18px; color: var(--primary-blue);">₹0</span>
+            <span class="detail-info-label" style="color: var(--primary-blue);">Final Payable Amount</span>
+            <span id="detail-final-amount" class="detail-info-value" style="font-size: 18px; color: var(--primary-blue); font-weight: 700;">₹0</span>
           </div>
         </div>
 
@@ -910,111 +923,258 @@
     </div>
   </div>
 
-  <!-- 2. Edit Order Modal -->
+  <!-- 2. Edit Order Modal (Redesigned per Requirement 1) -->
   <div id="modal-edit-order" class="modal-backdrop">
-    <div class="modal-container large">
+    <div class="modal-container extra-large edit-order-modal-container">
       <div class="modal-header">
-        <h3 class="modal-title">Edit Order: <span id="edit-order-id-display"></span></h3>
+        <h3 class="modal-title">
+          <svg class="icon-svg" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+          <span>Edit Order: <span id="edit-order-id-display">ORD0000</span></span>
+        </h3>
         <button id="btn-close-edit-order" class="btn-close-modal" aria-label="Close">&times;</button>
       </div>
-      <form id="form-edit-order">
-        <div class="modal-body">
-          <div class="form-grid">
-            <div class="form-group">
-              <label class="form-label" for="edit-customer-name">Customer Name</label>
-              <input type="text" id="edit-customer-name" class="form-control" required>
-            </div>
-            <div class="form-group">
-              <label class="form-label" for="edit-phone">Phone Number</label>
-              <input type="tel" id="edit-phone" class="form-control" required>
-            </div>
-            <div class="form-group span-2">
-              <label class="form-label" for="edit-address">Delivery Address</label>
-              <input type="text" id="edit-address" class="form-control" required>
-            </div>
-            <div class="form-group">
-              <label class="form-label" for="edit-state">State</label>
-              <select id="edit-state" class="form-control" required></select>
-            </div>
-            <div class="form-group">
-              <label class="form-label" for="edit-district">District</label>
-              <select id="edit-district" class="form-control" required></select>
-            </div>
-            <div class="form-group">
-              <label class="form-label" for="edit-pincode">PIN Code</label>
-              <input type="text" id="edit-pincode" class="form-control" required>
-            </div>
-            <div class="form-group">
-              <label class="form-label" for="edit-payment">Payment</label>
-              <select id="edit-payment" class="form-control" required>
-                <option value="Paid">Prepaid (Paid)</option>
-                <option value="COD">Cash on Delivery (COD)</option>
-              </select>
-            </div>
-          </div>
+      <form id="form-edit-order" novalidate>
+        <div class="modal-body edit-order-modal-body">
 
-          <div class="detail-section-title" style="margin-top: 24px;">Flavour Quantities</div>
-          <div class="flavours-grid">
-            <div class="flavour-card">
-              <div class="flavour-header"><span class="flavour-name">Tomato</span></div>
-              <div class="flavour-qty-control">
-                <button type="button" class="btn-qty" onclick="adjustEditFlavourQty('Tomato', -1)">−</button>
-                <input type="number" id="edit-qty-tomato" class="form-control qty-input" value="0" min="0">
-                <button type="button" class="btn-qty" onclick="adjustEditFlavourQty('Tomato', 1)">+</button>
-              </div>
+          <!-- Section A: Customer Information -->
+          <div class="edit-section-card">
+            <div class="edit-section-header">
+              <span class="edit-section-badge">A</span>
+              <h4 class="edit-section-title">Customer Information</h4>
             </div>
-            <div class="flavour-card">
-              <div class="flavour-header"><span class="flavour-name">Cheese</span></div>
-              <div class="flavour-qty-control">
-                <button type="button" class="btn-qty" onclick="adjustEditFlavourQty('Cheese', -1)">−</button>
-                <input type="number" id="edit-qty-cheese" class="form-control qty-input" value="0" min="0">
-                <button type="button" class="btn-qty" onclick="adjustEditFlavourQty('Cheese', 1)">+</button>
+            <div class="form-grid">
+              <div class="form-group">
+                <label class="form-label" for="edit-customer-name">Customer Name <span class="req-star">*</span></label>
+                <input type="text" id="edit-customer-name" class="form-control" placeholder="Enter customer name" required>
               </div>
-            </div>
-            <div class="flavour-card">
-              <div class="flavour-header"><span class="flavour-name">Sour Cream</span></div>
-              <div class="flavour-qty-control">
-                <button type="button" class="btn-qty" onclick="adjustEditFlavourQty('Sour Cream', -1)">−</button>
-                <input type="number" id="edit-qty-sour-cream" class="form-control qty-input" value="0" min="0">
-                <button type="button" class="btn-qty" onclick="adjustEditFlavourQty('Sour Cream', 1)">+</button>
+              <div class="form-group">
+                <label class="form-label" for="edit-phone">Phone Number <span class="req-star">*</span></label>
+                <input type="tel" id="edit-phone" class="form-control" maxlength="10" placeholder="10-digit mobile number" required>
+                <div id="edit-phone-warning" class="form-input-hint text-danger" style="display: none;"></div>
               </div>
-            </div>
-            <div class="flavour-card">
-              <div class="flavour-header"><span class="flavour-name">Peri Peri</span></div>
-              <div class="flavour-qty-control">
-                <button type="button" class="btn-qty" onclick="adjustEditFlavourQty('Peri Peri', -1)">−</button>
-                <input type="number" id="edit-qty-peri-peri" class="form-control qty-input" value="0" min="0">
-                <button type="button" class="btn-qty" onclick="adjustEditFlavourQty('Peri Peri', 1)">+</button>
+              <div class="form-group span-2">
+                <label class="form-label" for="edit-address">Full Address <span class="req-star">*</span></label>
+                <input type="text" id="edit-address" class="form-control" placeholder="Street address, building, landmark" required>
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="edit-pincode">PIN Code <span class="req-star">*</span></label>
+                <input type="text" id="edit-pincode" class="form-control" maxlength="6" placeholder="6-digit PIN" required>
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="edit-district">District <span class="req-star">*</span></label>
+                <select id="edit-district" class="form-control" required></select>
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="edit-state">State <span class="req-star">*</span></label>
+                <select id="edit-state" class="form-control" required></select>
               </div>
             </div>
           </div>
 
-          <div class="pricing-summary-card">
-            <div class="pricing-row">
-              <span>Bottles:</span>
-              <strong id="edit-total-bottles">0</strong>
+          <!-- Section B: Order Items -->
+          <div class="edit-section-card">
+            <div class="edit-section-header">
+              <span class="edit-section-badge">B</span>
+              <h4 class="edit-section-title">Order Items</h4>
+              <div class="edit-section-subinfo">
+                <span>Total: <strong id="edit-total-bottles">0</strong> bottles</span>
+                <span class="info-dot">&bull;</span>
+                <span>Total Weight: <strong id="edit-total-weight">0g</strong></span>
+              </div>
             </div>
-            <div class="pricing-row">
-              <span>Weight:</span>
-              <strong id="edit-total-weight">0g</strong>
+
+            <!-- Flavour Quantities Grid -->
+            <div class="flavours-grid edit-flavours-grid">
+              <div class="flavour-card">
+                <div class="flavour-header"><span class="flavour-name">Tomato</span></div>
+                <div class="flavour-qty-control">
+                  <button type="button" class="btn-qty" onclick="adjustEditFlavourQty('Tomato', -1)" aria-label="Decrease Tomato">−</button>
+                  <input type="number" id="edit-qty-tomato" class="form-control qty-input" value="0" min="0" step="1">
+                  <button type="button" class="btn-qty" onclick="adjustEditFlavourQty('Tomato', 1)" aria-label="Increase Tomato">+</button>
+                </div>
+              </div>
+              <div class="flavour-card">
+                <div class="flavour-header"><span class="flavour-name">Cheese</span></div>
+                <div class="flavour-qty-control">
+                  <button type="button" class="btn-qty" onclick="adjustEditFlavourQty('Cheese', -1)" aria-label="Decrease Cheese">−</button>
+                  <input type="number" id="edit-qty-cheese" class="form-control qty-input" value="0" min="0" step="1">
+                  <button type="button" class="btn-qty" onclick="adjustEditFlavourQty('Cheese', 1)" aria-label="Increase Cheese">+</button>
+                </div>
+              </div>
+              <div class="flavour-card">
+                <div class="flavour-header"><span class="flavour-name">Sour Cream</span></div>
+                <div class="flavour-qty-control">
+                  <button type="button" class="btn-qty" onclick="adjustEditFlavourQty('Sour Cream', -1)" aria-label="Decrease Sour Cream">−</button>
+                  <input type="number" id="edit-qty-sour-cream" class="form-control qty-input" value="0" min="0" step="1">
+                  <button type="button" class="btn-qty" onclick="adjustEditFlavourQty('Sour Cream', 1)" aria-label="Increase Sour Cream">+</button>
+                </div>
+              </div>
+              <div class="flavour-card">
+                <div class="flavour-header"><span class="flavour-name">Peri Peri</span></div>
+                <div class="flavour-qty-control">
+                  <button type="button" class="btn-qty" onclick="adjustEditFlavourQty('Peri Peri', -1)" aria-label="Decrease Peri Peri">−</button>
+                  <input type="number" id="edit-qty-peri-peri" class="form-control qty-input" value="0" min="0" step="1">
+                  <button type="button" class="btn-qty" onclick="adjustEditFlavourQty('Peri Peri', 1)" aria-label="Increase Peri Peri">+</button>
+                </div>
+              </div>
             </div>
-            <div class="pricing-row">
-              <span>Product Amount:</span>
-              <strong id="edit-product-amount">₹0</strong>
-            </div>
-            <div class="pricing-row">
-              <span>Delivery Fee (₹):</span>
-              <input type="number" id="edit-delivery-fee" class="form-control delivery-input" value="0" min="0" step="1">
-            </div>
-            <div class="pricing-row total-row">
-              <span>Recalculated Final Amount:</span>
-              <strong id="edit-final-amount">₹0</strong>
+
+            <!-- Combo Offer Selection & Status Box in Edit Modal (Requirement 2.C & 2.D) -->
+            <div id="edit-combo-box" class="edit-combo-box">
+              <div class="edit-combo-header-wrap">
+                <div class="edit-combo-desc">
+                  <span class="edit-combo-title" id="edit-combo-box-title">
+                    <svg class="icon-svg" viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+                    Combo Offer Selection
+                  </span>
+                  <div class="edit-combo-helper" id="edit-combo-box-helper">Select an eligible combo offer or regular pricing:</div>
+                </div>
+                <div class="edit-combo-status-pill" id="edit-combo-status-pill">
+                  <!-- Rendered dynamically -->
+                </div>
+              </div>
+
+              <!-- Explicit Combo Option Cards / Buttons -->
+              <div class="edit-combo-options-grid">
+                <button type="button" class="edit-combo-opt-card" id="btn-edit-opt-none" onclick="setEditOrderCombo('')">
+                  <div class="opt-card-radio"></div>
+                  <div class="opt-card-content">
+                    <div class="opt-card-title">Regular Pricing</div>
+                    <div class="opt-card-sub">Normal per-bottle price & discount</div>
+                  </div>
+                </button>
+                <button type="button" class="edit-combo-opt-card" id="btn-edit-opt-2" onclick="setEditOrderCombo('2_BOTTLE')">
+                  <div class="opt-card-radio"></div>
+                  <div class="opt-card-content">
+                    <div class="opt-card-title">2-Bottle Combo — ₹289</div>
+                    <div class="opt-card-sub">Requires exactly 2 bottles</div>
+                  </div>
+                </button>
+                <button type="button" class="edit-combo-opt-card" id="btn-edit-opt-4" onclick="setEditOrderCombo('4_BOTTLE')">
+                  <div class="opt-card-radio"></div>
+                  <div class="opt-card-content">
+                    <div class="opt-card-title">4-Bottle Combo — ₹559</div>
+                    <div class="opt-card-sub">Requires exactly 4 bottles</div>
+                  </div>
+                </button>
+              </div>
+
+              <!-- Validation Alert if selected combo no longer matches quantity (Requirement 2.D) -->
+              <div id="edit-combo-validation-alert" class="alert alert-warning edit-combo-validation" style="display: none; margin-top: 12px;">
+                <svg class="icon-svg" viewBox="0 0 24 24"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" x2="12" y1="9" y2="13"/><line x1="12" x2="12.01" y1="17" y2="17"/></svg>
+                <span id="edit-combo-validation-text">Selected combo does not match total bottle quantity.</span>
+              </div>
             </div>
           </div>
+
+          <!-- Section C: Pricing Summary (Requirement 1.C) -->
+          <div class="edit-section-card pricing-card-container">
+            <div class="edit-section-header">
+              <span class="edit-section-badge">C</span>
+              <h4 class="edit-section-title">Pricing Summary</h4>
+            </div>
+            <div class="edit-pricing-grid">
+              <div class="pricing-spec-row">
+                <span class="spec-label">Total Bottles</span>
+                <strong class="spec-value" id="edit-summary-bottles">0 Bottles</strong>
+              </div>
+              <div class="pricing-spec-row">
+                <span class="spec-label">Original Product Amount</span>
+                <span class="spec-value" id="edit-summary-original-amount">₹0</span>
+              </div>
+              <div class="pricing-spec-row">
+                <span class="spec-label">Discount Per Bottle</span>
+                <span class="spec-value text-muted" id="edit-summary-discount-per-bottle">-₹11</span>
+              </div>
+              <div class="pricing-spec-row">
+                <span class="spec-label">Total Discount</span>
+                <span class="spec-value text-success" id="edit-summary-total-discount">-₹0</span>
+              </div>
+              <div class="pricing-spec-row">
+                <span class="spec-label">Discounted Product Amount</span>
+                <span class="spec-value" id="edit-summary-discounted-product-amount">₹0</span>
+              </div>
+              <div class="pricing-spec-row">
+                <span class="spec-label">Combo Offer Status</span>
+                <span class="spec-value" id="edit-summary-combo-status"><span class="badge badge-secondary">Not Applied</span></span>
+              </div>
+              <div class="pricing-spec-row">
+                <span class="spec-label">Selected Combo Offer Price</span>
+                <span class="spec-value" id="edit-summary-combo-price">—</span>
+              </div>
+              <div class="pricing-spec-row delivery-spec-row">
+                <div class="delivery-label-group">
+                  <span class="spec-label">Delivery Fee</span>
+                  <div class="spec-hint" id="edit-delivery-zone-hint">Standard rate</div>
+                </div>
+                <div class="spec-value delivery-input-wrap">
+                  <span class="currency-symbol">₹</span>
+                  <input type="number" id="edit-delivery-fee" class="form-control delivery-input" value="0" min="0" step="1">
+                </div>
+              </div>
+              <div class="pricing-spec-row">
+                <span class="spec-label">Free Delivery Status</span>
+                <span class="spec-value" id="edit-summary-free-delivery-status">Not Applicable (&le; ₹800)</span>
+              </div>
+              <div class="pricing-spec-row final-payable-spec-row">
+                <div>
+                  <span class="spec-label" style="font-size: 15px; font-weight: 700; color: #FFFFFF;">Final Payable Amount</span>
+                  <div style="font-size: 12px; opacity: 0.85; color: #E8F0FE;">Applicable Product Amount + Delivery Fee</div>
+                </div>
+                <strong class="spec-value final-payable-value" id="edit-final-amount">₹0</strong>
+              </div>
+            </div>
+          </div>
+
+          <!-- Section D: Order Information (Requirement 1.D) -->
+          <div class="edit-section-card">
+            <div class="edit-section-header">
+              <span class="edit-section-badge">D</span>
+              <h4 class="edit-section-title">Order Information</h4>
+            </div>
+            <div class="order-meta-grid">
+              <div class="meta-item">
+                <span class="meta-label">Order ID</span>
+                <strong class="meta-value" id="edit-info-order-id">-</strong>
+              </div>
+              <div class="meta-item">
+                <span class="meta-label">Order Date</span>
+                <span class="meta-value" id="edit-info-order-date">-</span>
+              </div>
+              <div class="meta-item">
+                <span class="meta-label">Order Status</span>
+                <span class="meta-value"><span class="badge badge-paid">Active Order</span></span>
+              </div>
+              <div class="meta-item">
+                <label class="meta-label" for="edit-payment">Payment Status <span class="req-star">*</span></label>
+                <select id="edit-payment" class="form-control form-control-sm" required>
+                  <option value="Paid">Prepaid (Paid)</option>
+                  <option value="COD">Cash on Delivery (COD)</option>
+                </select>
+              </div>
+              <div class="meta-item">
+                <span class="meta-label">Dispatch Status</span>
+                <span class="meta-value" id="edit-info-dispatch-wrap"><span id="edit-info-dispatch-badge" class="badge badge-placed">PLACED</span></span>
+              </div>
+              <div class="meta-item">
+                <span class="meta-label">Created By</span>
+                <span class="meta-value" id="edit-info-created-by">-</span>
+              </div>
+              <div class="meta-item">
+                <span class="meta-label">Edited By</span>
+                <span class="meta-value" id="edit-info-edited-by">-</span>
+              </div>
+            </div>
+          </div>
+
         </div>
-        <div class="modal-footer">
-          <button type="button" class="btn btn-outline" onclick="document.getElementById('modal-edit-order').classList.remove('show')">Cancel</button>
-          <button type="submit" class="btn btn-primary">Save Changes</button>
+        <!-- Section E: Actions (Requirement 1.E) -->
+        <div class="modal-footer edit-modal-footer">
+          <button type="button" class="btn btn-outline" id="btn-cancel-edit-order">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="btn-save-edit-order">
+            <svg class="icon-svg" viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+            <span id="btn-save-edit-order-label">Save Changes</span>
+          </button>
         </div>
       </form>
     </div>

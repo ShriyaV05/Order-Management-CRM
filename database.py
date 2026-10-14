@@ -1,9 +1,85 @@
 import sqlite3
 import os
+import shutil
+from typing import Optional
 from datetime import datetime, timezone
 from auth import hash_password
 
-DEFAULT_DB_PATH = os.path.join(os.path.dirname(__file__), "popcone.db")
+DEFAULT_DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "popcone.db")
+
+def _auto_restore_if_needed(target_path: str):
+    """
+    Safety Guard: If the database file does not exist or is empty,
+    automatically restore from the latest valid backup or template so data is never lost.
+    """
+    if os.path.exists(target_path) and os.path.getsize(target_path) > 0:
+        return
+
+    base_dir = os.path.dirname(os.path.abspath(target_path))
+    backup_file = os.path.join(base_dir, "backups", "popcone_latest.bak")
+    
+    # 1. Restore from latest snapshot backup if available
+    if os.path.exists(backup_file) and os.path.getsize(backup_file) > 0:
+        try:
+            shutil.copy2(backup_file, target_path)
+            print(f"[Database Protection] Auto-restored missing database from backup: {backup_file}")
+            return
+        except Exception as e:
+            print(f"[Database Protection] Warning: Failed to restore from backup: {e}")
+
+    # 2. If target is a persistent mount (/var/data, /data, etc.) and DEFAULT_DB_PATH exists, seed from it
+    if os.path.abspath(target_path) != os.path.abspath(DEFAULT_DB_PATH):
+        if os.path.exists(DEFAULT_DB_PATH) and os.path.getsize(DEFAULT_DB_PATH) > 0:
+            try:
+                shutil.copy2(DEFAULT_DB_PATH, target_path)
+                print(f"[Database Protection] Initialized persistent database from template: {DEFAULT_DB_PATH}")
+                return
+            except Exception as e:
+                print(f"[Database Protection] Warning: Failed to seed from template: {e}")
+
+def backup_database() -> Optional[str]:
+    """
+    Safely creates an automated snapshot backup of the SQLite database
+    in a dedicated 'backups/' directory using SQLite's online backup API.
+    Guarantees no file corruption even under active traffic.
+    """
+    if os.environ.get("TURSO_DATABASE_URL") and os.environ.get("TURSO_AUTH_TOKEN"):
+        return None
+
+    db_path = resolve_db_path()
+    if not os.path.exists(db_path) or os.path.getsize(db_path) == 0:
+        return None
+
+    try:
+        base_dir = os.path.dirname(os.path.abspath(db_path))
+        backup_dir = os.path.join(base_dir, "backups")
+        os.makedirs(backup_dir, exist_ok=True)
+
+        latest_backup_path = os.path.join(backup_dir, "popcone_latest.bak")
+        today_str = datetime.now().strftime("%Y-%m-%d")
+        daily_backup_path = os.path.join(backup_dir, f"popcone_backup_{today_str}.db")
+
+        # Use SQLite online backup API for crash-safe, non-blocking backup
+        src_conn = sqlite3.connect(db_path)
+        try:
+            # Update latest backup snapshot
+            dst_conn_latest = sqlite3.connect(latest_backup_path)
+            with dst_conn_latest:
+                src_conn.backup(dst_conn_latest)
+            dst_conn_latest.close()
+
+            # Update daily backup snapshot
+            dst_conn_daily = sqlite3.connect(daily_backup_path)
+            with dst_conn_daily:
+                src_conn.backup(dst_conn_daily)
+            dst_conn_daily.close()
+        finally:
+            src_conn.close()
+
+        return latest_backup_path
+    except Exception as e:
+        print(f"[Database Backup] Notice: Could not create backup snapshot: {e}")
+        return None
 
 def resolve_db_path() -> str:
     env_path = os.environ.get("DB_PATH")
@@ -14,21 +90,23 @@ def resolve_db_path() -> str:
                 os.makedirs(parent_dir, exist_ok=True)
             except Exception:
                 pass
+        _auto_restore_if_needed(env_path)
         return env_path
 
     # Check known persistent mount directories on Render or Docker
     for mount_dir in ["/var/data", "/data", "/app/data"]:
         if os.path.isdir(mount_dir) and os.access(mount_dir, os.W_OK):
             persistent_path = os.path.join(mount_dir, "popcone.db")
-            # If persistent DB does not exist yet, safely seed from existing DB once
-            if not os.path.exists(persistent_path) and os.path.exists(DEFAULT_DB_PATH):
-                try:
-                    import shutil
-                    shutil.copy2(DEFAULT_DB_PATH, persistent_path)
-                except Exception:
-                    pass
+            _auto_restore_if_needed(persistent_path)
             return persistent_path
 
+    # Vercel serverless environment fallback
+    if os.environ.get("VERCEL") and not (os.environ.get("TURSO_DATABASE_URL") and os.environ.get("TURSO_AUTH_TOKEN")):
+        tmp_path = "/tmp/popcone.db"
+        _auto_restore_if_needed(tmp_path)
+        return tmp_path
+
+    _auto_restore_if_needed(DEFAULT_DB_PATH)
     return DEFAULT_DB_PATH
 
 DB_PATH = resolve_db_path()
@@ -115,9 +193,17 @@ def get_db():
     conn = sqlite3.connect(resolve_db_path())
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON;")
+    try:
+        conn.execute("PRAGMA journal_mode = WAL;")
+        conn.execute("PRAGMA synchronous = NORMAL;")
+    except Exception:
+        pass
     return conn
 
 def init_db():
+    # Automatically take a safe snapshot backup before any migrations or initialization
+    backup_database()
+
     conn = get_db()
     cursor = conn.cursor()
 
@@ -280,15 +366,16 @@ def init_db():
         cursor.executemany("INSERT INTO settings (key, value, updated_at) VALUES (?, ?, ?);", initial_settings)
         conn.commit()
     else:
-        # Ensure discount_per_bottle exists in settings
-        cursor.execute("SELECT value FROM settings WHERE key = 'discount_per_bottle';")
-        if not cursor.fetchone():
-            cursor.execute("INSERT INTO settings (key, value, updated_at) VALUES ('discount_per_bottle', '11', ?);", (now_str,))
-        # Update bottle_price setting to 160
-        cursor.execute("UPDATE settings SET value = '160', updated_at = ? WHERE key = 'bottle_price';", (now_str,))
-        # Update low_stock_threshold to 10
-        cursor.execute("UPDATE settings SET value = '10', updated_at = ? WHERE key = 'low_stock_threshold';", (now_str,))
-        cursor.execute("UPDATE inventory SET low_stock_threshold = 10, updated_at = ? WHERE low_stock_threshold = 20;", (now_str,))
+        # Ensure required settings exist without overwriting custom values
+        required_defaults = [
+            ("bottle_price", "160"),
+            ("discount_per_bottle", "11"),
+            ("low_stock_threshold", "10"),
+        ]
+        for key, def_val in required_defaults:
+            cursor.execute("SELECT value FROM settings WHERE key = ?;", (key,))
+            if not cursor.fetchone():
+                cursor.execute("INSERT INTO settings (key, value, updated_at) VALUES (?, ?, ?);", (key, def_val, now_str))
         conn.commit()
 
     # Check inventory
@@ -306,6 +393,12 @@ def init_db():
     conn.close()
 
 def reset_crm_data():
+    # Hard safety lock to prevent accidental wipes
+    if os.environ.get("ALLOW_DANGEROUS_DB_RESET") != "CONFIRM_PERMANENT_WIPE":
+        raise RuntimeError(
+            "CRITICAL SAFETY LOCK: Database wipe is locked to protect live data. "
+            "To force a wipe, set environment variable ALLOW_DANGEROUS_DB_RESET=CONFIRM_PERMANENT_WIPE"
+        )
     conn = get_db()
     cursor = conn.cursor()
     cursor.execute("DELETE FROM order_items;")

@@ -10,3 +10,13 @@ ENV/
 *.log
 .DS_Store
 Thumbs.db
+
+# SQLite Database & Backups - Never overwrite or track live database in git
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite3
+popcone.db
+backups/

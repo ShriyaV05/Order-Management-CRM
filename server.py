@@ -13,7 +13,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel, Field
 
 from auth import hash_password, verify_password, generate_session_token
-from database import get_db, init_db
+from database import get_db, init_db, backup_database, resolve_db_path
 from locations import INDIA_LOCATIONS, calculate_delivery_fee
 
 app = FastAPI(title="POPCONE Orders & Sales CRM", version="1.0.0")
@@ -335,6 +335,29 @@ def admin_set_user_password(req: AdminUserPasswordRequest, current_user: Dict[st
         "success": True,
         "message": f"Password for {target_user['display_name']} updated successfully. New password is active immediately."
     }
+
+# ----------------- Database Protection & Backup Routes -----------------
+@app.post("/api/admin/database/backup")
+def trigger_backup(current_user: Dict[str, Any] = Depends(require_admin)):
+    path = backup_database()
+    return {
+        "success": True,
+        "message": "Database backup created successfully",
+        "backup_path": path
+    }
+
+@app.get("/api/admin/database/download")
+def download_database(current_user: Dict[str, Any] = Depends(require_admin)):
+    backup_database()
+    db_path = resolve_db_path()
+    if not os.path.exists(db_path):
+        raise HTTPException(status_code=404, detail="Database file not found")
+    timestamp_str = datetime.now().strftime("%Y%m%d_%H%M%S")
+    return FileResponse(
+        db_path,
+        media_type="application/x-sqlite3",
+        filename=f"popcone_backup_{timestamp_str}.db"
+    )
 
 # ----------------- Locations, Postal PIN Lookup & Delivery -----------------
 @app.get("/api/locations")

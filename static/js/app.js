@@ -73,13 +73,18 @@ document.addEventListener('DOMContentLoaded', async () => {
   const loginError = document.getElementById('login-error');
 
   function updateAuthUI() {
+    const isActive = api.isSessionActive();
     state.user = api.getUser();
     const token = api.getToken();
-    if (!state.user || !token) {
+
+    if (!isActive || !state.user || !token) {
       loginOverlay.style.display = 'flex';
       return;
     }
     loginOverlay.style.display = 'none';
+
+    // Record activity timestamp on successful verification
+    api.recordActivity();
 
     // Requirement 22: User Display in Bottom-Left
     // For Ashish: Ashish \n ADMIN
@@ -107,7 +112,41 @@ document.addEventListener('DOMContentLoaded', async () => {
     switchTab(state.activeTab);
   }
 
-  window.addEventListener('auth-changed', () => updateAuthUI());
+  window.addEventListener('auth-changed', (e) => {
+    updateAuthUI();
+    if (e.detail && e.detail.expired) {
+      showToast('Your session timed out after 10 minutes of inactivity. Please login again.', 'warning');
+    }
+  });
+
+  // Track user activity to maintain active session while working (throttled to every 10 seconds)
+  let lastRecordedActivity = 0;
+  function handleUserActivity() {
+    const now = Date.now();
+    if (now - lastRecordedActivity > 10000) {
+      lastRecordedActivity = now;
+      api.recordActivity();
+    }
+  }
+
+  ['mousedown', 'keydown', 'scroll', 'touchstart', 'click'].forEach(evt => {
+    window.addEventListener(evt, handleUserActivity, { passive: true });
+  });
+
+  // Periodically check for 10-minute inactivity timeout (every 15s) and on tab focus
+  function checkSessionTimeout() {
+    if (api.getToken() && !api.isSessionActive()) {
+      updateAuthUI();
+    }
+  }
+
+  setInterval(checkSessionTimeout, 15000);
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) {
+      checkSessionTimeout();
+    }
+  });
+  window.addEventListener('focus', checkSessionTimeout);
 
   loginForm.addEventListener('submit', async (e) => {
     e.preventDefault();

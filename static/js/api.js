@@ -1,7 +1,46 @@
 // POPCONE API Client
 const API_BASE = '/api';
+const INACTIVITY_TIMEOUT_MS = 10 * 60 * 1000; // 10 minutes idle timeout
 
 const api = {
+  // Update timestamp of last user action
+  recordActivity() {
+    if (localStorage.getItem('popcone_token')) {
+      localStorage.setItem('popcone_last_active', Date.now().toString());
+    }
+  },
+
+  // Check if current session exists and is within 10-minute activity window
+  isSessionActive() {
+    const token = this.getToken();
+    if (!token) return false;
+
+    const lastActiveStr = localStorage.getItem('popcone_last_active');
+    if (!lastActiveStr) {
+      // First visit without recorded activity -> require login
+      return false;
+    }
+
+    const lastActive = parseInt(lastActiveStr, 10);
+    if (isNaN(lastActive)) return false;
+
+    const elapsed = Date.now() - lastActive;
+    if (elapsed > INACTIVITY_TIMEOUT_MS) {
+      // More than 10 minutes passed -> expire session
+      this.clearSession(true);
+      return false;
+    }
+
+    return true;
+  },
+
+  clearSession(expired = false) {
+    localStorage.removeItem('popcone_token');
+    localStorage.removeItem('popcone_user');
+    localStorage.removeItem('popcone_last_active');
+    window.dispatchEvent(new CustomEvent('auth-changed', { detail: { loggedIn: false, expired } }));
+  },
+
   getToken() {
     return localStorage.getItem('popcone_token');
   },
@@ -9,8 +48,10 @@ const api = {
   setToken(token) {
     if (token) {
       localStorage.setItem('popcone_token', token);
+      this.recordActivity();
     } else {
       localStorage.removeItem('popcone_token');
+      localStorage.removeItem('popcone_last_active');
     }
   },
 
@@ -32,6 +73,15 @@ const api = {
   },
 
   async request(endpoint, options = {}) {
+    // Check if session timed out prior to authenticated requests
+    if (!endpoint.startsWith('/auth/login') && this.getToken() && !this.isSessionActive()) {
+      this.clearSession(true);
+      throw new Error('Session timed out after 10 minutes of inactivity. Please login again.');
+    }
+
+    // Refresh activity timestamp on any request
+    this.recordActivity();
+
     const headers = options.headers || {};
     const token = this.getToken();
 
@@ -50,9 +100,7 @@ const api = {
       const response = await fetch(`${API_BASE}${endpoint}`, options);
       if (response.status === 401) {
         // Expired or unauthorized
-        this.setToken(null);
-        this.setUser(null);
-        window.dispatchEvent(new CustomEvent('auth-changed', { detail: { loggedIn: false } }));
+        this.clearSession(true);
         throw new Error('Session expired or unauthorized');
       }
 
@@ -74,6 +122,7 @@ const api = {
     });
     this.setToken(res.token);
     this.setUser(res.user);
+    this.recordActivity();
     window.dispatchEvent(new CustomEvent('auth-changed', { detail: { loggedIn: true, user: res.user } }));
     return res;
   },
@@ -84,9 +133,7 @@ const api = {
     } catch (e) {
       console.warn('Logout API failed:', e);
     }
-    this.setToken(null);
-    this.setUser(null);
-    window.dispatchEvent(new CustomEvent('auth-changed', { detail: { loggedIn: false } }));
+    this.clearSession(false);
   },
 
   async getMe() {

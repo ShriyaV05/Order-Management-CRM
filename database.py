@@ -5,6 +5,24 @@ from typing import Optional
 from datetime import datetime, timezone
 from auth import hash_password
 
+# Load .env file automatically into os.environ if present
+def _load_env_file():
+    env_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env")
+    if os.path.exists(env_file):
+        try:
+            with open(env_file, "r", encoding="utf-8") as f:
+                for line in f:
+                    line = line.strip()
+                    if line and not line.startswith("#") and "=" in line:
+                        k, v = line.split("=", 1)
+                        k, v = k.strip(), v.strip().strip('"').strip("'")
+                        if k and k not in os.environ:
+                            os.environ[k] = v
+        except Exception:
+            pass
+
+_load_env_file()
+
 DEFAULT_DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "popcone.db")
 
 def _auto_restore_if_needed(target_path: str):

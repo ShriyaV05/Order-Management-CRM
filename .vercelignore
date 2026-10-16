@@ -1,0 +1,16 @@
+.git
+.venv
+venv
+__pycache__
+*.pyc
+backups
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+popcone.db
+activity.txt
+Dockerfile
+docker-compose.yml
+.dockerignore
+.env

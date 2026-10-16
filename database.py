@@ -1,11 +1,15 @@
-import sqlite3
 import os
-import shutil
-from typing import Optional
+import sqlite3
+import threading
+from typing import Optional, List, Tuple, Any
 from datetime import datetime, timezone
 from auth import hash_password
 
-# Load .env file automatically into os.environ if present
+# Live data lives in ONE Turso database only.
+# Orders/inventory are never auto-wiped on startup, deploy, or schema init.
+# Allowed deletes: explicit SQL, this app's order-delete API, or a manual AI query.
+
+
 def _load_env_file():
     env_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env")
     if os.path.exists(env_file):
@@ -21,113 +25,50 @@ def _load_env_file():
         except Exception:
             pass
 
+
 _load_env_file()
 
-DEFAULT_DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "popcone.db")
+LOCAL_SQLITE_ARCHIVE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "popcone.db")
 
-def _auto_restore_if_needed(target_path: str):
-    """
-    Safety Guard: If the database file does not exist or is empty,
-    automatically restore from the latest valid backup or template so data is never lost.
-    """
-    if os.path.exists(target_path) and os.path.getsize(target_path) > 0:
-        return
+PLACEHOLDER_TOKENS = {
+    "",
+    "your_turso_auth_token_here",
+    "changeme",
+    "replace_me",
+}
 
-    base_dir = os.path.dirname(os.path.abspath(target_path))
-    backup_file = os.path.join(base_dir, "backups", "popcone_latest.bak")
-    
-    # 1. Restore from latest snapshot backup if available
-    if os.path.exists(backup_file) and os.path.getsize(backup_file) > 0:
-        try:
-            shutil.copy2(backup_file, target_path)
-            print(f"[Database Protection] Auto-restored missing database from backup: {backup_file}")
-            return
-        except Exception as e:
-            print(f"[Database Protection] Warning: Failed to restore from backup: {e}")
+SAFE_TABLES = frozenset({
+    "users",
+    "sessions",
+    "settings",
+    "inventory",
+    "inventory_movements",
+    "orders",
+    "order_items",
+    "audit_logs",
+})
 
-    # 2. If target is a persistent mount (/var/data, /data, etc.) and DEFAULT_DB_PATH exists, seed from it
-    if os.path.abspath(target_path) != os.path.abspath(DEFAULT_DB_PATH):
-        if os.path.exists(DEFAULT_DB_PATH) and os.path.getsize(DEFAULT_DB_PATH) > 0:
-            try:
-                shutil.copy2(DEFAULT_DB_PATH, target_path)
-                print(f"[Database Protection] Initialized persistent database from template: {DEFAULT_DB_PATH}")
-                return
-            except Exception as e:
-                print(f"[Database Protection] Warning: Failed to seed from template: {e}")
 
-def backup_database() -> Optional[str]:
-    """
-    Safely creates an automated snapshot backup of the SQLite database
-    in a dedicated 'backups/' directory using SQLite's online backup API.
-    Guarantees no file corruption even under active traffic.
-    """
-    if os.environ.get("TURSO_DATABASE_URL") and os.environ.get("TURSO_AUTH_TOKEN"):
-        return None
+def get_turso_credentials() -> Tuple[str, str]:
+    url = (os.environ.get("TURSO_DATABASE_URL") or "").strip()
+    token = (os.environ.get("TURSO_AUTH_TOKEN") or "").strip()
+    if not url or not token or token.lower() in PLACEHOLDER_TOKENS:
+        raise RuntimeError(
+            "POPCONE requires a single Turso database. "
+            "Set TURSO_DATABASE_URL and TURSO_AUTH_TOKEN in .env "
+            "(or the host environment). Local SQLite is disabled so deploys "
+            "cannot start on an empty file and look like data was erased."
+        )
+    return url, token
 
-    db_path = resolve_db_path()
-    if not os.path.exists(db_path) or os.path.getsize(db_path) == 0:
-        return None
 
+def using_turso() -> bool:
     try:
-        base_dir = os.path.dirname(os.path.abspath(db_path))
-        backup_dir = os.path.join(base_dir, "backups")
-        os.makedirs(backup_dir, exist_ok=True)
+        get_turso_credentials()
+        return True
+    except RuntimeError:
+        return False
 
-        latest_backup_path = os.path.join(backup_dir, "popcone_latest.bak")
-        today_str = datetime.now().strftime("%Y-%m-%d")
-        daily_backup_path = os.path.join(backup_dir, f"popcone_backup_{today_str}.db")
-
-        # Use SQLite online backup API for crash-safe, non-blocking backup
-        src_conn = sqlite3.connect(db_path)
-        try:
-            # Update latest backup snapshot
-            dst_conn_latest = sqlite3.connect(latest_backup_path)
-            with dst_conn_latest:
-                src_conn.backup(dst_conn_latest)
-            dst_conn_latest.close()
-
-            # Update daily backup snapshot
-            dst_conn_daily = sqlite3.connect(daily_backup_path)
-            with dst_conn_daily:
-                src_conn.backup(dst_conn_daily)
-            dst_conn_daily.close()
-        finally:
-            src_conn.close()
-
-        return latest_backup_path
-    except Exception as e:
-        print(f"[Database Backup] Notice: Could not create backup snapshot: {e}")
-        return None
-
-def resolve_db_path() -> str:
-    env_path = os.environ.get("DB_PATH")
-    if env_path:
-        parent_dir = os.path.dirname(env_path)
-        if parent_dir and not os.path.exists(parent_dir):
-            try:
-                os.makedirs(parent_dir, exist_ok=True)
-            except Exception:
-                pass
-        _auto_restore_if_needed(env_path)
-        return env_path
-
-    # Check known persistent mount directories on Render or Docker
-    for mount_dir in ["/var/data", "/data", "/app/data"]:
-        if os.path.isdir(mount_dir) and os.access(mount_dir, os.W_OK):
-            persistent_path = os.path.join(mount_dir, "popcone.db")
-            _auto_restore_if_needed(persistent_path)
-            return persistent_path
-
-    # Vercel serverless environment fallback
-    if os.environ.get("VERCEL") and not (os.environ.get("TURSO_DATABASE_URL") and os.environ.get("TURSO_AUTH_TOKEN")):
-        tmp_path = "/tmp/popcone.db"
-        _auto_restore_if_needed(tmp_path)
-        return tmp_path
-
-    _auto_restore_if_needed(DEFAULT_DB_PATH)
-    return DEFAULT_DB_PATH
-
-DB_PATH = resolve_db_path()
 
 class TursoRow(dict):
     def __init__(self, cols, values):
@@ -145,19 +86,39 @@ class TursoRow(dict):
     def keys(self):
         return self._cols
 
+
 class TursoCursor:
-    def __init__(self, client):
-        self.client = client
+    def __init__(self, conn: "TursoConnection"):
+        self.conn = conn
         self.results = []
         self._pos = 0
 
     def execute(self, sql, params=None):
         clean_sql = sql.strip().rstrip(";")
-        if clean_sql.upper().startswith("PRAGMA FOREIGN_KEYS"):
-            return self
-        
+        upper = clean_sql.upper()
         args = list(params) if params is not None else []
-        res = self.client.execute(sql, args)
+
+        if upper.startswith("PRAGMA FOREIGN_KEYS"):
+            return self
+
+        if upper.startswith("BEGIN"):
+            self.conn._pending = []
+            return self
+        if upper.startswith("COMMIT"):
+            self.conn.commit()
+            return self
+        if upper.startswith("ROLLBACK"):
+            self.conn.rollback()
+            return self
+
+        if self.conn._pending is not None:
+            # Queue writes until commit so they run as one atomic Turso batch.
+            self.conn._pending.append((clean_sql, args))
+            self.results = []
+            self._pos = 0
+            return self
+
+        res = self.conn.client.execute(clean_sql, args)
         cols = res.columns
         self.results = [TursoRow(cols, row) for row in res.rows]
         self._pos = 0
@@ -180,52 +141,128 @@ class TursoCursor:
         self._pos = len(self.results)
         return remaining
 
+
 class TursoConnection:
     def __init__(self, url, token):
         import libsql_client
         clean_url = url.replace("libsql://", "https://")
         self.client = libsql_client.create_client_sync(clean_url, auth_token=token)
+        self._pending: Optional[List[Tuple[str, list]]] = None
 
     def cursor(self):
-        return TursoCursor(self.client)
+        return TursoCursor(self)
 
     def execute(self, sql, params=None):
         cur = self.cursor()
         return cur.execute(sql, params)
 
     def commit(self):
-        pass
+        pending = self._pending
+        self._pending = None
+        if not pending:
+            return
+        batch_args: List[Any] = []
+        for sql, args in pending:
+            batch_args.append((sql, args) if args else sql)
+        self.client.batch(batch_args)
 
     def rollback(self):
-        pass
+        self._pending = None
 
     def close(self):
-        self.client.close()
+        self._pending = None
+        try:
+            self.client.close()
+        except Exception:
+            pass
+
 
 def get_db():
-    turso_url = os.environ.get("TURSO_DATABASE_URL")
-    turso_token = os.environ.get("TURSO_AUTH_TOKEN")
-    if turso_url and turso_token:
-        return TursoConnection(turso_url, turso_token)
+    url, token = get_turso_credentials()
+    return TursoConnection(url, token)
 
-    conn = sqlite3.connect(resolve_db_path())
-    conn.row_factory = sqlite3.Row
-    conn.execute("PRAGMA foreign_keys = ON;")
+
+def _scalar(row) -> Any:
+    if row is None:
+        return None
     try:
-        conn.execute("PRAGMA journal_mode = WAL;")
-        conn.execute("PRAGMA synchronous = NORMAL;")
+        if "cnt" in row.keys():
+            return row["cnt"]
     except Exception:
         pass
-    return conn
+    return row[0]
+
+
+def _table_row_count(cursor, table: str) -> int:
+    if table not in SAFE_TABLES:
+        raise ValueError(f"Refusing count on unexpected table: {table}")
+    cursor.execute(f"SELECT COUNT(*) AS cnt FROM {table};")
+    value = _scalar(cursor.fetchone())
+    return int(value or 0)
+
+
+def _column_names(cursor, table: str) -> List[str]:
+    if table not in SAFE_TABLES:
+        raise ValueError(f"Refusing pragma on unexpected table: {table}")
+    cursor.execute(f"PRAGMA table_info({table});")
+    names = []
+    for row in cursor.fetchall():
+        try:
+            names.append(row["name"])
+        except Exception:
+            names.append(row[1])
+    return names
+
+
+def _add_column_if_missing(cursor, table: str, column: str, ddl: str):
+    existing = _column_names(cursor, table)
+    if column in existing:
+        return
+    try:
+        cursor.execute(f"ALTER TABLE {table} ADD COLUMN {ddl};")
+    except Exception as e:
+        msg = str(e).lower()
+        if "duplicate column" in msg or "already exists" in msg:
+            return
+        raise
+
+
+def backup_database() -> Optional[str]:
+    # Live data is remote Turso; there is no local sqlite file to snapshot.
+    return None
+
+
+def resolve_db_path() -> str:
+    return "turso://popcone"
+
+
+_schema_lock = threading.Lock()
+_schema_ready = False
+
 
 def init_db():
-    # Automatically take a safe snapshot backup before any migrations or initialization
-    backup_database()
+    """
+    Additive-only startup:
+    - CREATE TABLE IF NOT EXISTS (never DROP)
+    - ALTER TABLE ADD COLUMN if a new field is missing
+    - Seed users/settings/inventory only when those tables are empty
+    Never deletes orders, items, movements, or audit rows.
+    Safe to call on every Vercel cold start / request.
+    """
+    global _schema_ready
+    if _schema_ready:
+        return
+    with _schema_lock:
+        if _schema_ready:
+            return
+        _init_db_unlocked()
+        _schema_ready = True
 
+
+def _init_db_unlocked():
     conn = get_db()
     cursor = conn.cursor()
 
-    # 1. Users table
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS users (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -238,7 +275,6 @@ def init_db():
     );
     """)
 
-    # 2. Sessions table
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS sessions (
         token TEXT PRIMARY KEY,
@@ -249,7 +285,6 @@ def init_db():
     );
     """)
 
-    # 3. Settings table
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS settings (
         key TEXT PRIMARY KEY,
@@ -258,7 +293,6 @@ def init_db():
     );
     """)
 
-    # 4. Inventory table
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS inventory (
         flavour TEXT PRIMARY KEY,
@@ -268,7 +302,6 @@ def init_db():
     );
     """)
 
-    # 5. Inventory movements table
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS inventory_movements (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -281,7 +314,6 @@ def init_db():
     );
     """)
 
-    # 6. Orders table
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS orders (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -307,7 +339,6 @@ def init_db():
     );
     """)
 
-    # 7. Order items table
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS order_items (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -320,7 +351,6 @@ def init_db():
     );
     """)
 
-    # 8. Audit logs table
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS audit_logs (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -332,33 +362,16 @@ def init_db():
     );
     """)
 
-    conn.commit()
+    _add_column_if_missing(cursor, "orders", "discount_per_bottle", "discount_per_bottle REAL NOT NULL DEFAULT 0.0")
+    _add_column_if_missing(cursor, "orders", "total_discount", "total_discount REAL NOT NULL DEFAULT 0.0")
+    _add_column_if_missing(cursor, "orders", "normal_product_amount", "normal_product_amount REAL NOT NULL DEFAULT 0.0")
+    _add_column_if_missing(cursor, "orders", "is_combo", "is_combo INTEGER NOT NULL DEFAULT 0")
+    _add_column_if_missing(cursor, "orders", "combo_type", "combo_type TEXT NOT NULL DEFAULT ''")
+    _add_column_if_missing(cursor, "orders", "combo_price", "combo_price REAL NOT NULL DEFAULT 0.0")
 
-    # Safe Schema Migrations for Orders Table (Pricing & Combo Fields)
-    cursor.execute("PRAGMA table_info(orders);")
-    existing_cols = [row["name"] for row in cursor.fetchall()]
-
-    if "discount_per_bottle" not in existing_cols:
-        cursor.execute("ALTER TABLE orders ADD COLUMN discount_per_bottle REAL NOT NULL DEFAULT 0.0;")
-    if "total_discount" not in existing_cols:
-        cursor.execute("ALTER TABLE orders ADD COLUMN total_discount REAL NOT NULL DEFAULT 0.0;")
-    if "normal_product_amount" not in existing_cols:
-        cursor.execute("ALTER TABLE orders ADD COLUMN normal_product_amount REAL NOT NULL DEFAULT 0.0;")
-    if "is_combo" not in existing_cols:
-        cursor.execute("ALTER TABLE orders ADD COLUMN is_combo INTEGER NOT NULL DEFAULT 0;")
-    if "combo_type" not in existing_cols:
-        cursor.execute("ALTER TABLE orders ADD COLUMN combo_type TEXT NOT NULL DEFAULT '';")
-    if "combo_price" not in existing_cols:
-        cursor.execute("ALTER TABLE orders ADD COLUMN combo_price REAL NOT NULL DEFAULT 0.0;")
-
-    conn.commit()
-
-    # Seed Initial Data if empty
     now_str = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
 
-    # Check users
-    cursor.execute("SELECT COUNT(*) FROM users;")
-    if cursor.fetchone()[0] == 0:
+    if _table_row_count(cursor, "users") == 0:
         default_pwd_hash = hash_password("Popcone@123")
         initial_users = [
             ("suguna@popcone", "Suguna", "MEMBER", default_pwd_hash, now_str, now_str),
@@ -371,20 +384,18 @@ def init_db():
         INSERT INTO users (username, display_name, role, password_hash, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?, ?);
         """, initial_users)
-        conn.commit()
 
-    # Check settings
-    cursor.execute("SELECT COUNT(*) FROM settings;")
-    if cursor.fetchone()[0] == 0:
+    if _table_row_count(cursor, "settings") == 0:
         initial_settings = [
             ("bottle_price", "160", now_str),
             ("discount_per_bottle", "11", now_str),
             ("low_stock_threshold", "10", now_str),
         ]
-        cursor.executemany("INSERT INTO settings (key, value, updated_at) VALUES (?, ?, ?);", initial_settings)
-        conn.commit()
+        cursor.executemany(
+            "INSERT INTO settings (key, value, updated_at) VALUES (?, ?, ?);",
+            initial_settings,
+        )
     else:
-        # Ensure required settings exist without overwriting custom values
         required_defaults = [
             ("bottle_price", "160"),
             ("discount_per_bottle", "11"),
@@ -393,41 +404,162 @@ def init_db():
         for key, def_val in required_defaults:
             cursor.execute("SELECT value FROM settings WHERE key = ?;", (key,))
             if not cursor.fetchone():
-                cursor.execute("INSERT INTO settings (key, value, updated_at) VALUES (?, ?, ?);", (key, def_val, now_str))
-        conn.commit()
+                cursor.execute(
+                    "INSERT INTO settings (key, value, updated_at) VALUES (?, ?, ?);",
+                    (key, def_val, now_str),
+                )
 
-    # Check inventory
-    cursor.execute("SELECT COUNT(*) FROM inventory;")
-    if cursor.fetchone()[0] == 0:
+    if _table_row_count(cursor, "inventory") == 0:
         initial_inventory = [
             ("Tomato", 0, 10, now_str),
             ("Cheese", 0, 10, now_str),
             ("Sour Cream", 0, 10, now_str),
             ("Peri Peri", 0, 10, now_str),
         ]
-        cursor.executemany("INSERT INTO inventory (flavour, current_stock, low_stock_threshold, updated_at) VALUES (?, ?, ?, ?);", initial_inventory)
-        conn.commit()
+        cursor.executemany(
+            "INSERT INTO inventory (flavour, current_stock, low_stock_threshold, updated_at) VALUES (?, ?, ?, ?);",
+            initial_inventory,
+        )
 
+    _import_local_sqlite_if_turso_orders_empty(cursor)
+
+    order_count = _table_row_count(cursor, "orders")
+    print(f"[Database] Connected to single Turso database. Live orders: {order_count}. Init is additive-only.")
     conn.close()
+
+
+def _row_get(row, key, default=None):
+    try:
+        keys = list(row.keys())
+        if key in keys:
+            val = row[key]
+            return default if val is None else val
+    except Exception:
+        pass
+    return default
+
+
+def _import_local_sqlite_if_turso_orders_empty(cursor):
+    """
+    One-way safety copy: if Turso has no orders yet but the old local popcone.db
+    still has them, copy into Turso. Never deletes Turso rows. Never writes back to sqlite.
+    """
+    if _table_row_count(cursor, "orders") > 0:
+        return
+    if not os.path.exists(LOCAL_SQLITE_ARCHIVE) or os.path.getsize(LOCAL_SQLITE_ARCHIVE) == 0:
+        return
+
+    try:
+        src = sqlite3.connect(LOCAL_SQLITE_ARCHIVE)
+        src.row_factory = sqlite3.Row
+        sc = src.cursor()
+        sc.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='orders';")
+        if not sc.fetchone():
+            src.close()
+            return
+        sc.execute("SELECT COUNT(*) FROM orders;")
+        local_orders = int(sc.fetchone()[0] or 0)
+        if local_orders <= 0:
+            src.close()
+            return
+
+        sc.execute("SELECT * FROM orders ORDER BY id ASC;")
+        orders = sc.fetchall()
+        for row in orders:
+            cursor.execute(
+                """
+                INSERT INTO orders (
+                    order_id, customer_name, phone, address, pin_code, state, district,
+                    total_bottles, total_weight_grams, unit_price, product_amount,
+                    delivery_fee, final_amount, payment, dispatch_state,
+                    created_by, created_at, edited_by, edited_at,
+                    discount_per_bottle, total_discount, normal_product_amount,
+                    is_combo, combo_type, combo_price
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+                """,
+                (
+                    row["order_id"], row["customer_name"], row["phone"], row["address"],
+                    row["pin_code"], row["state"], row["district"],
+                    row["total_bottles"], row["total_weight_grams"], row["unit_price"],
+                    row["product_amount"], row["delivery_fee"], row["final_amount"],
+                    row["payment"], row["dispatch_state"],
+                    row["created_by"], row["created_at"], row["edited_by"], row["edited_at"],
+                    _row_get(row, "discount_per_bottle", 0.0),
+                    _row_get(row, "total_discount", 0.0),
+                    _row_get(row, "normal_product_amount", 0.0),
+                    _row_get(row, "is_combo", 0),
+                    _row_get(row, "combo_type", ""),
+                    _row_get(row, "combo_price", 0.0),
+                ),
+            )
+
+        try:
+            sc.execute("SELECT * FROM order_items;")
+            for row in sc.fetchall():
+                cursor.execute(
+                    """
+                    INSERT INTO order_items (order_id, flavour, quantity, unit_price, line_amount)
+                    VALUES (?, ?, ?, ?, ?);
+                    """,
+                    (row["order_id"], row["flavour"], row["quantity"], row["unit_price"], row["line_amount"]),
+                )
+        except Exception as e:
+            print(f"[Database] Notice: could not import local order_items: {e}")
+
+        try:
+            sc.execute("SELECT * FROM inventory_movements;")
+            for row in sc.fetchall():
+                cursor.execute(
+                    """
+                    INSERT INTO inventory_movements (timestamp, flavour, movement_type, quantity, reference, created_by)
+                    VALUES (?, ?, ?, ?, ?, ?);
+                    """,
+                    (row["timestamp"], row["flavour"], row["movement_type"], row["quantity"], row["reference"], row["created_by"]),
+                )
+        except Exception as e:
+            print(f"[Database] Notice: could not import local inventory_movements: {e}")
+
+        try:
+            sc.execute("SELECT * FROM audit_logs;")
+            for row in sc.fetchall():
+                cursor.execute(
+                    """
+                    INSERT INTO audit_logs (timestamp, user, action, entity_id, details)
+                    VALUES (?, ?, ?, ?, ?);
+                    """,
+                    (row["timestamp"], row["user"], row["action"], row["entity_id"], row["details"]),
+                )
+        except Exception as e:
+            print(f"[Database] Notice: could not import local audit_logs: {e}")
+
+        try:
+            sc.execute("SELECT flavour, current_stock, low_stock_threshold, updated_at FROM inventory;")
+            for row in sc.fetchall():
+                cursor.execute(
+                    """
+                    UPDATE inventory
+                    SET current_stock = ?, low_stock_threshold = ?, updated_at = ?
+                    WHERE flavour = ?;
+                    """,
+                    (row["current_stock"], row["low_stock_threshold"], row["updated_at"], row["flavour"]),
+                )
+        except Exception as e:
+            print(f"[Database] Notice: could not import local inventory levels: {e}")
+
+        src.close()
+        print(f"[Database] One-way import: copied {local_orders} local sqlite order(s) into Turso. Local file was not deleted.")
+    except Exception as e:
+        print(f"[Database] Warning: local sqlite import skipped: {e}")
+
 
 def reset_crm_data():
-    # Hard safety lock to prevent accidental wipes
-    if os.environ.get("ALLOW_DANGEROUS_DB_RESET") != "CONFIRM_PERMANENT_WIPE":
-        raise RuntimeError(
-            "CRITICAL SAFETY LOCK: Database wipe is locked to protect live data. "
-            "To force a wipe, set environment variable ALLOW_DANGEROUS_DB_RESET=CONFIRM_PERMANENT_WIPE"
-        )
-    conn = get_db()
-    cursor = conn.cursor()
-    cursor.execute("DELETE FROM order_items;")
-    cursor.execute("DELETE FROM orders;")
-    cursor.execute("DELETE FROM inventory_movements;")
-    cursor.execute("DELETE FROM audit_logs WHERE action IN ('Order Created', 'Order Edited', 'Order Deleted', 'Dispatched', 'Undispatched', 'Inventory Reset', 'Inventory Stock Added', 'Inventory Adjustment');")
-    now_str = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
-    cursor.execute("UPDATE inventory SET current_stock = 0, updated_at = ?;", (now_str,))
-    conn.commit()
-    conn.close()
+    raise RuntimeError(
+        "Database wipe is permanently disabled. "
+        "Orders are only removed by deleting them on the Orders page, "
+        "or by an explicit SQL/AI query you run yourself."
+    )
+
 
 if __name__ == "__main__":
     init_db()
-    print("Database initialized successfully.")
+    print("Turso database initialized (additive only).")

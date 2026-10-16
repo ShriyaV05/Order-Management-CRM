@@ -73,24 +73,15 @@ The system uses transactional operations to maintain consistency between orders,
 * Secure session handling
 * No plaintext passwords
 
-## Render Deployment & Persistent Storage
+## Vercel Deployment
 
-POPCONE CRM stores its data in a SQLite database. On Render web services, the container filesystem is ephemeral by default, meaning redeployments or container sleep/restarts reset files in `/app`.
+POPCONE CRM runs as a FastAPI app on Vercel. All live data is stored in **one Turso database**, not on the Vercel filesystem.
 
-To ensure permanent database persistence across restarts and redeployments:
-
-1. **Persistent Disk on Render**:
-   - In the Render Dashboard, navigate to your Web Service -> **Disks**.
-   - Click **Add Disk**:
-     - **Name**: `popcone-data`
-     - **Mount Path**: `/var/data`
-     - **Size**: `1 GB` (or higher)
-   - In **Environment Variables**, ensure:
-     - `DB_PATH`: `/var/data/popcone.db`
-
-2. **Automatic Blueprint Deployment**:
-   - `render.yaml` is pre-configured with a persistent disk mounted at `/var/data` and sets `DB_PATH=/var/data/popcone.db`.
-   - On initial mount, `database.py` automatically initializes or copies the initial database to `/var/data/popcone.db` if it doesn't already exist.
+1. Import the GitHub repo into Vercel (Framework Preset: FastAPI).
+2. In Project Settings -> Environment Variables, set:
+   - `TURSO_DATABASE_URL`
+   - `TURSO_AUTH_TOKEN`
+3. Deploy. Confirm `/health` returns `"database": "turso"` and a live `order_count`.
 
 ## Purpose
 

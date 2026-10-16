@@ -6,6 +6,7 @@ import json
 from datetime import datetime, timezone, timedelta
 from typing import Optional, List, Dict, Any
 
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, Header, Depends, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -13,10 +14,16 @@ from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel, Field
 
 from auth import hash_password, verify_password, generate_session_token
-from database import get_db, init_db, backup_database, resolve_db_path
+from database import get_db, init_db, using_turso
 from locations import INDIA_LOCATIONS, calculate_delivery_fee
 
-app = FastAPI(title="POPCONE Orders & Sales CRM", version="1.0.0")
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    init_db()
+    yield
+
+
+app = FastAPI(title="POPCONE Orders & Sales CRM", version="1.0.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -28,6 +35,7 @@ app.add_middleware(
 
 @app.middleware("http")
 async def add_no_cache_headers(request: Request, call_next):
+    init_db()
     response = await call_next(request)
     if request.url.path == "/" or request.url.path.startswith("/static/") or request.url.path.startswith("/api/"):
         response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate, max-age=0"
@@ -359,24 +367,17 @@ def admin_set_user_password(req: AdminUserPasswordRequest, current_user: Dict[st
 # ----------------- Database Protection & Backup Routes -----------------
 @app.post("/api/admin/database/backup")
 def trigger_backup(current_user: Dict[str, Any] = Depends(require_admin)):
-    path = backup_database()
     return {
         "success": True,
-        "message": "Database backup created successfully",
-        "backup_path": path
+        "backend": "turso",
+        "message": "Live data is stored in a single Turso database. Use the Turso dashboard for snapshots. Local sqlite backups are disabled so they cannot overwrite or replace live orders."
     }
 
 @app.get("/api/admin/database/download")
 def download_database(current_user: Dict[str, Any] = Depends(require_admin)):
-    backup_database()
-    db_path = resolve_db_path()
-    if not os.path.exists(db_path):
-        raise HTTPException(status_code=404, detail="Database file not found")
-    timestamp_str = datetime.now().strftime("%Y%m%d_%H%M%S")
-    return FileResponse(
-        db_path,
-        media_type="application/x-sqlite3",
-        filename=f"popcone_backup_{timestamp_str}.db"
+    raise HTTPException(
+        status_code=400,
+        detail="Live data is in Turso, not a local sqlite file. Download from the Turso dashboard instead of a local .db that can be empty or stale."
     )
 
 # ----------------- Locations, Postal PIN Lookup & Delivery -----------------
@@ -1675,11 +1676,18 @@ def serve_index():
 
 @app.api_route("/health", methods=["GET", "HEAD"])
 def health_check():
-    return {"status": "ok"}
-
-@app.on_event("startup")
-def startup_event():
-    init_db()
+    payload = {"status": "ok", "database": "turso" if using_turso() else "unavailable"}
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute("SELECT COUNT(*) AS cnt FROM orders;")
+        row = cursor.fetchone()
+        payload["order_count"] = int(row["cnt"] if row and "cnt" in row.keys() else (row[0] if row else 0))
+        conn.close()
+    except Exception as e:
+        payload["status"] = "error"
+        payload["database_error"] = str(e)
+    return payload
 
 if __name__ == "__main__":
     import uvicorn

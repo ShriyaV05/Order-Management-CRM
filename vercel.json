@@ -1,21 +1,16 @@
 {
-  "builds": [
-    {
-      "src": "server.py",
-      "use": "@vercel/python",
-      "config": {
-        "includeFiles": [
-          "static/**",
-          "logo.jpg",
-          "icon.png"
-        ]
-      }
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": "fastapi",
+  "functions": {
+    "server.py": {
+      "maxDuration": 60,
+      "includeFiles": "{static/**,logo.jpg,icon.png,auth.py,database.py,locations.py}"
     }
-  ],
-  "routes": [
+  },
+  "rewrites": [
     {
-      "src": "/(.*)",
-      "dest": "server.py"
+      "source": "/(.*)",
+      "destination": "/server.py"
     }
   ]
 }

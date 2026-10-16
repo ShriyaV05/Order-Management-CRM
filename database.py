@@ -142,11 +142,27 @@ class TursoCursor:
         return remaining
 
 
-class TursoConnection:
-    def __init__(self, url, token):
+_shared_client = None
+_client_lock = threading.Lock()
+
+
+def get_shared_client():
+    global _shared_client
+    if _shared_client is not None:
+        return _shared_client
+    with _client_lock:
+        if _shared_client is not None:
+            return _shared_client
+        url, token = get_turso_credentials()
         import libsql_client
         clean_url = url.replace("libsql://", "https://")
-        self.client = libsql_client.create_client_sync(clean_url, auth_token=token)
+        _shared_client = libsql_client.create_client_sync(clean_url, auth_token=token)
+        return _shared_client
+
+
+class TursoConnection:
+    def __init__(self, url=None, token=None):
+        self.client = get_shared_client()
         self._pending: Optional[List[Tuple[str, list]]] = None
 
     def cursor(self):
@@ -171,15 +187,10 @@ class TursoConnection:
 
     def close(self):
         self._pending = None
-        try:
-            self.client.close()
-        except Exception:
-            pass
 
 
 def get_db():
-    url, token = get_turso_credentials()
-    return TursoConnection(url, token)
+    return TursoConnection()
 
 
 def _scalar(row) -> Any:
@@ -262,6 +273,15 @@ def init_db():
 def _init_db_unlocked():
     conn = get_db()
     cursor = conn.cursor()
+
+    # Fast path: check if database schema has already been initialized and seeded
+    try:
+        cursor.execute("SELECT value FROM settings WHERE key = 'bottle_price' LIMIT 1;")
+        if cursor.fetchone():
+            conn.close()
+            return
+    except Exception:
+        pass
 
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS users (

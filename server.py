@@ -35,7 +35,6 @@ app.add_middleware(
 
 @app.middleware("http")
 async def add_no_cache_headers(request: Request, call_next):
-    init_db()
     response = await call_next(request)
     if request.url.path == "/" or request.url.path.startswith("/static/") or request.url.path.startswith("/api/"):
         response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate, max-age=0"
@@ -110,7 +109,16 @@ class DeliveryCalcRequest(BaseModel):
     total_bottles: int
     product_amount: Optional[float] = None
 
-# ----------------- Auth Helpers -----------------
+# ----------------- Auth Helpers & Session Cache -----------------
+import threading
+_session_cache: Dict[str, Any] = {}
+_session_cache_lock = threading.Lock()
+SESSION_CACHE_TTL_SECONDS = 60.0
+
+def invalidate_session_cache(token: str):
+    with _session_cache_lock:
+        _session_cache.pop(token, None)
+
 def get_current_user(authorization: Optional[str] = Header(None)) -> Dict[str, Any]:
     if not authorization:
         raise HTTPException(status_code=401, detail="Missing authorization header")
@@ -120,6 +128,18 @@ def get_current_user(authorization: Optional[str] = Header(None)) -> Dict[str, A
         raise HTTPException(status_code=401, detail="Invalid authorization token format")
     
     token = parts[1]
+    now_utc = datetime.now(timezone.utc)
+    now_ts = now_utc.timestamp()
+
+    # Fast in-memory session cache check
+    with _session_cache_lock:
+        cached = _session_cache.get(token)
+        if cached:
+            if now_ts - cached["cached_at"] < SESSION_CACHE_TTL_SECONDS and now_utc < cached["expires_at"]:
+                return cached["user"]
+            else:
+                _session_cache.pop(token, None)
+
     conn = get_db()
     cursor = conn.cursor()
     cursor.execute("""
@@ -135,16 +155,25 @@ def get_current_user(authorization: Optional[str] = Header(None)) -> Dict[str, A
         raise HTTPException(status_code=401, detail="Invalid or expired session")
     
     expires_at = datetime.fromisoformat(row["expires_at"])
-    if datetime.now(timezone.utc) > expires_at:
+    if now_utc > expires_at:
         raise HTTPException(status_code=401, detail="Session expired. Please login again.")
 
-    return {
+    user_info = {
         "id": row["id"],
         "username": row["username"],
         "display_name": row["display_name"],
         "role": row["role"],
         "token": row["token"]
     }
+
+    with _session_cache_lock:
+        _session_cache[token] = {
+            "user": user_info,
+            "expires_at": expires_at,
+            "cached_at": now_ts
+        }
+
+    return user_info
 
 def require_admin(current_user: Dict[str, Any] = Depends(get_current_user)):
     if current_user["role"] != "ADMIN":
@@ -206,6 +235,7 @@ def get_me(current_user: Dict[str, Any] = Depends(get_current_user)):
 
 @app.post("/api/auth/logout")
 def logout(current_user: Dict[str, Any] = Depends(get_current_user)):
+    invalidate_session_cache(current_user.get("token", ""))
     conn = get_db()
     cursor = conn.cursor()
     cursor.execute("DELETE FROM sessions WHERE token = ?;", (current_user["token"],))
@@ -1414,58 +1444,73 @@ def get_analytics(year: Optional[int] = None, month: Optional[int] = None, curre
         "January", "February", "March", "April", "May", "June",
         "July", "August", "September", "October", "November", "December"
     ]
+
+    # Batch query 1: aggregate orders metrics for all months of selected year in 1 query
+    cursor.execute("""
+    SELECT 
+        strftime('%m', created_at) as month_str,
+        COUNT(*) as month_orders,
+        COALESCE(SUM(total_bottles), 0) as month_bottles,
+        COALESCE(SUM(delivery_fee), 0.0) as month_shipping,
+        COALESCE(SUM(product_amount), 0.0) as month_revenue
+    FROM orders
+    WHERE strftime('%Y', created_at) = ?
+    GROUP BY strftime('%m', created_at);
+    """, (str(target_year),))
+    monthly_orders_cache = {}
+    for r in cursor.fetchall():
+        try:
+            m_num = int(r["month_str"])
+            monthly_orders_cache[m_num] = {
+                "orders": r["month_orders"] or 0,
+                "bottles": r["month_bottles"] or 0,
+                "shipping": float(r["month_shipping"] or 0.0),
+                "revenue": float(r["month_revenue"] or 0.0)
+            }
+        except Exception:
+            pass
+
+    # Batch query 2: aggregate order items for all months of selected year in 1 query
+    cursor.execute("""
+    SELECT 
+        strftime('%m', o.created_at) as month_str,
+        oi.flavour,
+        COALESCE(SUM(oi.quantity), 0) as qty,
+        COALESCE(SUM(oi.line_amount), 0.0) as rev
+    FROM order_items oi
+    JOIN orders o ON oi.order_id = o.order_id
+    WHERE strftime('%Y', o.created_at) = ?
+    GROUP BY strftime('%m', o.created_at), oi.flavour;
+    """, (str(target_year),))
+    monthly_items_cache = {}
+    for r in cursor.fetchall():
+        try:
+            m_num = int(r["month_str"])
+            if m_num not in monthly_items_cache:
+                monthly_items_cache[m_num] = {}
+            monthly_items_cache[m_num][r["flavour"]] = {
+                "qty": r["qty"] or 0,
+                "rev": float(r["rev"] or 0.0)
+            }
+        except Exception:
+            pass
+
     monthly_data = []
-
     for month_idx in range(1, 13):
-        m_str = f"{month_idx:02d}"
         month_label = months_labels[month_idx - 1]
+        m_stat = monthly_orders_cache.get(month_idx, {"orders": 0, "bottles": 0, "shipping": 0.0, "revenue": 0.0})
+        m_items = monthly_items_cache.get(month_idx, {})
 
-        # Order totals, shipping costs, and real product revenue for this month
-        cursor.execute("""
-        SELECT 
-            COUNT(*) as month_orders,
-            COALESCE(SUM(total_bottles), 0) as month_bottles,
-            COALESCE(SUM(delivery_fee), 0.0) as month_shipping,
-            COALESCE(SUM(product_amount), 0.0) as month_revenue
-        FROM orders
-        WHERE strftime('%Y', created_at) = ? AND strftime('%m', created_at) = ?;
-        """, (str(target_year), m_str))
-        m_orders_row = cursor.fetchone()
-        month_orders_count = m_orders_row["month_orders"] if m_orders_row else 0
-        month_total_bottles = m_orders_row["month_bottles"] if m_orders_row else 0
-        month_shipping = float(m_orders_row["month_shipping"] if m_orders_row else 0.0)
-        month_revenue = float(m_orders_row["month_revenue"] if m_orders_row else 0.0)
+        month_flavour_map = {f: m_items.get(f, {}).get("qty", 0) for f in flavours}
+        month_rev_map = {f: m_items.get(f, {}).get("rev", 0.0) for f in flavours}
 
-        # Flavour quantities and line revenues for this month
-        cursor.execute("""
-        SELECT 
-            oi.flavour,
-            COALESCE(SUM(oi.quantity), 0) as qty,
-            COALESCE(SUM(oi.line_amount), 0.0) as rev
-        FROM order_items oi
-        JOIN orders o ON oi.order_id = o.order_id
-        WHERE strftime('%Y', o.created_at) = ? AND strftime('%m', o.created_at) = ?
-        GROUP BY oi.flavour;
-        """, (str(target_year), m_str))
-
-        month_flavour_map = {f: 0 for f in flavours}
-        month_rev_map = {f: 0.0 for f in flavours}
-
-        for r in cursor.fetchall():
-            flv = r["flavour"]
-            if flv in month_flavour_map:
-                flv_qty = r["qty"] or 0
-                month_flavour_map[flv] = flv_qty
-                month_rev_map[flv] = float(r["rev"] or 0.0)
-
-        # Most purchased flavour of this month
         has_m_sales = any(month_flavour_map.values())
         m_most = max(month_flavour_map.items(), key=lambda x: x[1]) if has_m_sales else ("None", 0)
 
         monthly_data.append({
             "month_num": month_idx,
             "month_name": month_label,
-            "total_orders": month_orders_count,
+            "total_orders": m_stat["orders"],
             "tomato": month_flavour_map["Tomato"],
             "tomato_revenue": month_rev_map["Tomato"],
             "cheese": month_flavour_map["Cheese"],
@@ -1474,9 +1519,9 @@ def get_analytics(year: Optional[int] = None, month: Optional[int] = None, curre
             "sour_cream_revenue": month_rev_map["Sour Cream"],
             "peri_peri": month_flavour_map["Peri Peri"],
             "peri_peri_revenue": month_rev_map["Peri Peri"],
-            "total_bottles": month_total_bottles,
-            "revenue": month_revenue,
-            "shipping_costs": month_shipping,
+            "total_bottles": m_stat["bottles"],
+            "revenue": m_stat["revenue"],
+            "shipping_costs": m_stat["shipping"],
             "most_purchased_flavour": m_most[0] if m_most[1] > 0 else "None"
         })
 

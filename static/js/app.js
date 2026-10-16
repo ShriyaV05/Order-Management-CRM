@@ -465,57 +465,65 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   // ---------------- 1. DASHBOARD ----------------
+  function renderDashboardUI(data) {
+    if (!data) return;
+    const kpis = data.kpis || { total_revenue: 0, total_orders: 0, bottles_sold: 0, paid_orders: 0, cod_orders: 0 };
+
+    // KPI Cards
+    const revEl = document.getElementById('kpi-total-revenue');
+    if (revEl) revEl.textContent = `₹${(kpis.total_revenue || 0).toLocaleString('en-IN')}`;
+    const ordEl = document.getElementById('kpi-total-orders');
+    if (ordEl) ordEl.textContent = kpis.total_orders || 0;
+    const btlEl = document.getElementById('kpi-bottles-sold');
+    if (btlEl) btlEl.textContent = kpis.bottles_sold || 0;
+    const paidEl = document.getElementById('kpi-paid-orders');
+    if (paidEl) paidEl.textContent = kpis.paid_orders || 0;
+    const codEl = document.getElementById('kpi-cod-orders');
+    if (codEl) codEl.textContent = kpis.cod_orders || 0;
+
+    // Top Selling Flavour (Requirement 8)
+    const mostFlv = data.most_purchased_flavour;
+    const mostFlvEl = document.getElementById('dashboard-most-flavour');
+    if (mostFlvEl) {
+      mostFlvEl.textContent = (mostFlv && mostFlv.name !== 'None' && mostFlv.bottles > 0)
+        ? `${mostFlv.name} (${mostFlv.bottles} bottles)`
+        : 'None';
+    }
+
+    // Recent Orders Table
+    const recentTableBody = document.getElementById('dashboard-recent-orders-tbody');
+    if (recentTableBody) {
+      if (data.recent_orders && data.recent_orders.length > 0) {
+        recentTableBody.innerHTML = data.recent_orders.map(o => `
+          <tr data-order-id="${o.order_id}">
+            <td><strong>${o.order_id}</strong></td>
+            <td>${o.customer}</td>
+            <td>₹${(o.amount || 0).toLocaleString('en-IN')}</td>
+            <td><span class="badge ${o.payment === 'Paid' ? 'badge-paid' : 'badge-cod'}">${o.payment}</span></td>
+            <td><span class="badge ${o.dispatch_state === 'DISPATCHED' ? 'badge-dispatched' : 'badge-placed'}">${o.dispatch_state}</span></td>
+            <td>${o.created_at}</td>
+          </tr>
+        `).join('');
+
+        recentTableBody.querySelectorAll('tr').forEach(row => {
+          row.addEventListener('click', () => openOrderDetails(row.dataset.orderId));
+        });
+      } else {
+        recentTableBody.innerHTML = `<tr><td colspan="6" style="text-align:center; padding: 28px; color: var(--text-secondary);">No orders recorded yet</td></tr>`;
+      }
+    }
+  }
+
   async function loadDashboard() {
     if (!api.getToken()) return;
+    if (state.dashboardData) {
+      renderDashboardUI(state.dashboardData);
+    }
     try {
       const data = await api.getDashboardStats();
       if (!data) return;
-      const kpis = data.kpis || { total_revenue: 0, total_orders: 0, bottles_sold: 0, paid_orders: 0, cod_orders: 0 };
-
-      // KPI Cards
-      const revEl = document.getElementById('kpi-total-revenue');
-      if (revEl) revEl.textContent = `₹${(kpis.total_revenue || 0).toLocaleString('en-IN')}`;
-      const ordEl = document.getElementById('kpi-total-orders');
-      if (ordEl) ordEl.textContent = kpis.total_orders || 0;
-      const btlEl = document.getElementById('kpi-bottles-sold');
-      if (btlEl) btlEl.textContent = kpis.bottles_sold || 0;
-      const paidEl = document.getElementById('kpi-paid-orders');
-      if (paidEl) paidEl.textContent = kpis.paid_orders || 0;
-      const codEl = document.getElementById('kpi-cod-orders');
-      if (codEl) codEl.textContent = kpis.cod_orders || 0;
-
-      // Top Selling Flavour (Requirement 8)
-      const mostFlv = data.most_purchased_flavour;
-      const mostFlvEl = document.getElementById('dashboard-most-flavour');
-      if (mostFlvEl) {
-        mostFlvEl.textContent = (mostFlv && mostFlv.name !== 'None' && mostFlv.bottles > 0)
-          ? `${mostFlv.name} (${mostFlv.bottles} bottles)`
-          : 'None';
-      }
-
-      // Recent Orders Table
-      const recentTableBody = document.getElementById('dashboard-recent-orders-tbody');
-      if (recentTableBody) {
-        if (data.recent_orders && data.recent_orders.length > 0) {
-          recentTableBody.innerHTML = data.recent_orders.map(o => `
-            <tr data-order-id="${o.order_id}">
-              <td><strong>${o.order_id}</strong></td>
-              <td>${o.customer}</td>
-              <td>₹${(o.amount || 0).toLocaleString('en-IN')}</td>
-              <td><span class="badge ${o.payment === 'Paid' ? 'badge-paid' : 'badge-cod'}">${o.payment}</span></td>
-              <td><span class="badge ${o.dispatch_state === 'DISPATCHED' ? 'badge-dispatched' : 'badge-placed'}">${o.dispatch_state}</span></td>
-              <td>${o.created_at}</td>
-            </tr>
-          `).join('');
-
-          recentTableBody.querySelectorAll('tr').forEach(row => {
-            row.addEventListener('click', () => openOrderDetails(row.dataset.orderId));
-          });
-        } else {
-          recentTableBody.innerHTML = `<tr><td colspan="6" style="text-align:center; padding: 28px; color: var(--text-secondary);">No orders recorded yet</td></tr>`;
-        }
-      }
-
+      state.dashboardData = data;
+      renderDashboardUI(data);
     } catch (err) {
       console.error('Error loading dashboard:', err);
       if (!api.getToken() || (err.message && (err.message.includes('Session expired') || err.message.includes('unauthorized') || err.message.includes('401')))) {
@@ -1124,6 +1132,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   // ---------------- 3. ORDERS PAGE ----------------
   async function loadOrders() {
     if (!api.getToken()) return;
+    if (state.orders && state.orders.length > 0) {
+      renderOrdersTable();
+    }
     try {
       const data = await api.getOrders(state.currentOrderFilter);
       state.orders = data.orders || [];
@@ -1985,59 +1996,67 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
 
   // ---------------- 7. INVENTORY PAGE ----------------
-  async function loadInventory() {
-    if (!api.getToken()) return;
-    try {
-      const data = await api.getInventory();
-      const stockGrid = document.getElementById('inventory-stock-grid');
-      
-      // Stock Cards (Requirement: low stock <= 10, warning ONLY in Inventory page)
-      if (stockGrid && data.stocks) {
-        stockGrid.innerHTML = data.stocks.map(s => {
-          const threshold = Number(s.low_stock_threshold) || 10;
-          const isLow = s.current_stock <= threshold;
-          const statusHtml = isLow
-            ? `<span class="stock-card-status danger"><svg class="icon-svg" style="width:14px;height:14px;" viewBox="0 0 24 24"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" x2="12" y1="9" y2="13"/><line x1="12" x2="12.01" y1="17" y2="17"/></svg> Low Stock (&le; 10)</span>`
-            : `<span class="stock-card-status safe"><svg class="icon-svg" style="width:14px;height:14px;" viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg> In Stock</span>`;
+  function renderInventoryUI(data) {
+    if (!data) return;
+    const stockGrid = document.getElementById('inventory-stock-grid');
+    
+    // Stock Cards (Requirement: low stock <= 10, warning ONLY in Inventory page)
+    if (stockGrid && data.stocks) {
+      stockGrid.innerHTML = data.stocks.map(s => {
+        const threshold = Number(s.low_stock_threshold) || 10;
+        const isLow = s.current_stock <= threshold;
+        const statusHtml = isLow
+          ? `<span class="stock-card-status danger"><svg class="icon-svg" style="width:14px;height:14px;" viewBox="0 0 24 24"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" x2="12" y1="9" y2="13"/><line x1="12" x2="12.01" y1="17" y2="17"/></svg> Low Stock (&le; 10)</span>`
+          : `<span class="stock-card-status safe"><svg class="icon-svg" style="width:14px;height:14px;" viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg> In Stock</span>`;
 
-          return `
-            <div class="stock-card ${isLow ? 'low-stock' : ''}">
-              <div class="stock-card-flavour">${s.flavour}</div>
-              <div>
-                <span class="stock-card-qty">${s.current_stock}</span>
-                <span class="stock-card-unit">bottles</span>
-              </div>
-              ${statusHtml}
+        return `
+          <div class="stock-card ${isLow ? 'low-stock' : ''}">
+            <div class="stock-card-flavour">${s.flavour}</div>
+            <div>
+              <span class="stock-card-qty">${s.current_stock}</span>
+              <span class="stock-card-unit">bottles</span>
             </div>
+            ${statusHtml}
+          </div>
+        `;
+      }).join('');
+    }
+
+    // Requirement 5: Do NOT display "Moved By" in the inventory history!
+    // Columns: Date/Time, Flavour, Type, Change, Reference
+    const movementsTbody = document.getElementById('inventory-movements-tbody');
+    if (movementsTbody) {
+      if (data.movements && data.movements.length > 0) {
+        movementsTbody.innerHTML = data.movements.map(m => {
+          const isPos = m.change > 0;
+          const changeBadge = isPos 
+            ? `<span style="color:var(--success-green); font-weight:700;">+${m.change}</span>` 
+            : `<span style="color:var(--danger-red); font-weight:700;">${m.change}</span>`;
+          return `
+            <tr>
+              <td>${m.when}</td>
+              <td><strong>${m.flavour}</strong></td>
+              <td><span class="badge ${m.type === 'Stock Added' ? 'badge-paid' : m.type === 'Sold' ? 'badge-placed' : 'badge-cod'}">${m.type}</span></td>
+              <td>${changeBadge}</td>
+              <td>${m.reference}</td>
+            </tr>
           `;
         }).join('');
+      } else {
+        movementsTbody.innerHTML = `<tr><td colspan="5" style="text-align:center; padding: 28px; color: var(--text-secondary);">No movements recorded yet</td></tr>`;
       }
+    }
+  }
 
-      // Requirement 5: Do NOT display "Moved By" in the inventory history!
-      // Columns: Date/Time, Flavour, Type, Change, Reference
-      const movementsTbody = document.getElementById('inventory-movements-tbody');
-      if (movementsTbody) {
-        if (data.movements && data.movements.length > 0) {
-          movementsTbody.innerHTML = data.movements.map(m => {
-            const isPos = m.change > 0;
-            const changeBadge = isPos 
-              ? `<span style="color:var(--success-green); font-weight:700;">+${m.change}</span>` 
-              : `<span style="color:var(--danger-red); font-weight:700;">${m.change}</span>`;
-            return `
-              <tr>
-                <td>${m.when}</td>
-                <td><strong>${m.flavour}</strong></td>
-                <td><span class="badge ${m.type === 'Stock Added' ? 'badge-paid' : m.type === 'Sold' ? 'badge-placed' : 'badge-cod'}">${m.type}</span></td>
-                <td>${changeBadge}</td>
-                <td>${m.reference}</td>
-              </tr>
-            `;
-          }).join('');
-        } else {
-          movementsTbody.innerHTML = `<tr><td colspan="5" style="text-align:center; padding: 28px; color: var(--text-secondary);">No movements recorded yet</td></tr>`;
-        }
-      }
-
+  async function loadInventory() {
+    if (!api.getToken()) return;
+    if (state.inventoryData) {
+      renderInventoryUI(state.inventoryData);
+    }
+    try {
+      const data = await api.getInventory();
+      state.inventoryData = data;
+      renderInventoryUI(data);
     } catch (err) {
       console.error('Error loading inventory:', err);
       if (!api.getToken() || (err.message && (err.message.includes('Session expired') || err.message.includes('unauthorized') || err.message.includes('401')))) {
@@ -2146,6 +2165,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   async function loadAnalytics() {
     if (!api.getToken()) return;
+    if (state.analyticsData) {
+      renderAnalyticsView();
+    }
     try {
       const year = state.analyticsYear;
       const data = await api.getAnalytics(year, state.analyticsMonth);
@@ -2202,7 +2224,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (mode === 'monthly') {
       currentShipping = selectedMonth.shipping_costs || 0;
       document.getElementById('analytics-kpi-revenue-label').textContent = `${selectedMonth.month_name} Product Revenue`;
-      document.getElementById('analytics-kpi-revenue-subtext').textContent = `${selectedMonth.month_name} ${state.analyticsYear} (Bottles × ₹149)`;
+      document.getElementById('analytics-kpi-revenue-subtext').textContent = `${selectedMonth.month_name} ${state.analyticsYear} Total Revenue`;
       document.getElementById('analytics-total-revenue').textContent = `₹${selectedMonth.revenue.toLocaleString('en-IN')}`;
       if (shippingLabel) shippingLabel.textContent = `${selectedMonth.month_name} Shipping Costs`;
       if (shippingSubtext) shippingSubtext.textContent = `Recorded Delivery Fees (${selectedMonth.month_name})`;
@@ -2215,7 +2237,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       const ann = data.annual_report;
       currentShipping = ann.shipping_costs || 0;
       document.getElementById('analytics-kpi-revenue-label').textContent = 'Annual Product Revenue';
-      document.getElementById('analytics-kpi-revenue-subtext').textContent = `Full Year ${state.analyticsYear} (Bottles × ₹149)`;
+      document.getElementById('analytics-kpi-revenue-subtext').textContent = `Full Year ${state.analyticsYear} Total Revenue`;
       document.getElementById('analytics-total-revenue').textContent = `₹${ann.total_revenue.toLocaleString('en-IN')}`;
       if (shippingLabel) shippingLabel.textContent = 'Annual Shipping Costs';
       if (shippingSubtext) shippingSubtext.textContent = `Full Year ${state.analyticsYear} Delivery Fees`;
@@ -2230,7 +2252,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       const totalWeeklyBottles = data.weekly_report.reduce((acc, w) => acc + w.total_bottles, 0);
       currentShipping = data.weekly_report.reduce((acc, w) => acc + (w.shipping_costs || 0), 0);
       document.getElementById('analytics-kpi-revenue-label').textContent = 'Weekly Product Revenue';
-      document.getElementById('analytics-kpi-revenue-subtext').textContent = `Weeks in ${state.analyticsYear} (Bottles × ₹149)`;
+      document.getElementById('analytics-kpi-revenue-subtext').textContent = `Weeks in ${state.analyticsYear} Total Revenue`;
       document.getElementById('analytics-total-revenue').textContent = `₹${totalWeeklyRev.toLocaleString('en-IN')}`;
       if (shippingLabel) shippingLabel.textContent = 'Weekly Shipping Costs';
       if (shippingSubtext) shippingSubtext.textContent = `Weeks in ${state.analyticsYear} Delivery Fees`;

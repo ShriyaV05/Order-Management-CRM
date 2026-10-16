@@ -8,7 +8,7 @@
   <meta http-equiv="Expires" content="0">
   <title>POPCONE Orders & Sales CRM</title>
   <meta name="description" content="Production-ready Order Management, Inventory Tracking, and Sales Analytics CRM for POPCONE.">
-  <link rel="stylesheet" href="/static/css/styles.css?v=20261016_07">
+  <link rel="stylesheet" href="/static/css/styles.css?v=20261016_08">
   <link rel="icon" href="/logo.jpg" type="image/jpeg">
   <link rel="shortcut icon" href="/logo.jpg" type="image/jpeg">
   <link rel="apple-touch-icon" href="/logo.jpg">
@@ -64,10 +64,19 @@
     <!-- Sidebar -->
     <aside class="sidebar" id="main-sidebar">
       <div class="sidebar-header">
-        <img src="/logo.jpg" alt="POPCONE" class="sidebar-logo">
-        <div class="sidebar-brand-text">
-          <h1>POPCONE</h1>
-          <p>Orders CRM</p>
+        <button id="btn-toggle-sidebar" class="btn-toggle-sidebar" title="Collapse Sidebar" aria-label="Collapse Sidebar">
+          <svg class="icon-svg" viewBox="0 0 24 24" width="18" height="18">
+            <line x1="3" y1="12" x2="21" y2="12"></line>
+            <line x1="3" y1="6" x2="21" y2="6"></line>
+            <line x1="3" y1="18" x2="21" y2="18"></line>
+          </svg>
+        </button>
+        <div class="sidebar-brand-group">
+          <img src="/logo.jpg" alt="POPCONE" class="sidebar-logo">
+          <div class="sidebar-brand-text">
+            <h1>POPCONE</h1>
+            <p>Orders CRM</p>
+          </div>
         </div>
       </div>
 
@@ -126,13 +135,6 @@
       <!-- Top Header -->
       <header class="top-header">
         <div class="header-title-area">
-          <button id="btn-toggle-sidebar" class="btn-toggle-sidebar" title="Toggle Sidebar" aria-label="Toggle Sidebar">
-            <svg class="icon-svg" viewBox="0 0 24 24" width="20" height="20">
-              <line x1="3" y1="12" x2="21" y2="12"></line>
-              <line x1="3" y1="6" x2="21" y2="6"></line>
-              <line x1="3" y1="18" x2="21" y2="18"></line>
-            </svg>
-          </button>
           <h2 id="header-page-title" class="page-title">Dashboard</h2>
         </div>
         <div class="header-actions">
@@ -1384,8 +1386,8 @@
   </div>
 
   <!-- Scripts (Cache-busted) -->
-  <script src="/static/js/xlsx.full.min.js?v=20261016_07"></script>
-  <script src="/static/js/api.js?v=20261016_07"></script>
-  <script src="/static/js/app.js?v=20261016_07"></script>
+  <script src="/static/js/xlsx.full.min.js?v=20261016_08"></script>
+  <script src="/static/js/api.js?v=20261016_08"></script>
+  <script src="/static/js/app.js?v=20261016_08"></script>
 </body>
 </html>

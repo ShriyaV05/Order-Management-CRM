@@ -208,6 +208,67 @@ document.addEventListener('DOMContentLoaded', async () => {
     updateAuthUI();
   });
 
+  // ---------------- Flexible Collapsible Sidebar ----------------
+  const sidebar = document.getElementById('main-sidebar');
+  const btnSidebarToggle = document.getElementById('btn-sidebar-toggle');
+  const btnHeaderToggle = document.getElementById('btn-toggle-sidebar');
+  const sidebarBackdrop = document.getElementById('sidebar-backdrop');
+
+  function updateSidebarToggleAttributes(isCollapsed) {
+    if (btnSidebarToggle) {
+      const label = isCollapsed ? 'Expand Sidebar' : 'Collapse Sidebar';
+      btnSidebarToggle.title = label;
+      btnSidebarToggle.setAttribute('aria-label', label);
+    }
+  }
+
+  function toggleSidebar() {
+    if (!sidebar) return;
+    const isMobile = window.innerWidth <= 768;
+    if (isMobile) {
+      const isOpen = sidebar.classList.toggle('mobile-open');
+      if (sidebarBackdrop) {
+        sidebarBackdrop.classList.toggle('active', isOpen);
+      }
+    } else {
+      const isCollapsed = sidebar.classList.toggle('collapsed');
+      localStorage.setItem('popcone_sidebar_collapsed', isCollapsed ? 'true' : 'false');
+      updateSidebarToggleAttributes(isCollapsed);
+    }
+  }
+
+  // Restore saved desktop collapsed state on page load
+  try {
+    const savedCollapsed = localStorage.getItem('popcone_sidebar_collapsed') === 'true';
+    if (savedCollapsed && window.innerWidth > 768 && sidebar) {
+      sidebar.classList.add('collapsed');
+      updateSidebarToggleAttributes(true);
+    }
+  } catch (e) {
+    console.warn('LocalStorage error while restoring sidebar preference:', e);
+  }
+
+  if (btnSidebarToggle) {
+    btnSidebarToggle.addEventListener('click', (e) => {
+      e.preventDefault();
+      toggleSidebar();
+    });
+  }
+
+  if (btnHeaderToggle) {
+    btnHeaderToggle.addEventListener('click', (e) => {
+      e.preventDefault();
+      toggleSidebar();
+    });
+  }
+
+  if (sidebarBackdrop) {
+    sidebarBackdrop.addEventListener('click', () => {
+      if (sidebar) sidebar.classList.remove('mobile-open');
+      sidebarBackdrop.classList.remove('active');
+    });
+  }
+
   // ---------------- Navigation / Tabs ----------------
   const navItems = document.querySelectorAll('.nav-item');
   navItems.forEach(item => {
@@ -215,6 +276,10 @@ document.addEventListener('DOMContentLoaded', async () => {
       e.preventDefault();
       const tab = item.dataset.tab;
       switchTab(tab);
+      if (window.innerWidth <= 768 && sidebar) {
+        sidebar.classList.remove('mobile-open');
+        if (sidebarBackdrop) sidebarBackdrop.classList.remove('active');
+      }
     });
   });
 

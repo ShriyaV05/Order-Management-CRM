@@ -8,7 +8,7 @@
   <meta http-equiv="Expires" content="0">
   <title>POPCONE Orders & Sales CRM</title>
   <meta name="description" content="Production-ready Order Management, Inventory Tracking, and Sales Analytics CRM for POPCONE.">
-  <link rel="stylesheet" href="/static/css/styles.css?v=20261016_04">
+  <link rel="stylesheet" href="/static/css/styles.css?v=20261016_05">
   <link rel="icon" href="/logo.jpg" type="image/jpeg">
   <link rel="shortcut icon" href="/logo.jpg" type="image/jpeg">
   <link rel="apple-touch-icon" href="/logo.jpg">
@@ -58,42 +58,48 @@
 
   <!-- Main Application Layout -->
   <div id="app-container">
+    <!-- Mobile Sidebar Backdrop -->
+    <div id="sidebar-backdrop" class="sidebar-backdrop"></div>
+
     <!-- Sidebar -->
-    <aside class="sidebar">
+    <aside class="sidebar" id="main-sidebar">
       <div class="sidebar-header">
         <img src="/logo.jpg" alt="POPCONE" class="sidebar-logo">
         <div class="sidebar-brand-text">
           <h1>POPCONE</h1>
           <p>Orders CRM</p>
         </div>
+        <button id="btn-sidebar-toggle" class="btn-sidebar-toggle" title="Collapse Sidebar" aria-label="Collapse Sidebar">
+          <svg class="icon-svg" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg>
+        </button>
       </div>
 
       <nav class="sidebar-nav">
-        <a href="#dashboard" class="nav-item active" data-tab="dashboard" id="nav-dashboard">
+        <a href="#dashboard" class="nav-item active" data-tab="dashboard" id="nav-dashboard" data-tooltip="Dashboard">
           <span class="nav-icon">
             <svg class="icon-svg" viewBox="0 0 24 24"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></svg>
           </span>
           <span class="nav-text">Dashboard</span>
         </a>
-        <a href="#new-order" class="nav-item" data-tab="new-order" id="nav-new-order">
+        <a href="#new-order" class="nav-item" data-tab="new-order" id="nav-new-order" data-tooltip="New Order">
           <span class="nav-icon">
             <svg class="icon-svg" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M8 12h8"/><path d="M12 8v8"/></svg>
           </span>
           <span class="nav-text">New Order</span>
         </a>
-        <a href="#orders" class="nav-item" data-tab="orders" id="nav-orders">
+        <a href="#orders" class="nav-item" data-tab="orders" id="nav-orders" data-tooltip="Orders">
           <span class="nav-icon">
             <svg class="icon-svg" viewBox="0 0 24 24"><path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg>
           </span>
           <span class="nav-text">Orders</span>
         </a>
-        <a href="#inventory" class="nav-item" data-tab="inventory" id="nav-inventory">
+        <a href="#inventory" class="nav-item" data-tab="inventory" id="nav-inventory" data-tooltip="Inventory">
           <span class="nav-icon">
             <svg class="icon-svg" viewBox="0 0 24 24"><path d="m12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83Z"/><path d="m22 17.65-9.17 4.16a2 2 0 0 1-1.66 0L2 17.65"/><path d="m22 12.65-9.17 4.16a2 2 0 0 1-1.66 0L2 12.65"/></svg>
           </span>
           <span class="nav-text">Inventory</span>
         </a>
-        <a href="#analytics" class="nav-item" data-tab="analytics" id="nav-analytics">
+        <a href="#analytics" class="nav-item" data-tab="analytics" id="nav-analytics" data-tooltip="Analytics">
           <span class="nav-icon">
             <svg class="icon-svg" viewBox="0 0 24 24"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
           </span>
@@ -123,6 +129,13 @@
       <!-- Top Header -->
       <header class="top-header">
         <div class="header-title-area">
+          <button id="btn-toggle-sidebar" class="btn-toggle-sidebar" title="Toggle Sidebar" aria-label="Toggle Sidebar">
+            <svg class="icon-svg" viewBox="0 0 24 24" width="20" height="20">
+              <line x1="3" y1="12" x2="21" y2="12"></line>
+              <line x1="3" y1="6" x2="21" y2="6"></line>
+              <line x1="3" y1="18" x2="21" y2="18"></line>
+            </svg>
+          </button>
           <h2 id="header-page-title" class="page-title">Dashboard</h2>
         </div>
         <div class="header-actions">
@@ -1374,8 +1387,8 @@
   </div>
 
   <!-- Scripts (Cache-busted) -->
-  <script src="/static/js/xlsx.full.min.js?v=20261016_04"></script>
-  <script src="/static/js/api.js?v=20261016_04"></script>
-  <script src="/static/js/app.js?v=20261016_04"></script>
+  <script src="/static/js/xlsx.full.min.js?v=20261016_05"></script>
+  <script src="/static/js/api.js?v=20261016_05"></script>
+  <script src="/static/js/app.js?v=20261016_05"></script>
 </body>
 </html>

@@ -1145,21 +1145,9 @@ document.addEventListener('DOMContentLoaded', async () => {
             </button>
           </td>
           <td style="text-align: right;">
-            <div class="three-dot-menu-wrapper">
-              <button class="btn-three-dot" data-menu-id="${o.order_id}" title="Order Actions">
-                <svg class="icon-svg" viewBox="0 0 24 24"><circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="5" r="1.5"/><circle cx="12" cy="19" r="1.5"/></svg>
-              </button>
-              <div class="three-dot-dropdown" id="dropdown-${o.order_id}">
-                <div class="three-dot-item" data-action="edit" data-order-id="${o.order_id}">
-                  <svg class="icon-svg" viewBox="0 0 24 24"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg>
-                  <span>Edit Order</span>
-                </div>
-                <div class="three-dot-item text-danger" data-action="delete" data-order-id="${o.order_id}">
-                  <svg class="icon-svg" viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg>
-                  <span>Delete Order</span>
-                </div>
-              </div>
-            </div>
+            <button class="btn-three-dot" data-menu-id="${o.order_id}" title="Order Actions" aria-label="Order Actions">
+              <svg class="icon-svg" viewBox="0 0 24 24"><circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="5" r="1.5"/><circle cx="12" cy="19" r="1.5"/></svg>
+            </button>
           </td>
         </tr>
       `;
@@ -1168,8 +1156,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Row click: opens details (Requirement 14)
     tbody.querySelectorAll('tr').forEach(row => {
       row.addEventListener('click', (e) => {
-        // Prevent opening if clicked on dispatch toggle or 3-dot menu
-        if (e.target.closest('.btn-dispatch-toggle') || e.target.closest('.three-dot-menu-wrapper')) {
+        // Prevent opening if clicked on dispatch toggle or 3-dot menu button
+        if (e.target.closest('.btn-dispatch-toggle') || e.target.closest('.btn-three-dot')) {
           return;
         }
         openOrderDetails(row.dataset.orderId);
@@ -1191,40 +1179,106 @@ document.addEventListener('DOMContentLoaded', async () => {
       });
     });
 
-    // Three Dot Menu listeners (Requirement 15)
+    // Three Dot Menu listeners (Requirement 15: floating outside order row)
     tbody.querySelectorAll('.btn-three-dot').forEach(btn => {
       btn.addEventListener('click', (e) => {
         e.stopPropagation();
         const oid = btn.dataset.menuId;
-        document.querySelectorAll('.three-dot-dropdown.show').forEach(m => {
-          if (m.id !== `dropdown-${oid}`) m.classList.remove('show');
-        });
-        const dropdown = document.getElementById(`dropdown-${oid}`);
-        if (dropdown) dropdown.classList.toggle('show');
-      });
-    });
-
-    // Dropdown Action items
-    tbody.querySelectorAll('.three-dot-item').forEach(item => {
-      item.addEventListener('click', (e) => {
-        e.stopPropagation();
-        const action = item.dataset.action;
-        const oid = item.dataset.orderId;
-        const dropdown = item.closest('.three-dot-dropdown');
-        if (dropdown) dropdown.classList.remove('show');
-
-        if (action === 'edit') {
-          openEditOrderModal(oid);
-        } else if (action === 'delete') {
-          openDeleteOrderModal(oid);
-        }
+        showOrderActionsMenu(btn, oid);
       });
     });
   }
 
-  // Close dropdowns on outside click
-  document.addEventListener('click', () => {
-    document.querySelectorAll('.three-dot-dropdown.show').forEach(m => m.classList.remove('show'));
+  // Floating Order Actions Dropdown (renders outside order row/table to prevent scrollbar/clipping)
+  function getOrderActionsMenu() {
+    let menu = document.getElementById('floating-order-actions-menu');
+    if (!menu) {
+      menu = document.createElement('div');
+      menu.id = 'floating-order-actions-menu';
+      menu.className = 'three-dot-dropdown floating-dropdown';
+      menu.innerHTML = `
+        <div class="three-dot-item" data-action="edit">
+          <svg class="icon-svg" viewBox="0 0 24 24"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg>
+          <span>Edit Order</span>
+        </div>
+        <div class="three-dot-item text-danger" data-action="delete">
+          <svg class="icon-svg" viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg>
+          <span>Delete Order</span>
+        </div>
+      `;
+      document.body.appendChild(menu);
+
+      menu.querySelectorAll('.three-dot-item').forEach(item => {
+        item.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const action = item.dataset.action;
+          const oid = menu.dataset.orderId;
+          hideOrderActionsMenu();
+
+          if (action === 'edit' && oid) {
+            openEditOrderModal(oid);
+          } else if (action === 'delete' && oid) {
+            openDeleteOrderModal(oid);
+          }
+        });
+      });
+    }
+    return menu;
+  }
+
+  function hideOrderActionsMenu() {
+    const menu = document.getElementById('floating-order-actions-menu');
+    if (menu) {
+      menu.classList.remove('show');
+      menu.style.display = 'none';
+      menu.dataset.orderId = '';
+    }
+  }
+
+  function showOrderActionsMenu(btn, orderId) {
+    const menu = getOrderActionsMenu();
+    if (menu.classList.contains('show') && menu.dataset.orderId === orderId) {
+      hideOrderActionsMenu();
+      return;
+    }
+
+    menu.dataset.orderId = orderId;
+    menu.style.display = 'flex';
+    menu.classList.add('show');
+
+    // Calculate fixed viewport position relative to the clicked button
+    const rect = btn.getBoundingClientRect();
+    const menuWidth = menu.offsetWidth || 145;
+    const menuHeight = menu.offsetHeight || 85;
+
+    // Align right side with button right side, maintaining 8px viewport padding
+    let left = rect.right - menuWidth;
+    if (left + menuWidth > window.innerWidth - 8) {
+      left = window.innerWidth - menuWidth - 8;
+    }
+    if (left < 8) left = 8;
+
+    // Check vertical space: place below button by default, or flip above if near screen bottom
+    let top = rect.bottom + 4;
+    if (top + menuHeight > window.innerHeight - 8) {
+      top = rect.top - menuHeight - 4;
+    }
+    if (top < 8) top = 8;
+
+    menu.style.top = `${top}px`;
+    menu.style.left = `${left}px`;
+  }
+
+  // Close floating dropdown on outside click, window scroll/resize, or Escape
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('#floating-order-actions-menu') && !e.target.closest('.btn-three-dot')) {
+      hideOrderActionsMenu();
+    }
+  });
+  window.addEventListener('scroll', hideOrderActionsMenu, true);
+  window.addEventListener('resize', hideOrderActionsMenu);
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') hideOrderActionsMenu();
   });
 
   // Filter & Search Controls

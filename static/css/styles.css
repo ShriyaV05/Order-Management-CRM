@@ -948,6 +948,9 @@ body {
   padding: 4px 8px;
   border-radius: var(--radius-sm);
   transition: all var(--transition-fast);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .btn-three-dot:hover {
@@ -970,8 +973,17 @@ body {
   padding: 6px 0;
 }
 
+.three-dot-dropdown.floating-dropdown {
+  position: fixed !important;
+  z-index: 999999 !important;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.15), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+  min-width: 145px;
+  margin: 0;
+  pointer-events: auto;
+}
+
 .three-dot-dropdown.show {
-  display: flex;
+  display: flex !important;
 }
 
 .three-dot-item {

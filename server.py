@@ -1671,6 +1671,8 @@ def serve_icon():
     return FileResponse(os.path.join(STATIC_DIR, "assets", "icon.png"), media_type="image/png")
 
 @app.api_route("/", methods=["GET", "HEAD"])
+@app.api_route("/server.py", methods=["GET", "HEAD"])
+@app.api_route("/server.py/", methods=["GET", "HEAD"])
 def serve_index():
     return FileResponse(os.path.join(STATIC_DIR, "index.html"))
 

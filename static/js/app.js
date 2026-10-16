@@ -208,17 +208,16 @@ document.addEventListener('DOMContentLoaded', async () => {
     updateAuthUI();
   });
 
-  // ---------------- Flexible Collapsible Sidebar ----------------
+  // ---------------- Flexible Collapsible Sidebar (Header Toggle) ----------------
   const sidebar = document.getElementById('main-sidebar');
-  const btnSidebarToggle = document.getElementById('btn-sidebar-toggle');
   const btnHeaderToggle = document.getElementById('btn-toggle-sidebar');
   const sidebarBackdrop = document.getElementById('sidebar-backdrop');
 
-  function updateSidebarToggleAttributes(isCollapsed) {
-    if (btnSidebarToggle) {
+  function updateHeaderToggleTooltip(isCollapsed) {
+    if (btnHeaderToggle) {
       const label = isCollapsed ? 'Expand Sidebar' : 'Collapse Sidebar';
-      btnSidebarToggle.title = label;
-      btnSidebarToggle.setAttribute('aria-label', label);
+      btnHeaderToggle.title = label;
+      btnHeaderToggle.setAttribute('aria-label', label);
     }
   }
 
@@ -233,7 +232,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     } else {
       const isCollapsed = sidebar.classList.toggle('collapsed');
       localStorage.setItem('popcone_sidebar_collapsed', isCollapsed ? 'true' : 'false');
-      updateSidebarToggleAttributes(isCollapsed);
+      updateHeaderToggleTooltip(isCollapsed);
     }
   }
 
@@ -242,17 +241,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     const savedCollapsed = localStorage.getItem('popcone_sidebar_collapsed') === 'true';
     if (savedCollapsed && window.innerWidth > 768 && sidebar) {
       sidebar.classList.add('collapsed');
-      updateSidebarToggleAttributes(true);
+      updateHeaderToggleTooltip(true);
+    } else {
+      updateHeaderToggleTooltip(false);
     }
   } catch (e) {
     console.warn('LocalStorage error while restoring sidebar preference:', e);
-  }
-
-  if (btnSidebarToggle) {
-    btnSidebarToggle.addEventListener('click', (e) => {
-      e.preventDefault();
-      toggleSidebar();
-    });
   }
 
   if (btnHeaderToggle) {

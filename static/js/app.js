@@ -412,13 +412,14 @@ document.addEventListener('DOMContentLoaded', async () => {
         ...state.settings,
         ...res
       };
-      // Original bottle price is fixed at 160 (Requirement 2)
+      // Current bottle price
+      const bp = res.bottle_price || res.original_bottle_price || 160;
       document.querySelectorAll('.current-bottle-price-display').forEach(el => {
-        el.textContent = `₹160`;
+        el.textContent = `₹${bp}`;
       });
       // Effective bottle price
       document.querySelectorAll('.effective-price-display').forEach(el => {
-        el.textContent = `₹${res.effective_bottle_price || (160 - (res.discount_per_bottle || 11))}`;
+        el.textContent = `₹${res.effective_bottle_price || (bp - (res.discount_per_bottle || 11))}`;
       });
     } catch (e) {
       console.warn('Could not load settings:', e);
@@ -827,8 +828,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     const distVal = document.getElementById('new-order-district').value;
     const totalBottles = Object.values(state.newOrderState.flavours).reduce((a, b) => a + b, 0);
 
-    // Requirement 2: Fixed original bottle price ₹160
-    const originalUnitPrice = 160.0;
+    // Dynamic bottle price from settings
+    const originalUnitPrice = (state.settings.bottle_price !== undefined) 
+      ? Number(state.settings.bottle_price) 
+      : (Number(state.settings.original_bottle_price) || 160.0);
     const discountPerBottle = (state.settings.discount_per_bottle !== undefined) 
       ? Number(state.settings.discount_per_bottle) 
       : 11.0;

@@ -35,10 +35,9 @@ async def add_no_cache_headers(request: Request, call_next):
         response.headers["Expires"] = "0"
     return response
 
-# Constant original bottle price (Requirement 2: Fixed at ₹160)
-ORIGINAL_BOTTLE_PRICE = 160.0
-# Constant bottle price for Analytics revenue metric (Requirement 3: Fixed at ₹149)
-ANALYTICS_BOTTLE_PRICE = 149.0
+# Default bottle pricing (configurable dynamically in settings table)
+DEFAULT_BOTTLE_PRICE = 160.0
+DEFAULT_DISCOUNT_PER_BOTTLE = 11.0
 
 # ----------------- Models -----------------
 class LoginRequest(BaseModel):
@@ -243,36 +242,43 @@ def get_settings(current_user: Dict[str, Any] = Depends(get_current_user)):
     rows = cursor.fetchall()
     conn.close()
     settings = {r["key"]: r["value"] for r in rows}
-    discount = float(settings.get("discount_per_bottle", 11.0))
+    bottle_price = float(settings.get("bottle_price", DEFAULT_BOTTLE_PRICE))
+    discount = float(settings.get("discount_per_bottle", DEFAULT_DISCOUNT_PER_BOTTLE))
+    effective_price = max(0.0, bottle_price - discount)
     return {
-        "original_bottle_price": ORIGINAL_BOTTLE_PRICE,
-        "bottle_price": ORIGINAL_BOTTLE_PRICE,
+        "original_bottle_price": bottle_price,
+        "bottle_price": bottle_price,
         "discount_per_bottle": discount,
-        "effective_bottle_price": ORIGINAL_BOTTLE_PRICE - discount,
+        "effective_bottle_price": effective_price,
         "low_stock_threshold": int(settings.get("low_stock_threshold", 10))
     }
 
 @app.post("/api/settings/discount")
 def update_discount(req: DiscountRequest, current_user: Dict[str, Any] = Depends(require_admin)):
-    # Requirement 3: Only admin (Ashish) may change discount per bottle. Validate discount.
     if req.discount_per_bottle < 0:
         raise HTTPException(status_code=400, detail="Discount per bottle cannot be negative")
-    if req.discount_per_bottle >= ORIGINAL_BOTTLE_PRICE:
-        raise HTTPException(status_code=400, detail=f"Discount per bottle must be less than original bottle price (Rs.{ORIGINAL_BOTTLE_PRICE:.0f})")
     
     conn = get_db()
     cursor = conn.cursor()
+    cursor.execute("SELECT value FROM settings WHERE key = 'bottle_price';")
+    bp_row = cursor.fetchone()
+    current_bottle_price = float(bp_row["value"]) if bp_row else DEFAULT_BOTTLE_PRICE
+
+    if req.discount_per_bottle >= current_bottle_price:
+        conn.close()
+        raise HTTPException(status_code=400, detail=f"Discount per bottle must be less than bottle price (Rs.{current_bottle_price:.0f})")
+    
     now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
     cursor.execute("SELECT value FROM settings WHERE key = 'discount_per_bottle';")
     old_val = cursor.fetchone()
-    old_disc = old_val["value"] if old_val else "11"
+    old_disc = old_val["value"] if old_val else str(DEFAULT_DISCOUNT_PER_BOTTLE)
 
     cursor.execute("""
     INSERT INTO settings (key, value, updated_at) VALUES ('discount_per_bottle', ?, ?)
     ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at;
     """, (str(req.discount_per_bottle), now))
 
-    effective_price = ORIGINAL_BOTTLE_PRICE - req.discount_per_bottle
+    effective_price = current_bottle_price - req.discount_per_bottle
     cursor.execute("""
     INSERT INTO audit_logs (timestamp, user, action, entity_id, details)
     VALUES (?, ?, ?, ?, ?);
@@ -289,8 +295,22 @@ def update_discount(req: DiscountRequest, current_user: Dict[str, Any] = Depends
 
 @app.post("/api/settings/bottle-price")
 def update_bottle_price(req: BottlePriceRequest, current_user: Dict[str, Any] = Depends(require_admin)):
-    # Requirement 2: Original bottle price is fixed at Rs.160. Users must not be able to modify this original price.
-    raise HTTPException(status_code=400, detail="Original selling price is fixed at Rs.160 per bottle and cannot be modified.")
+    if req.bottle_price <= 0:
+        raise HTTPException(status_code=400, detail="Bottle price must be greater than zero")
+    conn = get_db()
+    cursor = conn.cursor()
+    now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+    cursor.execute("""
+    INSERT INTO settings (key, value, updated_at) VALUES ('bottle_price', ?, ?)
+    ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at;
+    """, (str(req.bottle_price), now))
+    cursor.execute("""
+    INSERT INTO audit_logs (timestamp, user, action, entity_id, details)
+    VALUES (?, ?, ?, ?, ?);
+    """, (now, current_user["display_name"], "Bottle Price Changed", "bottle_price", f"Changed bottle price to Rs.{req.bottle_price}"))
+    conn.commit()
+    conn.close()
+    return {"success": True, "bottle_price": req.bottle_price, "message": f"Bottle price updated to Rs.{req.bottle_price}"}
 
 @app.post("/api/settings/user-password")
 def admin_set_user_password(req: AdminUserPasswordRequest, current_user: Dict[str, Any] = Depends(require_admin)):
@@ -421,11 +441,13 @@ def get_dashboard_stats(current_user: Dict[str, Any] = Depends(get_current_user)
     cursor = conn.cursor()
 
     # KPI stats from valid placed orders in CRM
+    # KPI metrics (Product Revenue is the exact sum of real product_amount charged for all orders)
     cursor.execute("""
     SELECT 
         COUNT(*) as total_orders,
         COALESCE(SUM(total_bottles), 0) as bottles_sold,
-        COALESCE(SUM(delivery_fee), 0) as total_shipping,
+        COALESCE(SUM(delivery_fee), 0.0) as total_shipping,
+        COALESCE(SUM(product_amount), 0.0) as total_revenue,
         SUM(CASE WHEN payment = 'Paid' THEN 1 ELSE 0 END) as paid_orders,
         SUM(CASE WHEN payment = 'COD' THEN 1 ELSE 0 END) as cod_orders
     FROM orders;
@@ -433,9 +455,8 @@ def get_dashboard_stats(current_user: Dict[str, Any] = Depends(get_current_user)
     stats_row = cursor.fetchone()
     total_orders = stats_row["total_orders"] or 0
     bottles_sold = stats_row["bottles_sold"] or 0
-    total_shipping = stats_row["total_shipping"] or 0.0
-    # Rule 3: Product Revenue = Total Bottles Sold * ₹149 (Delivery fees excluded)
-    total_revenue = bottles_sold * ANALYTICS_BOTTLE_PRICE
+    total_shipping = float(stats_row["total_shipping"] or 0.0)
+    total_revenue = float(stats_row["total_revenue"] or 0.0)
     paid_orders = stats_row["paid_orders"] or 0
     cod_orders = stats_row["cod_orders"] or 0
 
@@ -725,21 +746,19 @@ def create_order(req: CreateOrderRequest, current_user: Dict[str, Any] = Depends
     # Requirement 5: Bottle Weight = 100 grams
     total_weight_grams = total_bottles * 100
 
-    # Requirement 2: Original Unit Price is fixed at Rs.160
-    original_unit_price = ORIGINAL_BOTTLE_PRICE
-
-    # Requirement 3: Configured Discount per Bottle from Settings
-    cursor.execute("SELECT value FROM settings WHERE key = 'discount_per_bottle';")
-    disc_row = cursor.fetchone()
-    discount_per_bottle = float(disc_row["value"]) if disc_row else 11.0
+    # Dynamic Bottle Price & Discount from Settings table
+    cursor.execute("SELECT key, value FROM settings WHERE key IN ('bottle_price', 'discount_per_bottle');")
+    s_rows = {r["key"]: r["value"] for r in cursor.fetchall()}
+    original_unit_price = float(s_rows.get("bottle_price", DEFAULT_BOTTLE_PRICE))
+    discount_per_bottle = float(s_rows.get("discount_per_bottle", DEFAULT_DISCOUNT_PER_BOTTLE))
 
     # Financial formulas:
-    # Original Product Amount = Total Bottle Quantity * Rs.160
+    # Original Product Amount = Total Bottle Quantity * Bottle Price
     # Total Discount = Total Bottle Quantity * Discount Per Bottle
     # Discounted Product Amount = Original Product Amount - Total Discount
     original_product_amount = total_bottles * original_unit_price
     total_discount = total_bottles * discount_per_bottle
-    normal_product_amount = original_product_amount - total_discount
+    normal_product_amount = max(0.0, original_product_amount - total_discount)
 
     # Requirement 2 & 5: Optional Combo Offers (Must be explicitly selected and validated)
     # Exactly 2 bottles = ₹289
@@ -1353,28 +1372,28 @@ def get_analytics(year: Optional[int] = None, month: Optional[int] = None, curre
     available_years.sort(reverse=True)
 
     # 1. Total Overview for selected year
-    # Rule 3: PRODUCT REVENUE = TOTAL BOTTLES SOLD × ₹149 (Delivery fees excluded)
-    # Rule 4: SHIPPING COSTS = SUM OF RECORDED DELIVERY FEES FOR ELIGIBLE ORDERS IN THE SELECTED PERIOD
+    # 1. Total Overview for selected year - calculated directly from actual product_amount
     cursor.execute("""
     SELECT 
         COUNT(*) as total_orders,
         COALESCE(SUM(total_bottles), 0) as total_bottles,
-        COALESCE(SUM(delivery_fee), 0) as total_shipping
+        COALESCE(SUM(delivery_fee), 0.0) as total_shipping,
+        COALESCE(SUM(product_amount), 0.0) as total_revenue
     FROM orders
     WHERE strftime('%Y', created_at) = ?;
     """, (str(target_year),))
     overview_row = cursor.fetchone()
     year_total_orders = overview_row["total_orders"] or 0
     year_total_bottles = overview_row["total_bottles"] or 0
-    year_total_shipping = overview_row["total_shipping"] or 0.0
-    year_total_revenue = year_total_bottles * ANALYTICS_BOTTLE_PRICE
+    year_total_shipping = float(overview_row["total_shipping"] or 0.0)
+    year_total_revenue = float(overview_row["total_revenue"] or 0.0)
 
-    # 2. Flavour Breakdown for selected year
+    # 2. Flavour Breakdown for selected year - sum exact line_amount paid
     flavours = ["Tomato", "Cheese", "Sour Cream", "Peri Peri"]
     flavour_stats = {f: {"bottles": 0, "revenue": 0.0} for f in flavours}
 
     cursor.execute("""
-    SELECT oi.flavour, COALESCE(SUM(oi.quantity), 0) as bottles
+    SELECT oi.flavour, COALESCE(SUM(oi.quantity), 0) as bottles, COALESCE(SUM(oi.line_amount), 0.0) as rev
     FROM order_items oi
     JOIN orders o ON oi.order_id = o.order_id
     WHERE strftime('%Y', o.created_at) = ?
@@ -1384,12 +1403,12 @@ def get_analytics(year: Optional[int] = None, month: Optional[int] = None, curre
         if r["flavour"] in flavour_stats:
             flv_qty = r["bottles"] or 0
             flavour_stats[r["flavour"]]["bottles"] = flv_qty
-            flavour_stats[r["flavour"]]["revenue"] = flv_qty * ANALYTICS_BOTTLE_PRICE
+            flavour_stats[r["flavour"]]["revenue"] = float(r["rev"] or 0.0)
 
     has_sales = any(s["bottles"] > 0 for s in flavour_stats.values())
     most_purchased = max(flavour_stats.items(), key=lambda x: x[1]["bottles"]) if has_sales else ("None", {"bottles": 0, "revenue": 0.0})
 
-    # 3. Monthly Report (All 12 months: Jan to Dec)
+    # 3. Monthly Report (All 12 months: Jan to Dec) - exact product_amount & line_amount sums
     months_labels = [
         "January", "February", "March", "April", "May", "June",
         "July", "August", "September", "October", "November", "December"
@@ -1400,26 +1419,28 @@ def get_analytics(year: Optional[int] = None, month: Optional[int] = None, curre
         m_str = f"{month_idx:02d}"
         month_label = months_labels[month_idx - 1]
 
-        # Order totals and shipping costs for this month
+        # Order totals, shipping costs, and real product revenue for this month
         cursor.execute("""
         SELECT 
             COUNT(*) as month_orders,
             COALESCE(SUM(total_bottles), 0) as month_bottles,
-            COALESCE(SUM(delivery_fee), 0) as month_shipping
+            COALESCE(SUM(delivery_fee), 0.0) as month_shipping,
+            COALESCE(SUM(product_amount), 0.0) as month_revenue
         FROM orders
         WHERE strftime('%Y', created_at) = ? AND strftime('%m', created_at) = ?;
         """, (str(target_year), m_str))
         m_orders_row = cursor.fetchone()
         month_orders_count = m_orders_row["month_orders"] if m_orders_row else 0
         month_total_bottles = m_orders_row["month_bottles"] if m_orders_row else 0
-        month_shipping = m_orders_row["month_shipping"] if m_orders_row else 0.0
-        month_revenue = month_total_bottles * ANALYTICS_BOTTLE_PRICE
+        month_shipping = float(m_orders_row["month_shipping"] if m_orders_row else 0.0)
+        month_revenue = float(m_orders_row["month_revenue"] if m_orders_row else 0.0)
 
-        # Flavour quantities for this month
+        # Flavour quantities and line revenues for this month
         cursor.execute("""
         SELECT 
             oi.flavour,
-            COALESCE(SUM(oi.quantity), 0) as qty
+            COALESCE(SUM(oi.quantity), 0) as qty,
+            COALESCE(SUM(oi.line_amount), 0.0) as rev
         FROM order_items oi
         JOIN orders o ON oi.order_id = o.order_id
         WHERE strftime('%Y', o.created_at) = ? AND strftime('%m', o.created_at) = ?
@@ -1434,7 +1455,7 @@ def get_analytics(year: Optional[int] = None, month: Optional[int] = None, curre
             if flv in month_flavour_map:
                 flv_qty = r["qty"] or 0
                 month_flavour_map[flv] = flv_qty
-                month_rev_map[flv] = flv_qty * ANALYTICS_BOTTLE_PRICE
+                month_rev_map[flv] = float(r["rev"] or 0.0)
 
         # Most purchased flavour of this month
         has_m_sales = any(month_flavour_map.values())
@@ -1463,14 +1484,15 @@ def get_analytics(year: Optional[int] = None, month: Optional[int] = None, curre
     if month and 1 <= month <= 12:
         selected_month_data = monthly_data[month - 1]
 
-    # 4. Weekly Report for the selected year
+    # 4. Weekly Report for the selected year - calculated directly from order product_amount & line_amount
     cursor.execute("""
     SELECT 
         strftime('%W', created_at) as week_num,
         MIN(strftime('%Y-%m-%d', created_at)) as week_start,
         COUNT(*) as week_orders,
         COALESCE(SUM(total_bottles), 0) as week_bottles,
-        COALESCE(SUM(delivery_fee), 0) as week_shipping
+        COALESCE(SUM(delivery_fee), 0.0) as week_shipping,
+        COALESCE(SUM(product_amount), 0.0) as week_revenue
     FROM orders
     WHERE strftime('%Y', created_at) = ?
     GROUP BY week_num
@@ -1491,15 +1513,16 @@ def get_analytics(year: Optional[int] = None, month: Optional[int] = None, curre
             "sour_cream": 0, "sour_cream_revenue": 0.0,
             "peri_peri": 0, "peri_peri_revenue": 0.0,
             "total_bottles": w_bottles,
-            "revenue": w_bottles * ANALYTICS_BOTTLE_PRICE,
-            "shipping_costs": wr["week_shipping"] or 0.0
+            "revenue": float(wr["week_revenue"] or 0.0),
+            "shipping_costs": float(wr["week_shipping"] or 0.0)
         }
 
     cursor.execute("""
     SELECT 
         strftime('%W', o.created_at) as week_num,
         oi.flavour,
-        COALESCE(SUM(oi.quantity), 0) as qty
+        COALESCE(SUM(oi.quantity), 0) as qty,
+        COALESCE(SUM(oi.line_amount), 0.0) as rev
     FROM order_items oi
     JOIN orders o ON oi.order_id = o.order_id
     WHERE strftime('%Y', o.created_at) = ?
@@ -1511,7 +1534,7 @@ def get_analytics(year: Optional[int] = None, month: Optional[int] = None, curre
         if wn in weekly_dict:
             flv = r["flavour"]
             qty = r["qty"] or 0
-            rev = qty * ANALYTICS_BOTTLE_PRICE
+            rev = float(r["rev"] or 0.0)
             if flv == "Tomato":
                 weekly_dict[wn]["tomato"] += qty
                 weekly_dict[wn]["tomato_revenue"] += rev
@@ -1558,22 +1581,24 @@ def get_analytics(year: Optional[int] = None, month: Optional[int] = None, curre
 
     conn.close()
 
+    overview_to_return = {
+        "total_orders": year_total_orders,
+        "total_bottles": year_total_bottles,
+        "bottles_sold": year_total_bottles,
+        "total_revenue": year_total_revenue,
+        "product_revenue": year_total_revenue,
+        "shipping_costs": year_total_shipping,
+        "most_purchased_flavour": most_purchased[0] if most_purchased[1]["bottles"] > 0 else "None",
+        "most_purchased_bottles": most_purchased[1]["bottles"],
+        "flavour_breakdown": flavour_stats
+    }
+
     return {
         "selected_year": target_year,
         "selected_month": month,
         "selected_month_data": selected_month_data,
         "available_years": available_years,
-        "overview": {
-            "total_orders": year_total_orders,
-            "total_bottles": year_total_bottles,
-            "bottles_sold": year_total_bottles,
-            "total_revenue": year_total_revenue,
-            "product_revenue": year_total_revenue,
-            "shipping_costs": year_total_shipping,
-            "most_purchased_flavour": most_purchased[0] if most_purchased[1]["bottles"] > 0 else "None",
-            "most_purchased_bottles": most_purchased[1]["bottles"],
-            "flavour_breakdown": flavour_stats
-        },
+        "overview": overview_to_return,
         "weekly_report": weekly_data,
         "monthly_report": monthly_data,
         "annual_report": annual_data

@@ -148,6 +148,42 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
   window.addEventListener('focus', checkSessionTimeout);
 
+  // Eye icon password toggle in login form
+  const btnToggleLoginPassword = document.getElementById('btn-toggle-login-password');
+  const loginPasswordInput = document.getElementById('login-password');
+  const eyeIconShow = document.getElementById('eye-icon-show');
+  const eyeIconHide = document.getElementById('eye-icon-hide');
+
+  function resetLoginPasswordVisibility() {
+    if (loginPasswordInput) {
+      loginPasswordInput.type = 'password';
+      if (eyeIconShow && eyeIconHide) {
+        eyeIconShow.style.display = 'inline-block';
+        eyeIconHide.style.display = 'none';
+      }
+      if (btnToggleLoginPassword) {
+        btnToggleLoginPassword.title = 'Show Password';
+        btnToggleLoginPassword.setAttribute('aria-label', 'Show Password');
+      }
+    }
+  }
+
+  if (btnToggleLoginPassword && loginPasswordInput) {
+    btnToggleLoginPassword.addEventListener('click', (e) => {
+      e.preventDefault();
+      const isPassword = loginPasswordInput.type === 'password';
+      loginPasswordInput.type = isPassword ? 'text' : 'password';
+      if (eyeIconShow && eyeIconHide) {
+        eyeIconShow.style.display = isPassword ? 'none' : 'inline-block';
+        eyeIconHide.style.display = isPassword ? 'inline-block' : 'none';
+      }
+      const newTitle = isPassword ? 'Hide Password' : 'Show Password';
+      btnToggleLoginPassword.title = newTitle;
+      btnToggleLoginPassword.setAttribute('aria-label', newTitle);
+      loginPasswordInput.focus();
+    });
+  }
+
   loginForm.addEventListener('submit', async (e) => {
     e.preventDefault();
     loginError.style.display = 'none';
@@ -157,6 +193,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     try {
       await api.login(username, password);
       showToast('Logged in successfully!');
+      resetLoginPasswordVisibility();
       updateAuthUI();
     } catch (err) {
       loginError.textContent = err.message || 'Login failed';
@@ -166,6 +203,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   document.getElementById('btn-logout').addEventListener('click', async () => {
     await api.logout();
+    resetLoginPasswordVisibility();
     showToast('Logged out');
     updateAuthUI();
   });

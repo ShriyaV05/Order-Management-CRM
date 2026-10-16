@@ -8,7 +8,7 @@
   <meta http-equiv="Expires" content="0">
   <title>POPCONE Orders & Sales CRM</title>
   <meta name="description" content="Production-ready Order Management, Inventory Tracking, and Sales Analytics CRM for POPCONE.">
-  <link rel="stylesheet" href="/static/css/styles.css?v=20261016_02">
+  <link rel="stylesheet" href="/static/css/styles.css?v=20261016_03">
   <link rel="icon" href="/logo.jpg" type="image/jpeg">
   <link rel="shortcut icon" href="/logo.jpg" type="image/jpeg">
   <link rel="apple-touch-icon" href="/logo.jpg">
@@ -33,18 +33,26 @@
         </div>
         <div class="form-group" style="text-align: left; margin-bottom: 22px;">
           <label class="form-label" for="login-password">Password</label>
-          <input type="password" id="login-password" class="form-control" placeholder="Enter password" required autocomplete="current-password">
+          <div class="password-input-wrapper">
+            <input type="password" id="login-password" class="form-control" placeholder="Enter password" required autocomplete="current-password">
+            <button type="button" id="btn-toggle-login-password" class="btn-toggle-password" title="Show Password" aria-label="Toggle password visibility">
+              <!-- Eye open icon (default) -->
+              <svg id="eye-icon-show" class="icon-svg" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/>
+                <circle cx="12" cy="12" r="3"/>
+              </svg>
+              <!-- Eye off (slashed) icon (hidden initially) -->
+              <svg id="eye-icon-hide" class="icon-svg" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: none;">
+                <path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"/>
+                <path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"/>
+                <path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61"/>
+                <line x1="2" x2="22" y1="2" y2="22"/>
+              </svg>
+            </button>
+          </div>
         </div>
         <button type="submit" class="btn btn-primary btn-lg" style="width: 100%;">Sign In</button>
       </form>
-
-      <div class="login-users-hint">
-        <strong>Authorized CRM Accounts:</strong>
-        <ul>
-          <li><strong>Administrator:</strong> <code>ashish@popcone</code></li>
-          <li><strong>Members:</strong> <code>shriya@popcone</code>, <code>vaishnavi@popcone</code>, <code>harini@popcone</code>, <code>suguna@popcone</code></li>
-        </ul>
-      </div>
     </div>
   </div>
 
@@ -1366,8 +1374,8 @@
   </div>
 
   <!-- Scripts (Cache-busted) -->
-  <script src="/static/js/xlsx.full.min.js?v=20261016_02"></script>
-  <script src="/static/js/api.js?v=20261016_02"></script>
-  <script src="/static/js/app.js?v=20261016_02"></script>
+  <script src="/static/js/xlsx.full.min.js?v=20261016_03"></script>
+  <script src="/static/js/api.js?v=20261016_03"></script>
+  <script src="/static/js/app.js?v=20261016_03"></script>
 </body>
 </html>

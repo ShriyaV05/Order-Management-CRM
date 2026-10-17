@@ -556,12 +556,10 @@ body {
   background: var(--accent-yellow);
 }
 
-.kpi-card.accent-green::after {
-  background: var(--success-green);
-}
-
+.kpi-card.accent-blue::after,
+.kpi-card.accent-green::after,
 .kpi-card.accent-purple::after {
-  background: #8B5CF6;
+  background: var(--primary-blue);
 }
 
 .kpi-label {
@@ -2137,10 +2135,6 @@ body {
   border-top: 1px solid var(--border-light);
 }
 
-/* Analytics Shipping Costs Card (Requirement 4) */
-.kpi-card.accent-blue {
-  border-top: 4px solid var(--info-blue);
-}
 
 .analytics-kpi-grid {
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));

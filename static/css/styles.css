@@ -846,6 +846,96 @@ body {
   width: 100%;
 }
 
+/* ---------------- New Order Flavour Cards with Bottle Pictures ---------------- */
+#view-new-order .flavour-card {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 16px;
+  position: relative;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-md);
+  transition: all var(--transition-fast);
+}
+
+#view-new-order .flavour-card:hover {
+  border-color: var(--primary-blue);
+  box-shadow: 0 4px 12px rgba(13, 71, 161, 0.08);
+}
+
+#view-new-order .flavour-card-media {
+  width: 68px;
+  height: 68px;
+  min-width: 68px;
+  min-height: 68px;
+  border-radius: var(--radius-md);
+  background: #F8F7F2;
+  border: 1px solid var(--border-subtle);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  padding: 2px;
+  flex-shrink: 0;
+}
+
+#view-new-order .flavour-bottle-img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  transition: transform var(--transition-fast);
+}
+
+#view-new-order .flavour-card:hover .flavour-bottle-img {
+  transform: scale(1.06);
+}
+
+#view-new-order .flavour-card-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+
+#view-new-order .flavour-header {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+}
+
+#view-new-order .flavour-name {
+  font-weight: 700;
+  font-size: 15px;
+  color: var(--primary-blue);
+  text-align: center;
+  width: 100%;
+}
+
+#view-new-order .flavour-stock-tag {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-app);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-subtle);
+}
+
+#view-new-order .flavour-qty-control {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+}
+
 .btn-qty {
   width: 36px;
   height: 36px;

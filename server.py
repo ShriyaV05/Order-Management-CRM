@@ -1691,6 +1691,10 @@ def serve_css(file_path: str):
 def serve_js(file_path: str):
     return serve_static(f"js/{file_path}")
 
+@app.api_route("/flavours/{file_path:path}", methods=["GET", "HEAD"])
+def serve_flavours(file_path: str):
+    return serve_static(f"assets/flavours/{file_path}")
+
 # Directly serve logo.jpg from workspace or static/assets
 @app.get("/logo.jpg")
 def serve_logo():

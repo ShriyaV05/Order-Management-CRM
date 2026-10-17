@@ -20,3 +20,6 @@ Thumbs.db
 *.sqlite3
 popcone.db
 backups/
+
+# Untracked raw upload images in root (tracked cleanly inside static/assets/flavours/)
+/*.PNG

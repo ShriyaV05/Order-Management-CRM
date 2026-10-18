@@ -1,4 +1,10 @@
 {
+  "crons": [
+    {
+      "path": "/api/cron/daily-backup",
+      "schedule": "0 2 * * *"
+    }
+  ],
   "builds": [
     {
       "src": "server.py",
@@ -10,7 +16,8 @@
           "icon.png",
           "auth.py",
           "database.py",
-          "locations.py"
+          "locations.py",
+          "backup_service.py"
         ]
       }
     }

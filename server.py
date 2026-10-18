@@ -394,21 +394,259 @@ def admin_set_user_password(req: AdminUserPasswordRequest, current_user: Dict[st
         "message": f"Password for {target_user['display_name']} updated successfully. New password is active immediately."
     }
 
-# ----------------- Database Protection & Backup Routes -----------------
-@app.post("/api/admin/database/backup")
-def trigger_backup(current_user: Dict[str, Any] = Depends(require_admin)):
-    return {
-        "success": True,
-        "backend": "turso",
-        "message": "Live data is stored in a single Turso database. Use the Turso dashboard for snapshots. Local sqlite backups are disabled so they cannot overwrite or replace live orders."
+# ----------------- Database Protection & Backup Routes (Stage 1) -----------------
+import backup_service
+
+@app.get("/api/admin/backups/status")
+def backup_status(current_user: Dict[str, Any] = Depends(require_admin)):
+    """Check if external backup storage (Google Drive or S3) and cryptographic keys are configured."""
+    provider = backup_service.get_storage_provider()
+    configured = backup_service.is_storage_configured()
+    status_info = {
+        "storage_configured": configured,
+        "storage_provider": provider,
+        "s3_configured": backup_service.is_s3_configured(),
+        "gdrive_configured": backup_service.is_gdrive_configured(),
+        "turso_database": using_turso(),
+        "storage_backend": (
+            "Google Drive (Personal Free Tier)" if provider == "gdrive"
+            else "S3-compatible (Cloudflare R2 / AWS S3)" if provider == "s3"
+            else "Not Configured"
+        )
     }
+    if provider == "gdrive":
+        try:
+            status_info["gdrive_quota"] = backup_service.check_gdrive_quota()
+        except Exception as e:
+            status_info["gdrive_quota_error"] = str(e)
+    return status_info
+
+@app.get("/api/admin/backups/manifest")
+def list_backups_manifest(current_user: Dict[str, Any] = Depends(require_admin)):
+    """List durable backup manifests stored independently in external storage."""
+    if not backup_service.is_storage_configured():
+        return {
+            "configured": False,
+            "backups": [],
+            "message": "Backup storage is not configured. Configure GDRIVE_* or BACKUP_S3_* environment variables."
+        }
+    try:
+        manifest = backup_service.get_backups_manifest()
+        return {
+            "configured": True,
+            "storage_provider": backup_service.get_storage_provider(),
+            "backups": manifest
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch backup manifest: {e}")
+
+@app.post("/api/admin/backups", status_code=201)
+def create_manual_backup(current_user: Dict[str, Any] = Depends(require_admin)):
+    """
+    Executes a complete, cryptographically signed, point-in-time database snapshot
+    and uploads to durable external storage with immediate Tier 1 & 2 offline verification.
+    """
+    if not backup_service.is_storage_configured():
+        raise HTTPException(
+            status_code=400,
+            detail="Backup storage is not configured. Configure GDRIVE_* or BACKUP_S3_* environment variables."
+        )
+
+    try:
+        meta = backup_service.execute_backup(backup_type="MANUAL", initiated_by=current_user["username"])
+
+        # Record in audit logs
+        now_str = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+        try:
+            conn = get_db()
+            cursor = conn.cursor()
+            cursor.execute("""
+            INSERT INTO audit_logs (timestamp, user, action, entity_id, details)
+            VALUES (?, ?, ?, ?, ?);
+            """, (
+                now_str,
+                current_user["username"],
+                "CREATE_BACKUP",
+                meta.get("backup_id"),
+                f"Manual backup created: {meta.get('backup_id')} ({meta.get('size_bytes', 0)} bytes). Tier 1 & Tier 2 verified."
+            ))
+            conn.commit()
+            conn.close()
+        except Exception as e:
+            print(f"[Backup] Warning: could not write to audit_logs: {e}")
+
+        return {
+            "success": True,
+            "backup": meta
+        }
+    except backup_service.AuthenticationError as e:
+        raise HTTPException(status_code=401, detail=f"Storage authentication failed: {e}")
+    except backup_service.QuotaExceededError as e:
+        raise HTTPException(status_code=507, detail=f"Storage quota exceeded: {e}")
+    except backup_service.ConcurrencyLockError as e:
+        raise HTTPException(status_code=409, detail=str(e))
+    except backup_service.StorageConfigurationError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except backup_service.BackupIntegrityError as e:
+        raise HTTPException(status_code=500, detail=f"Backup verification failed: {e}")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Backup creation failed: {e}")
+
+@app.post("/api/admin/backups/{backup_id}/verify")
+def verify_existing_backup(backup_id: str, current_user: Dict[str, Any] = Depends(require_admin)):
+    """
+    Fetches an existing backup archive from external storage (Google Drive or S3)
+    and performs full Tier 1 & Tier 2 offline verification.
+    """
+    if not backup_service.is_storage_configured():
+        raise HTTPException(status_code=400, detail="Backup storage is not configured.")
+
+    try:
+        header, snapshot_data = backup_service.verify_backup_archive_by_id(backup_id)
+        tier2_result = backup_service.verify_backup_tier2(snapshot_data)
+
+        return {
+            "success": True,
+            "backup_id": backup_id,
+            "tier1_verified": True,
+            "tier2_verified": True,
+            "tier2_details": tier2_result,
+            "header": header
+        }
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=404, detail=f"Backup archive '{backup_id}' not found in storage: {e}")
+    except backup_service.BackupIntegrityError as e:
+        raise HTTPException(status_code=422, detail=f"Integrity verification failed: {e}")
+    except Exception as e:
+        err_msg = str(e)
+        if "NoSuchKey" in err_msg or "404" in err_msg or "not found" in err_msg.lower():
+            raise HTTPException(status_code=404, detail=f"Backup archive '{backup_id}' not found in storage.")
+        raise HTTPException(status_code=500, detail=f"Verification failed: {e}")
+
+@app.post("/api/admin/backups/restore")
+def restore_backup_disabled(current_user: Dict[str, Any] = Depends(require_admin)):
+    """Safety barrier: Production restoration is strictly disabled in Stage 1."""
+    raise HTTPException(
+        status_code=403,
+        detail="Production restoration is disabled in Stage 1 per safety protocol. Production data cannot be modified until isolated staging restore tests pass."
+    )
+
+# Backward-compatible alias
+@app.post("/api/admin/database/backup")
+def legacy_trigger_backup(current_user: Dict[str, Any] = Depends(require_admin)):
+    return create_manual_backup(current_user)
 
 @app.get("/api/admin/database/download")
-def download_database(current_user: Dict[str, Any] = Depends(require_admin)):
-    raise HTTPException(
-        status_code=400,
-        detail="Live data is in Turso, not a local sqlite file. Download from the Turso dashboard instead of a local .db that can be empty or stale."
-    )
+def legacy_download_database(current_user: Dict[str, Any] = Depends(require_admin)):
+    return list_backups_manifest(current_user)
+
+# ----------------- Vercel Cron Scheduled Backups (Stage 2) -----------------
+def verify_cron_or_admin(authorization: Optional[str] = Header(None)) -> Dict[str, Any]:
+    """
+    Authenticates Vercel Cron requests via CRON_SECRET Bearer token,
+    or authenticated admin users via their session token.
+    Returns caller identity dict.
+    """
+    if not authorization:
+        raise HTTPException(
+            status_code=401,
+            detail="Missing Authorization header. Vercel Cron requires 'Bearer <CRON_SECRET>'."
+        )
+
+    parts = authorization.split()
+    if len(parts) != 2 or parts[0].lower() != "bearer":
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid Authorization header format. Expected 'Bearer <token>'."
+        )
+
+    token = parts[1]
+
+    # 1. Check CRON_SECRET first
+    cron_secret = (os.environ.get("CRON_SECRET") or "").strip()
+    placeholder_secrets = {"", "your_vercel_cron_secret_here", "changeme", "replace_me"}
+
+    if cron_secret and cron_secret not in placeholder_secrets:
+        import secrets
+        if secrets.compare_digest(token, cron_secret):
+            return {"type": "CRON", "username": "vercel-cron"}
+
+    # 2. Check if it's an authenticated Admin session token
+    try:
+        user = get_current_user(authorization=authorization)
+        if user.get("role") == "ADMIN":
+            return {"type": "ADMIN", "username": user.get("username", "admin")}
+    except Exception:
+        pass
+
+    # If neither matched:
+    if not cron_secret or cron_secret in placeholder_secrets:
+        raise HTTPException(
+            status_code=500,
+            detail="CRON_SECRET is not configured on the server. Scheduled backup invocations are rejected."
+        )
+    raise HTTPException(status_code=401, detail="Invalid CRON_SECRET or unauthorized caller.")
+
+
+@app.get("/api/cron/daily-backup")
+@app.post("/api/cron/daily-backup")
+def cron_daily_backup(caller: Dict[str, Any] = Depends(verify_cron_or_admin)):
+    """
+    Vercel Cron endpoint for automated daily backups.
+    Invoked daily (e.g. 02:00 UTC) via HTTP GET with 'Authorization: Bearer <CRON_SECRET>'.
+    - Enforces calendar-day idempotency: skips duplicate runs if today's scheduled backup completed.
+    - Executes complete point-in-time database snapshot, encryption, signing, and Tier 1 & 2 verification.
+    - Safely prunes expired backups beyond BACKUP_RETENTION_DAYS while preserving MIN_BACKUPS_RETAINED.
+    - Records audit log in CRM database.
+    """
+    if not backup_service.is_storage_configured():
+        raise HTTPException(
+            status_code=400,
+            detail="Backup storage is not configured. Automated backups cannot run without durable external storage."
+        )
+
+    try:
+        result = backup_service.execute_scheduled_daily_backup()
+
+        # Audit log
+        now_str = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+        action = "CRON_BACKUP" if result.get("status") == "COMPLETED" else "CRON_SKIPPED"
+        details = result.get("message", "Daily backup operation executed.")
+        if result.get("pruning", {}).get("pruned_count", 0) > 0:
+            details += f" Pruned {result['pruning']['pruned_count']} expired backup(s)."
+
+        try:
+            conn = get_db()
+            cursor = conn.cursor()
+            cursor.execute("""
+            INSERT INTO audit_logs (timestamp, user, action, entity_id, details)
+            VALUES (?, ?, ?, ?, ?);
+            """, (
+                now_str,
+                caller.get("username", "vercel-cron"),
+                action,
+                result.get("backup", {}).get("backup_id") or result.get("backup_id"),
+                details
+            ))
+            conn.commit()
+            conn.close()
+        except Exception as e:
+            print(f"[Cron Backup] Warning: could not write to audit_logs: {e}")
+
+        return result
+    except backup_service.AuthenticationError as e:
+        raise HTTPException(status_code=401, detail=f"Storage authentication failed: {e}")
+    except backup_service.QuotaExceededError as e:
+        raise HTTPException(status_code=507, detail=f"Storage quota exceeded: {e}")
+    except backup_service.ConcurrencyLockError as e:
+        raise HTTPException(status_code=409, detail=str(e))
+    except backup_service.StorageConfigurationError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except backup_service.BackupIntegrityError as e:
+        raise HTTPException(status_code=500, detail=f"Daily backup verification failed: {e}")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Daily backup execution failed: {e}")
+
 
 # ----------------- Locations, Postal PIN Lookup & Delivery -----------------
 @app.get("/api/locations")

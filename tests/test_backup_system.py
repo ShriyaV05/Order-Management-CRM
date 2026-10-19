@@ -1927,5 +1927,159 @@ class TestLongTermRetentionAndRecovery(unittest.TestCase):
             mock_del.assert_not_called()
 
 
+class TestKeyRotationAndKeyringFallback(unittest.TestCase):
+    """
+    Regression tests for key rotation, multi-key keyring resolution,
+    unversioned rotation ID collision handling, and diagnostic error clarity.
+    """
+
+    def setUp(self):
+        self.orig_env = dict(os.environ)
+        self.sample_snapshot = create_sample_snapshot()
+        self.key_v1 = secrets.token_bytes(32)
+        self.key_v2 = secrets.token_bytes(32)
+
+    def tearDown(self):
+        os.environ.clear()
+        os.environ.update(self.orig_env)
+
+    def test_unversioned_key_rotation_fallback_with_dict(self):
+        """Verify old archives verify via keyring fallback even if key IDs collide on sign_v1."""
+        # Archive created with key_v1
+        archive_v1, header_v1 = backup_service.create_backup_package(
+            self.sample_snapshot,
+            enc_key=self.key_v1,
+            sign_key=self.key_v1,
+            enc_key_id="enc_v1",
+            sign_key_id="sign_v1"
+        )
+
+        # Environment rotated to key_v2 without changing key IDs
+        os.environ["BACKUP_ENCRYPTION_KEY"] = self.key_v2.hex()
+        os.environ["BACKUP_SIGNING_KEY"] = self.key_v2.hex()
+        os.environ["CURRENT_ENCRYPTION_KEY_ID"] = "enc_v1"
+        os.environ["CURRENT_SIGNING_KEY_ID"] = "sign_v1"
+
+        # Without keyring, archive_v1 fails verification
+        with self.assertRaises(backup_service.BackupIntegrityError) as ctx:
+            backup_service.verify_backup_tier1(archive_v1)
+        self.assertIn("HMAC signature mismatch", str(ctx.exception))
+
+        # Add key_v1 to keyring under the same ID (unversioned rotation)
+        os.environ["BACKUP_ENCRYPTION_KEYRING_JSON"] = json.dumps({"enc_v1": self.key_v1.hex()})
+        os.environ["BACKUP_SIGNING_KEYRING_JSON"] = json.dumps({"sign_v1": self.key_v1.hex()})
+
+        # Now archive_v1 succeeds via keyring fallback
+        h1, s1 = backup_service.verify_backup_tier1(archive_v1)
+        self.assertEqual(h1["backup_id"], header_v1["backup_id"])
+        self.assertEqual(s1["table_counts"]["users"], 2)
+
+        # And a new archive created with key_v2 also verifies cleanly
+        archive_v2, header_v2 = backup_service.create_backup_package(self.sample_snapshot)
+        h2, s2 = backup_service.verify_backup_tier1(archive_v2)
+        self.assertEqual(h2["backup_id"], header_v2["backup_id"])
+
+    def test_unversioned_key_rotation_fallback_with_list(self):
+        """Verify old archives verify when keyring is provided as a JSON list of historical keys."""
+        archive_v1, _ = backup_service.create_backup_package(
+            self.sample_snapshot,
+            enc_key=self.key_v1,
+            sign_key=self.key_v1,
+            enc_key_id="enc_v1",
+            sign_key_id="sign_v1"
+        )
+
+        os.environ["BACKUP_ENCRYPTION_KEY"] = self.key_v2.hex()
+        os.environ["BACKUP_SIGNING_KEY"] = self.key_v2.hex()
+        os.environ["BACKUP_ENCRYPTION_KEYRING_JSON"] = json.dumps([self.key_v1.hex()])
+        os.environ["BACKUP_SIGNING_KEYRING_JSON"] = json.dumps([self.key_v1.hex()])
+
+        h1, s1 = backup_service.verify_backup_tier1(archive_v1)
+        self.assertIn("backup_id", h1)
+        self.assertIn("users", s1["tables"])
+
+    def test_fallback_keys_environment_variable(self):
+        """Verify comma-separated fallback variables enable legacy archive verification."""
+        archive_v1, _ = backup_service.create_backup_package(
+            self.sample_snapshot,
+            enc_key=self.key_v1,
+            sign_key=self.key_v1,
+            enc_key_id="enc_v1",
+            sign_key_id="sign_v1"
+        )
+
+        os.environ["BACKUP_ENCRYPTION_KEY"] = self.key_v2.hex()
+        os.environ["BACKUP_SIGNING_KEY"] = self.key_v2.hex()
+        os.environ["BACKUP_ENCRYPTION_KEYS_FALLBACK"] = f"{self.key_v1.hex()}"
+        os.environ["BACKUP_SIGNING_KEYS_FALLBACK"] = f"{self.key_v1.hex()}"
+
+        h1, s1 = backup_service.verify_backup_tier1(archive_v1)
+        self.assertIn("backup_id", h1)
+        self.assertEqual(len(s1["tables"]["users"]), 2)
+
+    def test_tampered_archive_rejected_even_with_keyring(self):
+        """Ensure cryptographic authenticity is strictly enforced even when fallback keys exist."""
+        archive_v1, _ = backup_service.create_backup_package(
+            self.sample_snapshot,
+            enc_key=self.key_v1,
+            sign_key=self.key_v1,
+            enc_key_id="enc_v1",
+            sign_key_id="sign_v1"
+        )
+
+        os.environ["BACKUP_ENCRYPTION_KEY"] = self.key_v2.hex()
+        os.environ["BACKUP_SIGNING_KEY"] = self.key_v2.hex()
+        os.environ["BACKUP_ENCRYPTION_KEYRING_JSON"] = json.dumps({"legacy": self.key_v1.hex()})
+        os.environ["BACKUP_SIGNING_KEYRING_JSON"] = json.dumps({"legacy": self.key_v1.hex()})
+
+        # 1. Tamper HMAC signature bytes -> rejected
+        tampered_sig = bytearray(archive_v1)
+        tampered_sig[len(backup_service.BACKUP_MAGIC) + 2] ^= 0xFF
+        with self.assertRaises(backup_service.BackupIntegrityError):
+            backup_service.verify_backup_tier1(bytes(tampered_sig))
+
+        # 2. Tamper ciphertext payload -> rejected
+        tampered_body = bytearray(archive_v1)
+        tampered_body[-5] ^= 0xFF
+        with self.assertRaises(backup_service.BackupIntegrityError):
+            backup_service.verify_backup_tier1(bytes(tampered_body))
+
+    def test_key_parsing_strips_quotes(self):
+        """Ensure quotes accidentally copied into environment variables are safely stripped."""
+        quoted_key = f'"{self.key_v1.hex()}"'
+        parsed = backup_service._parse_key_bytes(quoted_key, "TEST_KEY")
+        self.assertEqual(parsed, self.key_v1)
+
+        single_quoted = f"'{self.key_v1.hex()}'"
+        parsed_sq = backup_service._parse_key_bytes(single_quoted, "TEST_KEY")
+        self.assertEqual(parsed_sq, self.key_v1)
+
+    def test_manifest_context_error_on_intact_archive(self):
+        """Verify _verify_archive_with_manifest_context reports intact storage when checksum matches."""
+        archive_v1, header = backup_service.create_backup_package(
+            self.sample_snapshot,
+            enc_key=self.key_v1,
+            sign_key=self.key_v1,
+            enc_key_id="enc_v1",
+            sign_key_id="sign_v1"
+        )
+        arch_sha = header["archive_sha256"]
+
+        # Active key is key_v2 (mismatch)
+        os.environ["BACKUP_ENCRYPTION_KEY"] = self.key_v2.hex()
+        os.environ["BACKUP_SIGNING_KEY"] = self.key_v2.hex()
+
+        with self.assertRaises(backup_service.BackupIntegrityError) as ctx:
+            backup_service._verify_archive_with_manifest_context(
+                archive_v1,
+                header["backup_id"],
+                manifest_sha256=arch_sha
+            )
+        err_msg = str(ctx.exception)
+        self.assertIn("Storage file checksum matches manifest", err_msg)
+        self.assertIn("cannot be authenticated or decrypted", err_msg)
+        self.assertIn("BACKUP_SIGNING_KEYRING_JSON", err_msg)
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -18,6 +18,7 @@ Implements:
 """
 
 import os
+import re
 import json
 import uuid
 import hmac
@@ -294,31 +295,36 @@ def _parse_key_bytes(raw_val: str, key_name: str) -> bytes:
     if not val or val in {"your_32_byte_aes_gcm_encryption_key_here", "your_32_byte_hmac_sha256_signing_key_here"}:
         raise StorageConfigurationError(f"Missing or placeholder secret key: {key_name}.")
 
-    # Try hex
-    try:
-        k = bytes.fromhex(val)
-        if len(k) == 32:
-            return k
-    except Exception:
-        pass
+    # Strip optional surrounding quotes if present from environment variable pasting
+    clean_val = val.strip("\"'").strip()
+    if clean_val:
+        # Try hex
+        try:
+            k = bytes.fromhex(clean_val)
+            if len(k) == 32:
+                return k
+        except Exception:
+            pass
 
-    # Try base64
-    import base64
-    try:
-        k = base64.b64decode(val)
-        if len(k) == 32:
-            return k
-    except Exception:
-        pass
+        # Try base64
+        import base64
+        try:
+            k = base64.b64decode(clean_val)
+            if len(k) == 32:
+                return k
+        except Exception:
+            pass
 
     # Fallback to UTF-8 SHA-256 derivation if raw string
-    return hashlib.sha256(val.encode("utf-8")).digest()
+    return hashlib.sha256(clean_val.encode("utf-8")).digest()
 
 
 def get_crypto_keyring() -> Tuple[Dict[str, bytes], str, Dict[str, bytes], str]:
     """
     Returns (encryption_keyring, current_enc_id, signing_keyring, current_sign_id).
     Supports independent key versioning and future rotation.
+    If multiple keys are configured under the same ID or via fallback variables,
+    both primary and legacy keys are retained in the keyring without collisions.
     """
     enc_raw = os.environ.get("BACKUP_ENCRYPTION_KEY", "")
     sign_raw = os.environ.get("BACKUP_SIGNING_KEY", "")
@@ -331,20 +337,58 @@ def get_crypto_keyring() -> Tuple[Dict[str, bytes], str, Dict[str, bytes], str]:
     enc_keyring = {current_enc_id: enc_key}
     sign_keyring = {current_sign_id: sign_key}
 
-    # Optional multi-key keyring from JSON if configured
+    # Optional multi-key keyring from JSON dict or list if configured
     extra_enc = os.environ.get("BACKUP_ENCRYPTION_KEYRING_JSON")
     if extra_enc:
         try:
-            for k_id, k_val in json.loads(extra_enc).items():
-                enc_keyring[k_id] = _parse_key_bytes(k_val, f"KEYRING:{k_id}")
+            parsed_enc = json.loads(extra_enc)
+            if isinstance(parsed_enc, dict):
+                for k_id, k_val in parsed_enc.items():
+                    key_bytes = _parse_key_bytes(k_val, f"KEYRING:{k_id}")
+                    if k_id == current_enc_id and key_bytes != enc_key:
+                        enc_keyring[f"{k_id}_legacy"] = key_bytes
+                    else:
+                        enc_keyring[k_id] = key_bytes
+            elif isinstance(parsed_enc, list):
+                for idx, k_val in enumerate(parsed_enc):
+                    enc_keyring[f"enc_hist_{idx+1}"] = _parse_key_bytes(k_val, f"KEYRING_HIST:{idx+1}")
+        except Exception:
+            pass
+
+    # Optional fallback encryption keys (comma or newline separated)
+    extra_enc_fallback = os.environ.get("BACKUP_ENCRYPTION_KEYS_FALLBACK") or os.environ.get("BACKUP_ENCRYPTION_FALLBACK_KEYS")
+    if extra_enc_fallback:
+        try:
+            for idx, part in enumerate(re.split(r"[,;\n\s]+", extra_enc_fallback.strip())):
+                if part.strip():
+                    enc_keyring[f"enc_fallback_{idx+1}"] = _parse_key_bytes(part.strip(), f"FALLBACK_ENC:{idx+1}")
         except Exception:
             pass
 
     extra_sign = os.environ.get("BACKUP_SIGNING_KEYRING_JSON")
     if extra_sign:
         try:
-            for k_id, k_val in json.loads(extra_sign).items():
-                sign_keyring[k_id] = _parse_key_bytes(k_val, f"SIGN_KEYRING:{k_id}")
+            parsed_sign = json.loads(extra_sign)
+            if isinstance(parsed_sign, dict):
+                for k_id, k_val in parsed_sign.items():
+                    key_bytes = _parse_key_bytes(k_val, f"SIGN_KEYRING:{k_id}")
+                    if k_id == current_sign_id and key_bytes != sign_key:
+                        sign_keyring[f"{k_id}_legacy"] = key_bytes
+                    else:
+                        sign_keyring[k_id] = key_bytes
+            elif isinstance(parsed_sign, list):
+                for idx, k_val in enumerate(parsed_sign):
+                    sign_keyring[f"sign_hist_{idx+1}"] = _parse_key_bytes(k_val, f"SIGN_KEYRING_HIST:{idx+1}")
+        except Exception:
+            pass
+
+    # Optional fallback signing keys (comma or newline separated)
+    extra_sign_fallback = os.environ.get("BACKUP_SIGNING_KEYS_FALLBACK") or os.environ.get("BACKUP_SIGNING_FALLBACK_KEYS")
+    if extra_sign_fallback:
+        try:
+            for idx, part in enumerate(re.split(r"[,;\n\s]+", extra_sign_fallback.strip())):
+                if part.strip():
+                    sign_keyring[f"sign_fallback_{idx+1}"] = _parse_key_bytes(part.strip(), f"FALLBACK_SIGN:{idx+1}")
         except Exception:
             pass
 
@@ -914,29 +958,75 @@ def verify_backup_tier1(
 
     # Verify HMAC Authenticity Signature
     sign_key_id = header.get("sign_key_id")
-    if sign_key_id not in sign_keyring:
-        raise BackupIntegrityError(f"Unknown signing key ID '{sign_key_id}'. Key is missing from keyring.")
+    matched_sign_id = None
 
-    computed_sig = hmac.new(sign_keyring[sign_key_id], package_body, hashlib.sha256).digest()
-    if not secrets.compare_digest(expected_sig, computed_sig):
-        raise BackupIntegrityError("Authenticity verification failed: HMAC signature mismatch (archive has been tampered with).")
+    # 1. Try declared signing key ID first
+    if sign_key_id and sign_key_id in sign_keyring:
+        candidate_sig = hmac.new(sign_keyring[sign_key_id], package_body, hashlib.sha256).digest()
+        if secrets.compare_digest(expected_sig, candidate_sig):
+            matched_sign_id = sign_key_id
 
-    # Verify Encryption Key ID
-    enc_key_id = header.get("enc_key_id")
-    if enc_key_id not in enc_keyring:
-        raise BackupIntegrityError(f"Unknown encryption key ID '{enc_key_id}'. Key is missing from keyring.")
+    # 2. If declared key did not match, try other authorized keys in the keyring
+    if matched_sign_id is None:
+        for k_id, k_bytes in sign_keyring.items():
+            if k_id == sign_key_id:
+                continue
+            candidate_sig = hmac.new(k_bytes, package_body, hashlib.sha256).digest()
+            if secrets.compare_digest(expected_sig, candidate_sig):
+                matched_sign_id = k_id
+                header["_resolved_sign_key_id"] = k_id
+                break
 
-    # Decrypt AES-256-GCM Payload
+    if matched_sign_id is None:
+        if sign_key_id and sign_key_id not in sign_keyring:
+            raise BackupIntegrityError(
+                f"Unknown signing key ID '{sign_key_id}'. Key is missing from keyring. "
+                "Configure BACKUP_SIGNING_KEYRING_JSON with historical keys to verify legacy backups."
+            )
+        raise BackupIntegrityError(
+            "Authenticity verification failed: HMAC signature mismatch (archive has been tampered with "
+            "or was signed with a key not present in the keyring)."
+        )
+
+    # Verify Encryption Key ID & Decrypt AES-256-GCM Payload
     nonce_start = 4 + header_len
     nonce_end = nonce_start + 12
     nonce = package_body[nonce_start:nonce_end]
     ciphertext = package_body[nonce_end:]
 
-    aesgcm = AESGCM(enc_keyring[enc_key_id])
-    try:
-        plaintext_bytes = aesgcm.decrypt(nonce, ciphertext, associated_data=header_bytes)
-    except Exception as e:
-        raise BackupIntegrityError(f"Decryption failed: AES-256-GCM authentication tag mismatch: {e}")
+    enc_key_id = header.get("enc_key_id")
+    plaintext_bytes = None
+    decryption_err = None
+
+    # 1. Try declared encryption key ID first
+    if enc_key_id and enc_key_id in enc_keyring:
+        try:
+            aesgcm = AESGCM(enc_keyring[enc_key_id])
+            plaintext_bytes = aesgcm.decrypt(nonce, ciphertext, associated_data=header_bytes)
+        except Exception as e:
+            decryption_err = e
+
+    # 2. If declared key failed, try other authorized keys in the keyring
+    if plaintext_bytes is None:
+        for k_id, k_bytes in enc_keyring.items():
+            if k_id == enc_key_id:
+                continue
+            try:
+                aesgcm = AESGCM(k_bytes)
+                plaintext_bytes = aesgcm.decrypt(nonce, ciphertext, associated_data=header_bytes)
+                header["_resolved_enc_key_id"] = k_id
+                decryption_err = None
+                break
+            except Exception:
+                pass
+
+    if plaintext_bytes is None:
+        if enc_key_id and enc_key_id not in enc_keyring:
+            raise BackupIntegrityError(
+                f"Unknown encryption key ID '{enc_key_id}'. Key is missing from keyring. "
+                "Configure BACKUP_ENCRYPTION_KEYRING_JSON with historical keys to verify legacy backups."
+            )
+        raise BackupIntegrityError(f"Decryption failed: AES-256-GCM authentication tag mismatch: {decryption_err}")
 
     # Check SHA-256 payload checksum
     actual_sha256 = hashlib.sha256(plaintext_bytes).hexdigest()
@@ -2035,6 +2125,30 @@ def prune_expired_backups(
     }
 
 
+def _verify_archive_with_manifest_context(
+    arch_bytes: bytes,
+    backup_id: str,
+    manifest_sha256: Optional[str] = None
+) -> Tuple[Dict[str, Any], Dict[str, Any]]:
+    """Helper to verify tier 1 and tier 2 while adding storage manifest integrity context if verification fails."""
+    try:
+        header, snapshot = verify_backup_tier1(arch_bytes)
+        verify_backup_tier2(snapshot)
+        return header, snapshot
+    except BackupIntegrityError as e:
+        if manifest_sha256 and "HMAC signature mismatch" in str(e):
+            arch_sha = hashlib.sha256(arch_bytes).hexdigest()
+            if secrets.compare_digest(arch_sha, manifest_sha256):
+                raise BackupIntegrityError(
+                    f"Authenticity verification failed: HMAC signature mismatch. "
+                    f"Storage file checksum matches manifest ({arch_sha[:12]}...), but the archive "
+                    f"cannot be authenticated or decrypted with the active keyring. "
+                    f"If the archive was created prior to key rotation, cryptographic verification and recovery "
+                    f"require explicitly configuring the original historical key in BACKUP_SIGNING_KEYRING_JSON and BACKUP_ENCRYPTION_KEYRING_JSON."
+                ) from e
+        raise
+
+
 def verify_backup_archive_by_id(
     backup_id: str,
     s3_client=None,
@@ -2047,33 +2161,53 @@ def verify_backup_archive_by_id(
         archive_key = f"archives/{backup_id}.enc.bak"
         res = s3.get_object(Bucket=cfg["bucket"], Key=archive_key)
         arch_bytes = res["Body"].read()
-        header, snapshot = verify_backup_tier1(arch_bytes)
-        verify_backup_tier2(snapshot)
-        return header, snapshot
+        manifest_sha256 = None
+        try:
+            m_res = s3.get_object(Bucket=cfg["bucket"], Key=f"metadata/{backup_id}.meta.json")
+            manifest_sha256 = json.loads(m_res["Body"].read().decode("utf-8")).get("archive_sha256")
+        except Exception:
+            pass
+        return _verify_archive_with_manifest_context(arch_bytes, backup_id, manifest_sha256)
+
     if gdrive_service is not None and s3_client is None:
         srv = gdrive_service
         folders = ensure_gdrive_folders(srv)
         arch_bytes = download_bytes_from_gdrive(srv, folders["archives"], f"{backup_id}.enc.bak")
-        header, snapshot = verify_backup_tier1(arch_bytes)
-        verify_backup_tier2(snapshot)
-        return header, snapshot
+        manifest_sha256 = None
+        try:
+            meta_raw = download_bytes_from_gdrive(srv, folders["metadata"], f"{backup_id}.meta.json")
+            manifest_sha256 = json.loads(meta_raw.decode("utf-8")).get("archive_sha256")
+        except Exception:
+            pass
+        return _verify_archive_with_manifest_context(arch_bytes, backup_id, manifest_sha256)
+
     provider = get_storage_provider()
     if provider == "gdrive":
         srv = gdrive_service or get_gdrive_service()
         folders = ensure_gdrive_folders(srv)
         arch_bytes = download_bytes_from_gdrive(srv, folders["archives"], f"{backup_id}.enc.bak")
-        header, snapshot = verify_backup_tier1(arch_bytes)
-        verify_backup_tier2(snapshot)
-        return header, snapshot
+        manifest_sha256 = None
+        try:
+            meta_raw = download_bytes_from_gdrive(srv, folders["metadata"], f"{backup_id}.meta.json")
+            manifest_sha256 = json.loads(meta_raw.decode("utf-8")).get("archive_sha256")
+        except Exception:
+            pass
+        return _verify_archive_with_manifest_context(arch_bytes, backup_id, manifest_sha256)
+
     elif provider == "s3":
         cfg = get_s3_config()
         s3 = s3_client or get_s3_client(cfg)
         archive_key = f"archives/{backup_id}.enc.bak"
         res = s3.get_object(Bucket=cfg["bucket"], Key=archive_key)
         arch_bytes = res["Body"].read()
-        header, snapshot = verify_backup_tier1(arch_bytes)
-        verify_backup_tier2(snapshot)
-        return header, snapshot
+        manifest_sha256 = None
+        try:
+            m_res = s3.get_object(Bucket=cfg["bucket"], Key=f"metadata/{backup_id}.meta.json")
+            manifest_sha256 = json.loads(m_res["Body"].read().decode("utf-8")).get("archive_sha256")
+        except Exception:
+            pass
+        return _verify_archive_with_manifest_context(arch_bytes, backup_id, manifest_sha256)
+
     else:
         raise StorageConfigurationError("No backup storage provider is configured.")
 

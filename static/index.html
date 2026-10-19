@@ -102,6 +102,12 @@
           </span>
           <span class="nav-text">Analytics</span>
         </a>
+        <a href="#backups" class="nav-item admin-only" data-tab="backups" id="nav-backups" title="Backup & Recovery" style="display: none;">
+          <span class="nav-icon">
+            <svg class="icon-svg" viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14a9 3 0 0 0 18 0V5"/><path d="M3 12a9 3 0 0 0 18 0"/></svg>
+          </span>
+          <span class="nav-text">Backups</span>
+        </a>
       </nav>
 
       <!-- Sidebar User Section (Bottom-Left) -->
@@ -842,6 +848,96 @@
           </div>
         </section>
 
+        <!-- ==================== 7. BACKUP & RECOVERY VIEW (ADMIN ONLY) ==================== -->
+        <section id="view-backups" class="view-page admin-only" style="display: none;">
+          <div class="panel">
+            <div class="panel-header" style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 12px;">
+              <div>
+                <h3 class="panel-title">Backup & Recovery</h3>
+                <span style="font-size: 13px; color: var(--text-muted);">Encrypted Google Drive Snapshots & Long-Term Point-in-Time Recovery</span>
+              </div>
+              <div style="display: flex; gap: 10px; align-items: center;">
+                <button id="btn-refresh-backups" class="btn btn-outline btn-sm" title="Refresh Manifest">
+                  <svg class="icon-svg" viewBox="0 0 24 24"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M3 21v-5h5"/></svg>
+                  <span>Refresh</span>
+                </button>
+                <button id="btn-open-create-backup-modal" class="btn btn-primary btn-sm" title="Create Manual Backup">
+                  <svg class="icon-svg" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/></svg>
+                  <span>Create Backup Now</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Cloud Storage Status Banner -->
+            <div class="settings-box" style="margin-top: 16px;">
+              <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px;">
+                <div class="stat-card" style="padding: 14px; background: var(--bg-app); border: 1px solid var(--border-light); border-radius: var(--radius-md);">
+                  <div style="font-size: 12px; color: var(--text-muted); font-weight: 600; text-transform: uppercase;">Storage Provider</div>
+                  <div id="backup-storage-provider" style="font-size: 16px; font-weight: 700; color: var(--text-main); margin-top: 4px;">Loading...</div>
+                </div>
+                <div class="stat-card" style="padding: 14px; background: var(--bg-app); border: 1px solid var(--border-light); border-radius: var(--radius-md);">
+                  <div style="font-size: 12px; color: var(--text-muted); font-weight: 600; text-transform: uppercase;">Production DB</div>
+                  <div style="font-size: 16px; font-weight: 700; color: var(--primary-blue); margin-top: 4px;">Single Turso Cloud (Additive)</div>
+                </div>
+                <div class="stat-card" style="padding: 14px; background: var(--bg-app); border: 1px solid var(--border-light); border-radius: var(--radius-md);">
+                  <div style="font-size: 12px; color: var(--text-muted); font-weight: 600; text-transform: uppercase;">Retention Policy</div>
+                  <div style="font-size: 14px; font-weight: 600; color: var(--text-main); margin-top: 4px;">Daily: 90 Days • Monthly: 12 Months</div>
+                </div>
+                <div class="stat-card" style="padding: 14px; background: var(--bg-app); border: 1px solid var(--border-light); border-radius: var(--radius-md);">
+                  <div style="font-size: 12px; color: var(--text-muted); font-weight: 600; text-transform: uppercase;">Encryption & Integrity</div>
+                  <div style="font-size: 14px; font-weight: 600; color: #10b981; margin-top: 4px;">AES-256-GCM + HMAC-SHA256</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Feedback Alert Box -->
+            <div id="backup-feedback-alert" class="feedback-msg" style="display: none; margin-top: 16px; padding: 12px 16px; border-radius: var(--radius-md); font-size: 14px; font-weight: 600;"></div>
+
+            <!-- Backup History Manifest Table -->
+            <div class="settings-box" style="margin-top: 24px;">
+              <div class="settings-box-header" style="margin-bottom: 12px;">
+                <h4 class="settings-box-title">Durable Cloud Backups</h4>
+                <span class="settings-box-subtitle">Verified point-in-time full database archives stored in Google Drive</span>
+              </div>
+              <div class="table-responsive" style="overflow-x: auto;">
+                <table class="table" id="table-backups-manifest" style="width: 100%; border-collapse: collapse;">
+                  <thead>
+                    <tr>
+                      <th style="text-align: left; padding: 10px 12px;">Backup ID</th>
+                      <th style="text-align: left; padding: 10px 12px;">Created (UTC)</th>
+                      <th style="text-align: left; padding: 10px 12px;">Type</th>
+                      <th style="text-align: left; padding: 10px 12px;">Retention Category</th>
+                      <th style="text-align: right; padding: 10px 12px;">Size</th>
+                      <th style="text-align: center; padding: 10px 12px;">Verification</th>
+                      <th style="text-align: center; padding: 10px 12px;">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody id="tbody-backups-manifest">
+                    <tr>
+                      <td colspan="7" style="text-align: center; padding: 24px; color: var(--text-muted);">
+                        Loading backup manifest...
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <!-- Safe Recovery Workflow Documentation Box -->
+            <div class="settings-box" style="margin-top: 24px; background: var(--bg-app); border: 1px solid var(--border-light); border-radius: var(--radius-md); padding: 16px;">
+              <h4 style="font-size: 14px; font-weight: 700; color: var(--primary-blue); margin-bottom: 8px;">Safe Recovery Workflow & Security Notice</h4>
+              <p style="font-size: 13px; color: var(--text-secondary); line-height: 1.5; margin: 0 0 8px 0;">
+                All backups contain full, consistent snapshots of all historical orders, customer records, inventory, settings, and audit logs.
+                Per POPCONE CRM Stage 1 safety protocols, direct in-place production database overwrite is strictly disabled to prevent accidental data corruption or loss.
+              </p>
+              <p style="font-size: 12px; color: var(--text-muted); line-height: 1.4; margin: 0;">
+                To recover or inspect historical data: Decrypt the archive using your secure offline key, replay the snapshot into an isolated sandbox database, and verify complete schema and relational integrity.
+              </p>
+            </div>
+
+          </div>
+        </section>
+
       </main>
     </div>
   </div>
@@ -1399,6 +1495,34 @@
       <div class="modal-footer">
         <button id="btn-cancel-reset-stock" type="button" class="btn btn-outline">Cancel</button>
         <button id="btn-confirm-reset-stock" type="button" class="btn btn-danger">Confirm Reset to 0</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 8. Confirm Backup Modal (Admin Only) -->
+  <div id="modal-confirm-backup" class="modal-backdrop">
+    <div class="modal-container">
+      <div class="modal-header">
+        <h3 class="modal-title">Create Database Backup</h3>
+        <button id="btn-close-confirm-backup" class="btn-close-modal" aria-label="Close">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p style="font-size: 14px; color: var(--text-main); line-height: 1.5; margin-bottom: 12px;">
+          Create a complete point-in-time encrypted snapshot of the POPCONE CRM database now?
+        </p>
+        <div style="background: var(--bg-app); border-left: 4px solid var(--primary-blue); padding: 12px 14px; border-radius: 4px; font-size: 13px; color: var(--text-secondary); line-height: 1.5;">
+          • Extracts all orders, complete customer details, order items, inventory, settings, and audit logs.<br>
+          • Encrypts with AES-256-GCM and signs with HMAC-SHA256.<br>
+          • Uploads directly to your private Google Drive storage.<br>
+          • Performs immediate Tier 1 & Tier 2 offline integrity verification.
+        </div>
+      </div>
+      <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 10px;">
+        <button id="btn-cancel-backup" type="button" class="btn btn-outline">Cancel</button>
+        <button id="btn-confirm-create-backup" type="button" class="btn btn-primary">
+          <svg class="icon-svg" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+          <span>Proceed with Backup</span>
+        </button>
       </div>
     </div>
   </div>

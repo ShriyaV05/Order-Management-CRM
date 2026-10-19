@@ -281,5 +281,26 @@ const api = {
     if (month) query.append('month', month);
     const qs = query.toString();
     return this.request(`/analytics${qs ? '?' + qs : ''}`);
+  },
+
+  // Backups & Recovery (Admin Only)
+  async getBackupStatus() {
+    return this.request('/admin/backups/status');
+  },
+
+  async getBackupsManifest() {
+    return this.request('/admin/backups/manifest');
+  },
+
+  async createManualBackup() {
+    return this.request('/admin/backups', {
+      method: 'POST'
+    });
+  },
+
+  async verifyBackup(backupId) {
+    return this.request(`/admin/backups/${encodeURIComponent(backupId)}/verify`, {
+      method: 'POST'
+    });
   }
 };

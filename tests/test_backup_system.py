@@ -21,7 +21,7 @@ import secrets
 import hashlib
 import unittest
 from datetime import datetime, timezone, timedelta
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 # Import backup engine modules
 import backup_service
@@ -1505,6 +1505,426 @@ class TestGoogleDriveBackupStorage(unittest.TestCase):
                 self.assertEqual(restore_res.status_code, 403)
         finally:
             app.dependency_overrides.pop(server.require_admin, None)
+
+
+class TestLongTermRetentionAndRecovery(unittest.TestCase):
+    """
+    Comprehensive tests for:
+    - Preserving historical business data (>1 year old) in full snapshots.
+    - 90-day daily retention and 12-month monthly recovery points.
+    - Protection of latest backup and sole recovery points.
+    - Fail-safe retention pruning on corrupted/malformed manifests.
+    - Isolated offline reconstitution and integrity checks without touching production.
+    - Admin-only authorization and duplicate manual backup handling.
+    """
+
+    def setUp(self):
+        self.enc_key = b"A" * 32
+        self.sign_key = b"B" * 32
+        os.environ["BACKUP_ENCRYPTION_KEY"] = self.enc_key.hex()
+        os.environ["BACKUP_SIGNING_KEY"] = self.sign_key.hex()
+
+    def tearDown(self):
+        os.environ.pop("BACKUP_ENCRYPTION_KEY", None)
+        os.environ.pop("BACKUP_SIGNING_KEY", None)
+
+    def test_full_historical_database_snapshot_includes_old_records_and_customers(self):
+        """Verify full snapshot captures all historical records including 400-day-old orders and customer details."""
+        now_dt = datetime.now(timezone.utc)
+        historical_dt_str = (now_dt - timedelta(days=400)).strftime("%Y-%m-%d %H:%M:%S")
+
+        mock_turso = MagicMock()
+
+        class MockResultSet:
+            def __init__(self, columns, rows):
+                self.columns = columns
+                self.rows = rows
+
+        mock_turso.batch.return_value = [
+            MockResultSet(
+                ["name", "type", "sql"],
+                [
+                    ("users", "table", "CREATE TABLE users (id INTEGER PRIMARY KEY, username TEXT, display_name TEXT, role TEXT, password_hash TEXT, created_at TEXT, updated_at TEXT);"),
+                    ("settings", "table", "CREATE TABLE settings (key TEXT PRIMARY KEY, value TEXT, updated_at TEXT);"),
+                    ("inventory", "table", "CREATE TABLE inventory (flavour TEXT PRIMARY KEY, current_stock INTEGER, low_stock_threshold INTEGER, updated_at TEXT);"),
+                    ("inventory_movements", "table", "CREATE TABLE inventory_movements (id INTEGER PRIMARY KEY, timestamp TEXT, flavour TEXT, movement_type TEXT, quantity INTEGER, reference TEXT, created_by TEXT);"),
+                    ("orders", "table", "CREATE TABLE orders (id INTEGER PRIMARY KEY, order_id TEXT UNIQUE, customer_name TEXT, phone TEXT, address TEXT, pin_code TEXT, state TEXT, district TEXT, total_bottles INTEGER, total_weight_grams INTEGER, unit_price REAL, product_amount REAL, delivery_fee REAL, final_amount REAL, payment TEXT, dispatch_state TEXT, created_by TEXT, created_at TEXT, edited_by TEXT, edited_at TEXT);"),
+                    ("order_items", "table", "CREATE TABLE order_items (id INTEGER PRIMARY KEY, order_id TEXT, flavour TEXT, quantity INTEGER, unit_price REAL, line_amount REAL, FOREIGN KEY (order_id) REFERENCES orders(order_id));"),
+                    ("audit_logs", "table", "CREATE TABLE audit_logs (id INTEGER PRIMARY KEY, timestamp TEXT, user TEXT, action TEXT, entity_id TEXT, details TEXT);"),
+                ]
+            ),
+            MockResultSet(["user_version"], [(1,)]),
+            # users
+            MockResultSet(["id", "username", "display_name", "role", "password_hash", "created_at", "updated_at"], [
+                (1, "ashish@popcone", "Ashish", "ADMIN", "hash_admin", historical_dt_str, historical_dt_str),
+                (2, "shriya@popcone", "Shriya", "MEMBER", "hash_member", historical_dt_str, historical_dt_str),
+            ]),
+            # settings
+            MockResultSet(["key", "value", "updated_at"], [
+                ("bottle_price", "160", historical_dt_str),
+            ]),
+            # inventory
+            MockResultSet(["flavour", "current_stock", "low_stock_threshold", "updated_at"], [
+                ("Tomato", 50, 10, historical_dt_str),
+                ("Cheese", 40, 10, historical_dt_str),
+            ]),
+            # inventory_movements
+            MockResultSet(["id", "timestamp", "flavour", "movement_type", "quantity", "reference", "created_by"], [
+                (1, historical_dt_str, "Tomato", "Initial Stock", 50, "Batch 0", "Ashish"),
+            ]),
+            # orders - contains historical order from 400 days ago
+            MockResultSet(
+                ["id", "order_id", "customer_name", "phone", "address", "pin_code", "state", "district", "total_bottles", "total_weight_grams", "unit_price", "product_amount", "delivery_fee", "final_amount", "payment", "dispatch_state", "created_by", "created_at", "edited_by", "edited_at"],
+                [
+                    (1, "ORD-HIST-001", "Old Customer Alice", "9876543210", "123 Old Heritage Rd", "560001", "Karnataka", "Bengaluru", 2, 500, 160.0, 320.0, 50.0, 370.0, "Paid", "DISPATCHED", "Shriya", historical_dt_str, "Shriya", historical_dt_str)
+                ]
+            ),
+            # order_items
+            MockResultSet(["id", "order_id", "flavour", "quantity", "unit_price", "line_amount"], [
+                (1, "ORD-HIST-001", "Tomato", 1, 160.0, 160.0),
+                (2, "ORD-HIST-001", "Cheese", 1, 160.0, 160.0),
+            ]),
+            # audit_logs
+            MockResultSet(["id", "timestamp", "user", "action", "entity_id", "details"], [
+                (1, historical_dt_str, "Shriya", "CREATE_ORDER", "ORD-HIST-001", "Order created 400 days ago"),
+            ]),
+        ]
+
+        # Extract snapshot
+        snapshot = backup_service.extract_database_snapshot(client=mock_turso)
+        self.assertIn("orders", snapshot["tables"])
+        self.assertEqual(len(snapshot["tables"]["orders"]), 1)
+        self.assertEqual(snapshot["tables"]["orders"][0]["order_id"], "ORD-HIST-001")
+        self.assertEqual(snapshot["tables"]["orders"][0]["customer_name"], "Old Customer Alice")
+
+        # Package snapshot
+        pkg, header = backup_service.create_backup_package(snapshot, backup_type="MANUAL")
+        self.assertTrue(header["backup_id"].startswith("bak_"))
+
+        # Tier 1 verification
+        hdr1, decrypted_snapshot = backup_service.verify_backup_tier1(pkg)
+        self.assertEqual(hdr1["backup_id"], header["backup_id"])
+
+        # Tier 2 verification
+        tier2 = backup_service.verify_backup_tier2(decrypted_snapshot)
+        self.assertTrue(tier2["tier2_verified"])
+        self.assertEqual(tier2["integrity_check"], "ok")
+        self.assertEqual(tier2["fk_check"], "ok")
+
+    def test_isolated_restore_to_sqlite_reconstitutes_historical_orders(self):
+        """Verify restore_snapshot_to_sqlite creates an isolated, queryable SQLite sandbox."""
+        snapshot = {
+            "schema": [
+                {"name": "orders", "type": "table", "sql": "CREATE TABLE orders (order_id TEXT PRIMARY KEY, customer_name TEXT, total_amount REAL);"},
+                {"name": "order_items", "type": "table", "sql": "CREATE TABLE order_items (id INTEGER PRIMARY KEY, order_id TEXT, flavour TEXT, quantity INTEGER, FOREIGN KEY(order_id) REFERENCES orders(order_id));"},
+                {"name": "users", "type": "table", "sql": "CREATE TABLE users (id INTEGER PRIMARY KEY, username TEXT, role TEXT);"}
+            ],
+            "tables": {
+                "orders": [{"order_id": "ORD-1", "customer_name": "Bob", "total_amount": 320.0}],
+                "order_items": [{"id": 1, "order_id": "ORD-1", "flavour": "Peri Peri", "quantity": 2}],
+                "users": [{"id": 1, "username": "ashish@popcone", "role": "ADMIN"}]
+            }
+        }
+
+        conn = backup_service.restore_snapshot_to_sqlite(snapshot, target_db_path=":memory:")
+        try:
+            cursor = conn.cursor()
+            cursor.execute("SELECT customer_name, total_amount FROM orders WHERE order_id = 'ORD-1';")
+            row = cursor.fetchone()
+            self.assertEqual(row, ("Bob", 320.0))
+
+            cursor.execute("SELECT flavour, quantity FROM order_items WHERE order_id = 'ORD-1';")
+            item = cursor.fetchone()
+            self.assertEqual(item, ("Peri Peri", 2))
+
+            cursor.execute("PRAGMA foreign_key_check;")
+            self.assertEqual(len(cursor.fetchall()), 0)
+        finally:
+            conn.close()
+
+    def test_long_term_retention_preserves_daily_90d_and_monthly_12mo_recovery_points(self):
+        """Verify 90-day daily retention and 12-month monthly recovery points."""
+        now_dt = datetime.now(timezone.utc)
+
+        # 1. Latest backup (today)
+        m_today = {"backup_id": "bak_today", "created_at": now_dt.isoformat()}
+        # 2. Daily backups (within 90 days)
+        m_day20 = {"backup_id": "bak_day20", "created_at": (now_dt - timedelta(days=20)).isoformat()}
+        m_day50 = {"backup_id": "bak_day50", "created_at": (now_dt - timedelta(days=50)).isoformat()}
+        m_day80 = {"backup_id": "bak_day80", "created_at": (now_dt - timedelta(days=80)).isoformat()}
+        # 3. Month -4 (120 days ago): 2 backups in this month -> newest is kept as Monthly Recovery Point, older pruned
+        dt_m4_new = now_dt - timedelta(days=120)
+        dt_m4_old = now_dt - timedelta(days=125)
+        m_m4_new = {"backup_id": "bak_m4_new", "created_at": dt_m4_new.isoformat()}
+        m_m4_old = {"backup_id": "bak_m4_old", "created_at": dt_m4_old.isoformat()}
+        # 4. Month -7 (210 days ago): single backup in this month -> kept as Monthly Recovery Point
+        m_m7 = {"backup_id": "bak_m7", "created_at": (now_dt - timedelta(days=210)).isoformat()}
+        # 5. Month -11 (330 days ago): single backup in this month -> kept as Monthly Recovery Point
+        m_m11 = {"backup_id": "bak_m11", "created_at": (now_dt - timedelta(days=330)).isoformat()}
+        # 6. Month -15 (450 days ago): older than 12 months -> eligible for pruning
+        m_m15 = {"backup_id": "bak_m15", "created_at": (now_dt - timedelta(days=450)).isoformat()}
+
+        manifest = [m_today, m_day20, m_day50, m_day80, m_m4_new, m_m4_old, m_m7, m_m11, m_m15]
+
+        res = backup_service.classify_backups_for_retention(
+            manifest=manifest,
+            daily_retention_days=90,
+            monthly_retention_months=12,
+            min_retained=3,
+            now_utc=now_dt
+        )
+
+        surviving_ids = {item["backup_id"] for item in res["surviving"]}
+        prunable_ids = {item["backup_id"] for item in res["prunable"]}
+
+        # Protected:
+        # bak_today (LATEST)
+        # bak_day20, bak_day50, bak_day80 (DAILY within 90 days)
+        # bak_m4_new (MONTHLY_RECOVERY_POINT for month -4)
+        # bak_m7 (MONTHLY_RECOVERY_POINT for month -7)
+        # bak_m11 (MONTHLY_RECOVERY_POINT for month -11)
+        self.assertIn("bak_today", surviving_ids)
+        self.assertIn("bak_day20", surviving_ids)
+        self.assertIn("bak_day50", surviving_ids)
+        self.assertIn("bak_day80", surviving_ids)
+        self.assertIn("bak_m4_new", surviving_ids)
+        self.assertIn("bak_m7", surviving_ids)
+        self.assertIn("bak_m11", surviving_ids)
+
+        # Pruned:
+        # bak_m4_old (redundant backup in month -4, older than 90d)
+        # bak_m15 (>12 months old)
+        self.assertIn("bak_m4_old", prunable_ids)
+        self.assertIn("bak_m15", prunable_ids)
+        self.assertEqual(len(prunable_ids), 2)
+        self.assertEqual(len(surviving_ids), 7)
+
+    def test_newest_backup_and_sole_recovery_points_protected_even_when_old(self):
+        """Verify that an inactive database with only 1 backup from 400 days ago is NEVER pruned."""
+        now_dt = datetime.now(timezone.utc)
+        m_ancient = {"backup_id": "bak_ancient", "created_at": (now_dt - timedelta(days=400)).isoformat()}
+
+        res = backup_service.classify_backups_for_retention(
+            manifest=[m_ancient],
+            daily_retention_days=90,
+            monthly_retention_months=12,
+            min_retained=3,
+            now_utc=now_dt
+        )
+
+        # Must survive because it is the sole and latest backup!
+        self.assertEqual(len(res["prunable"]), 0)
+        self.assertEqual(len(res["surviving"]), 1)
+        self.assertEqual(res["surviving"][0]["backup_id"], "bak_ancient")
+
+    def test_retention_fails_safe_on_corrupted_or_malformed_manifest(self):
+        """Verify malformed manifest entries with invalid dates or corrupted fields are NEVER deleted."""
+        now_dt = datetime.now(timezone.utc)
+        manifest = [
+            {"backup_id": "bak_valid_1", "created_at": now_dt.isoformat()},
+            {"backup_id": "bak_valid_2", "created_at": (now_dt - timedelta(days=1)).isoformat()},
+            {"backup_id": "bak_valid_3", "created_at": (now_dt - timedelta(days=2)).isoformat()},
+            {"backup_id": "bak_valid_4", "created_at": (now_dt - timedelta(days=3)).isoformat()},
+            {"backup_id": "bak_corrupt_date", "created_at": "not-a-valid-date-string"},
+            {"backup_id": "", "created_at": now_dt.isoformat()},
+            "not_even_a_dictionary"
+        ]
+
+        res = backup_service.classify_backups_for_retention(
+            manifest=manifest,
+            daily_retention_days=90,
+            monthly_retention_months=12,
+            min_retained=3,
+            now_utc=now_dt
+        )
+
+        surviving_ids = [item.get("backup_id") if isinstance(item, dict) else item for item in res["surviving"]]
+        self.assertIn("bak_corrupt_date", surviving_ids)
+        self.assertIn("not_even_a_dictionary", surviving_ids)
+        # None of the malformed items were marked as prunable
+        for p in res["prunable"]:
+            self.assertNotEqual(p.get("backup_id"), "bak_corrupt_date")
+
+    def test_admin_only_endpoints_reject_member_and_unauthenticated_requests(self):
+        """Verify /api/admin/backups rejects unauthenticated callers and non-admin members."""
+        from fastapi.testclient import TestClient
+        import server
+        from server import app
+
+        client = TestClient(app)
+
+        # 1. Unauthenticated request -> 401
+        res = client.post("/api/admin/backups")
+        self.assertEqual(res.status_code, 401)
+
+        res_manifest = client.get("/api/admin/backups/manifest")
+        self.assertEqual(res_manifest.status_code, 401)
+
+        # 2. Member request (authenticated as MEMBER) -> 403 Forbidden
+        app.dependency_overrides[server.require_admin] = lambda: (_ for _ in ()).throw(
+            server.HTTPException(status_code=403, detail="Admin privileges required")
+        )
+        try:
+            res_member = client.post("/api/admin/backups")
+            self.assertEqual(res_member.status_code, 403)
+
+            res_member_manifest = client.get("/api/admin/backups/manifest")
+            self.assertEqual(res_member_manifest.status_code, 403)
+        finally:
+            app.dependency_overrides.pop(server.require_admin, None)
+
+    def test_env_var_precedence_daily_retention(self):
+        """Verify BACKUP_DAILY_RETENTION_DAYS takes precedence over legacy BACKUP_RETENTION_DAYS."""
+        now_dt = datetime.now(timezone.utc)
+        m = [{"backup_id": "bak1", "created_at": now_dt.isoformat()}]
+
+        # 1. Both present: BACKUP_DAILY_RETENTION_DAYS=90 takes precedence over BACKUP_RETENTION_DAYS=30
+        with patch.dict(os.environ, {"BACKUP_DAILY_RETENTION_DAYS": "90", "BACKUP_RETENTION_DAYS": "30"}):
+            res1 = backup_service.classify_backups_for_retention(manifest=m, now_utc=now_dt)
+            self.assertEqual(res1["daily_retention_days"], 90)
+
+        # 2. Only legacy BACKUP_RETENTION_DAYS=30 present
+        with patch.dict(os.environ, {"BACKUP_RETENTION_DAYS": "30"}, clear=False):
+            if "BACKUP_DAILY_RETENTION_DAYS" in os.environ:
+                del os.environ["BACKUP_DAILY_RETENTION_DAYS"]
+            res2 = backup_service.classify_backups_for_retention(manifest=m, now_utc=now_dt)
+            self.assertEqual(res2["daily_retention_days"], 30)
+
+        # 3. Neither present: defaults to 90
+        with patch.dict(os.environ, {}, clear=False):
+            os.environ.pop("BACKUP_DAILY_RETENTION_DAYS", None)
+            os.environ.pop("BACKUP_RETENTION_DAYS", None)
+            res3 = backup_service.classify_backups_for_retention(manifest=m, now_utc=now_dt)
+            self.assertEqual(res3["daily_retention_days"], 90)
+
+    def test_exact_12_month_recovery_point_boundary(self):
+        """Verify the exact boundary: month -12 is protected, month -13 is pruned."""
+        now_dt = datetime(2026, 10, 19, 12, 0, 0, tzinfo=timezone.utc)
+
+        # Month 0 (current month: Oct 2026)
+        m_m0 = {"backup_id": "bak_m0", "created_at": "2026-10-10T10:00:00+00:00"}
+        # Minimum 3 retained backups (recent)
+        m_m0_2 = {"backup_id": "bak_m0_2", "created_at": "2026-10-09T10:00:00+00:00"}
+        m_m0_3 = {"backup_id": "bak_m0_3", "created_at": "2026-10-08T10:00:00+00:00"}
+
+        # Month -12 (Oct 2025: exactly 12 calendar months ago)
+        # Two backups in Oct 2025: newest must be kept as recovery point, older pruned
+        m_m12_new = {"backup_id": "bak_m12_new", "created_at": "2025-10-25T10:00:00+00:00"}
+        m_m12_old = {"backup_id": "bak_m12_old", "created_at": "2025-10-10T10:00:00+00:00"}
+
+        # Month -13 (Sep 2025: 13 calendar months ago -> outside 12-month window)
+        m_m13 = {"backup_id": "bak_m13", "created_at": "2025-09-20T10:00:00+00:00"}
+
+        manifest = [m_m0, m_m0_2, m_m0_3, m_m12_new, m_m12_old, m_m13]
+
+        res = backup_service.classify_backups_for_retention(
+            manifest=manifest,
+            daily_retention_days=90,
+            monthly_retention_months=12,
+            min_retained=3,
+            now_utc=now_dt
+        )
+
+        surviving_ids = {item["backup_id"] for item in res["surviving"]}
+        prunable_ids = {item["backup_id"] for item in res["prunable"]}
+
+        # Month -12 newest is protected as Monthly Recovery Point
+        self.assertIn("bak_m12_new", surviving_ids)
+        self.assertEqual(res["category_map"]["bak_m12_new"], "MONTHLY_RECOVERY_POINT")
+
+        # Month -12 older is redundant and older than 90d -> pruned
+        self.assertIn("bak_m12_old", prunable_ids)
+
+        # Month -13 is 13 months old -> pruned
+        self.assertIn("bak_m13", prunable_ids)
+
+    def test_timezone_normalization_with_non_utc_offsets(self):
+        """Verify that parsed timestamps with non-UTC offsets normalize to UTC correctly."""
+        now_dt = datetime(2026, 10, 19, 12, 0, 0, tzinfo=timezone.utc)
+
+        # 2026-10-01T01:30:00+05:30 in IST is 2026-09-30T20:00:00Z in UTC (September!)
+        m_ist_sep = {
+            "backup_id": "bak_ist_sep",
+            "created_at": "2026-10-01T01:30:00+05:30"
+        }
+        # 2026-10-02T10:00:00Z in UTC (October)
+        m_utc_oct = {
+            "backup_id": "bak_utc_oct",
+            "created_at": "2026-10-02T10:00:00+00:00"
+        }
+
+        manifest = [m_utc_oct, m_ist_sep]
+
+        res = backup_service.classify_backups_for_retention(
+            manifest=manifest,
+            daily_retention_days=90,
+            monthly_retention_months=12,
+            min_retained=1,
+            now_utc=now_dt
+        )
+
+        # bak_utc_oct is LATEST (month 10)
+        self.assertEqual(res["category_map"]["bak_utc_oct"], "LATEST")
+        # bak_ist_sep normalized to UTC is September (month 9) and survives
+        surviving_ids = {item["backup_id"] for item in res["surviving"]}
+        self.assertIn("bak_ist_sep", surviving_ids)
+
+    def test_gdrive_pruning_partial_deletion_safety(self):
+        """Verify partial deletion failures do NOT leave misleading healthy manifest entries."""
+        mock_srv = MagicMock()
+        mock_folders = {"root": "root_1", "archives": "arch_1", "metadata": "meta_1"}
+
+        now_dt = datetime.now(timezone.utc)
+        m_recent = {"backup_id": "bak_recent", "created_at": now_dt.isoformat()}
+        m_expired_1 = {"backup_id": "bak_exp_1", "created_at": (now_dt - timedelta(days=500)).isoformat()}
+        m_expired_2 = {"backup_id": "bak_exp_2", "created_at": (now_dt - timedelta(days=501)).isoformat()}
+
+        manifest = [m_recent, m_expired_1, m_expired_2]
+
+        def mock_delete(srv, folder_id, file_name):
+            if "bak_exp_1" in file_name and folder_id == "meta_1":
+                raise Exception("Metadata delete failed")
+            if "bak_exp_2" in file_name and folder_id == "arch_1":
+                raise Exception("Archive delete failed")
+            return True
+
+        saved_manifests = []
+        with patch.object(backup_service, "get_gdrive_service", return_value=mock_srv), \
+             patch.object(backup_service, "ensure_gdrive_folders", return_value=mock_folders), \
+             patch.object(backup_service, "get_gdrive_manifest", return_value=manifest), \
+             patch.object(backup_service, "delete_gdrive_file", side_effect=mock_delete), \
+             patch.object(backup_service, "save_gdrive_manifest", side_effect=lambda m, s, r: saved_manifests.append(list(m))):
+
+            res = backup_service.prune_expired_gdrive_backups(
+                service=mock_srv,
+                retention_days=90,
+                monthly_retention_months=12,
+                min_retained=1,
+                now_utc=now_dt
+            )
+
+            final_manifest = saved_manifests[-1]
+            final_ids = {m["backup_id"]: m for m in final_manifest}
+
+            self.assertNotIn("bak_exp_1", final_ids, "Partially deleted backup with missing archive must not remain in manifest as healthy")
+            if "bak_exp_2" in final_ids:
+                self.assertFalse(final_ids["bak_exp_2"].get("tier1_verified", True))
+                self.assertEqual(final_ids["bak_exp_2"].get("status"), "INCOMPLETE_ORPHANED_ARCHIVE")
+
+    def test_gdrive_pruning_fails_safely_on_manifest_error(self):
+        """Verify pruning aborts safely with 0 deletions if manifest retrieval fails."""
+        mock_srv = MagicMock()
+        mock_folders = {"root": "root_1", "archives": "arch_1", "metadata": "meta_1"}
+
+        with patch.object(backup_service, "get_gdrive_service", return_value=mock_srv), \
+             patch.object(backup_service, "ensure_gdrive_folders", return_value=mock_folders), \
+             patch.object(backup_service, "get_gdrive_manifest", side_effect=backup_service.StorageConfigurationError("Corrupted manifest")), \
+             patch.object(backup_service, "delete_gdrive_file") as mock_del:
+
+            res = backup_service.prune_expired_gdrive_backups(service=mock_srv)
+            self.assertEqual(res["pruned_count"], 0)
+            self.assertTrue(len(res["errors"]) > 0)
+            mock_del.assert_not_called()
 
 
 if __name__ == "__main__":

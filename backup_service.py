@@ -47,11 +47,17 @@ GDRIVE_SCOPES = ["https://www.googleapis.com/auth/drive.file"]
 GDRIVE_LOCK_NAME = "backup_active.lock"
 GDRIVE_MANIFEST_NAME = "backups_manifest.json"
 
-# Stage 2 Safe Retention Pruning Defaults & Safety Floors
-DEFAULT_RETENTION_DAYS = 30
+# Stage 2 Safe Long-Term Retention Defaults & Safety Floors
+# - Daily backups retained for at least 90 days
+# - Monthly recovery points retained for at least 12 months (365 days)
+# - Minimum 3 newest backups always protected
+DEFAULT_DAILY_RETENTION_DAYS = 90
+DEFAULT_MONTHLY_RETENTION_MONTHS = 12
+DEFAULT_RETENTION_DAYS = DEFAULT_DAILY_RETENTION_DAYS
 MIN_ENFORCED_RETENTION_DAYS = 7  # Safety floor to protect against accidental 0-day configs
 DEFAULT_MIN_BACKUPS_RETAINED = 3  # Minimum backups to always preserve regardless of age
 MIN_ENFORCED_RETAINED_COUNT = 1
+
 
 
 class BackupError(Exception):
@@ -941,6 +947,76 @@ def verify_backup_tier1(
     return header, snapshot_data
 
 
+def restore_snapshot_to_sqlite(
+    snapshot_data: Dict[str, Any],
+    target_db_path: str = ":memory:"
+) -> sqlite3.Connection:
+    """
+    Reconstitutes a decrypted database snapshot into an isolated SQLite database.
+    Used for safe offline verification, sandbox inspection, and local recovery.
+    Never modifies the live production Turso database.
+    """
+    conn = sqlite3.connect(target_db_path)
+    cursor = conn.cursor()
+
+    # Defer foreign-key enforcement during snapshot population to allow all tables
+    # and dependent rows to be inserted regardless of dictionary key sorting.
+    cursor.execute("PRAGMA foreign_keys = OFF;")
+
+    # 1. Replay Schema (tables, indexes, triggers)
+    schema_items = snapshot_data.get("schema", [])
+    for item in schema_items:
+        sql = item.get("sql")
+        if sql:
+            try:
+                cursor.execute(sql)
+            except Exception as e:
+                conn.close()
+                raise BackupIntegrityError(f"Schema DDL replay error for {item.get('name')}: {e}")
+
+    # 2. Insert Data in parent-first dependency order
+    TABLE_ORDER = [
+        "users",
+        "settings",
+        "inventory",
+        "inventory_movements",
+        "orders",
+        "order_items",
+        "audit_logs"
+    ]
+    tables = snapshot_data.get("tables", {})
+
+    def table_order_key(name: str):
+        try:
+            return (TABLE_ORDER.index(name), name)
+        except ValueError:
+            return (len(TABLE_ORDER), name)
+
+    for table_name in sorted(tables.keys(), key=table_order_key):
+        rows = tables.get(table_name, [])
+        if not rows:
+            continue
+        cols = list(rows[0].keys())
+        placeholders = ", ".join(["?"] * len(cols))
+        col_names = ", ".join(cols)
+        insert_sql = f"INSERT INTO {table_name} ({col_names}) VALUES ({placeholders});"
+
+        batch_values = []
+        for r in rows:
+            batch_values.append([r[c] for c in cols])
+
+        try:
+            cursor.executemany(insert_sql, batch_values)
+        except Exception as e:
+            conn.close()
+            raise BackupIntegrityError(f"Data constraint violation while populating table '{table_name}': {e}")
+
+    conn.commit()
+    # Re-enable foreign keys once all tables and rows are loaded
+    cursor.execute("PRAGMA foreign_keys = ON;")
+    return conn
+
+
 def verify_backup_tier2(snapshot_data: Dict[str, Any], expected_counts: Optional[Dict[str, int]] = None) -> Dict[str, Any]:
     """
     Tier 2 Verification (Isolated Sandbox Test):
@@ -948,62 +1024,12 @@ def verify_backup_tier2(snapshot_data: Dict[str, Any], expected_counts: Optional
     executing PRAGMA integrity_check, PRAGMA foreign_key_check, constraint validation,
     and row count assertions.
     """
-    conn = sqlite3.connect(":memory:")
+    conn = restore_snapshot_to_sqlite(snapshot_data, target_db_path=":memory:")
     cursor = conn.cursor()
 
     try:
-        # Defer foreign-key enforcement during snapshot population to allow all tables
-        # and dependent rows to be inserted regardless of dictionary key sorting.
-        cursor.execute("PRAGMA foreign_keys = OFF;")
-
-        # 1. Replay Schema (tables, indexes, triggers)
-        schema_items = snapshot_data.get("schema", [])
-        for item in schema_items:
-            sql = item.get("sql")
-            if sql:
-                try:
-                    cursor.execute(sql)
-                except Exception as e:
-                    raise BackupIntegrityError(f"Schema DDL replay error for {item.get('name')}: {e}")
-
-        # 2. Insert Data in parent-first dependency order
-        TABLE_ORDER = [
-            "users",
-            "settings",
-            "inventory",
-            "inventory_movements",
-            "orders",
-            "order_items",
-            "audit_logs"
-        ]
         tables = snapshot_data.get("tables", {})
 
-        def table_order_key(name: str):
-            try:
-                return (TABLE_ORDER.index(name), name)
-            except ValueError:
-                return (len(TABLE_ORDER), name)
-
-        for table_name in sorted(tables.keys(), key=table_order_key):
-            rows = tables[table_name]
-            if not rows:
-                continue
-            cols = list(rows[0].keys())
-            placeholders = ", ".join(["?"] * len(cols))
-            col_names = ", ".join(cols)
-            insert_sql = f"INSERT INTO {table_name} ({col_names}) VALUES ({placeholders});"
-
-            batch_values = []
-            for r in rows:
-                batch_values.append([r[c] for c in cols])
-
-            try:
-                cursor.executemany(insert_sql, batch_values)
-            except Exception as e:
-                raise BackupIntegrityError(f"Data constraint violation while populating table '{table_name}': {e}")
-
-        # Re-enable foreign keys once all tables and rows are loaded
-        cursor.execute("PRAGMA foreign_keys = ON;")
 
         # 3. Database Integrity Check
         cursor.execute("PRAGMA integrity_check;")
@@ -1158,13 +1184,192 @@ def execute_s3_backup(
         return meta_payload
 
 
+def classify_backups_for_retention(
+    manifest: List[Dict[str, Any]],
+    daily_retention_days: Optional[int] = None,
+    monthly_retention_months: Optional[int] = None,
+    min_retained: Optional[int] = None,
+    now_utc: Optional[datetime] = None
+) -> Dict[str, Any]:
+    """
+    Classifies backup manifest entries for long-term retention:
+    - Protects the latest successful backup.
+    - Preserves minimum recent backups (default: 3).
+    - Preserves all daily backups within daily_retention_days (minimum 90 days default).
+    - Preserves designated monthly recovery points within monthly_retention_months (minimum 12 months default).
+    - Protects any backup that is the sole recovery point for its period.
+    - Fails safe: corrupted items or unparseable dates are NEVER marked as prunable.
+    """
+    if now_utc is None:
+        now_utc = datetime.now(timezone.utc)
+    elif now_utc.tzinfo is None:
+        now_utc = now_utc.replace(tzinfo=timezone.utc)
+    else:
+        now_utc = now_utc.astimezone(timezone.utc)
+
+    # Resolve daily retention days:
+    # Explicit BACKUP_DAILY_RETENTION_DAYS takes precedence over legacy BACKUP_RETENTION_DAYS
+    if daily_retention_days is None:
+        try:
+            raw_daily = os.environ.get("BACKUP_DAILY_RETENTION_DAYS")
+            if raw_daily and raw_daily.strip():
+                daily_retention_days = int(raw_daily.strip())
+            else:
+                raw_legacy = os.environ.get("BACKUP_RETENTION_DAYS")
+                if raw_legacy and raw_legacy.strip():
+                    daily_retention_days = int(raw_legacy.strip())
+                else:
+                    daily_retention_days = DEFAULT_DAILY_RETENTION_DAYS
+        except (ValueError, TypeError):
+            daily_retention_days = DEFAULT_DAILY_RETENTION_DAYS
+    daily_retention_days = max(daily_retention_days, MIN_ENFORCED_RETENTION_DAYS)
+
+    # Resolve monthly retention months
+    if monthly_retention_months is None:
+        try:
+            raw_m = os.environ.get("BACKUP_MONTHLY_RETENTION_MONTHS")
+            if raw_m and raw_m.strip():
+                monthly_retention_months = int(raw_m.strip())
+            else:
+                monthly_retention_months = DEFAULT_MONTHLY_RETENTION_MONTHS
+        except (ValueError, TypeError):
+            monthly_retention_months = DEFAULT_MONTHLY_RETENTION_MONTHS
+    monthly_retention_months = max(monthly_retention_months, 1)
+
+    # Resolve min_retained
+    if min_retained is None:
+        try:
+            raw_min = os.environ.get("MIN_BACKUPS_RETAINED")
+            if raw_min and raw_min.strip():
+                min_retained = int(raw_min.strip())
+            else:
+                min_retained = DEFAULT_MIN_BACKUPS_RETAINED
+        except (ValueError, TypeError):
+            min_retained = DEFAULT_MIN_BACKUPS_RETAINED
+    min_retained = max(min_retained, MIN_ENFORCED_RETAINED_COUNT)
+
+    if not isinstance(manifest, list) or len(manifest) == 0:
+        return {
+            "prunable": [],
+            "surviving": [],
+            "protected_count": 0,
+            "category_map": {},
+            "daily_retention_days": daily_retention_days,
+            "monthly_retention_months": monthly_retention_months,
+            "min_retained": min_retained
+        }
+
+    # 1. Separate valid items and unparseable/corrupted items
+    valid_entries: List[Tuple[Dict[str, Any], datetime]] = []
+    unparseable_entries: List[Dict[str, Any]] = []
+
+    for item in manifest:
+        if not isinstance(item, dict) or not item.get("backup_id"):
+            unparseable_entries.append(item)
+            continue
+        created_str = item.get("created_at", "")
+        try:
+            dt = datetime.fromisoformat(created_str)
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=timezone.utc)
+            else:
+                dt = dt.astimezone(timezone.utc)
+            valid_entries.append((item, dt))
+        except Exception:
+            unparseable_entries.append(item)
+
+    # If total valid + unparseable <= min_retained, everything survives
+    if len(manifest) <= min_retained:
+        category_map = {}
+        for idx, (it, _) in enumerate(valid_entries):
+            category_map[it["backup_id"]] = "LATEST" if idx == 0 else "RECENT_MIN_RETAINED"
+        return {
+            "prunable": [],
+            "surviving": list(manifest),
+            "protected_count": len(manifest),
+            "category_map": category_map,
+            "daily_retention_days": daily_retention_days,
+            "monthly_retention_months": monthly_retention_months,
+            "min_retained": min_retained
+        }
+
+    # Sort valid entries newest first
+    valid_entries.sort(key=lambda pair: pair[1], reverse=True)
+
+    protected_ids = set()
+    category_map = {}
+
+    # Rule A: The newest entry is always LATEST and protected
+    latest_id = valid_entries[0][0]["backup_id"]
+    protected_ids.add(latest_id)
+    category_map[latest_id] = "LATEST"
+
+    # Rule B: Protect the first min_retained valid entries
+    for item, _ in valid_entries[:min_retained]:
+        bid = item["backup_id"]
+        protected_ids.add(bid)
+        if bid not in category_map:
+            category_map[bid] = "RECENT_MIN_RETAINED"
+
+    # Rule C: Daily retention window
+    daily_cutoff = now_utc - timedelta(days=daily_retention_days)
+    for item, dt in valid_entries:
+        bid = item["backup_id"]
+        if dt >= daily_cutoff:
+            protected_ids.add(bid)
+            if bid not in category_map:
+                category_map[bid] = "DAILY"
+
+    # Rule D: Monthly recovery points (current calendar month and each of the previous monthly_retention_months)
+    by_month: Dict[Tuple[int, int], List[Tuple[Dict[str, Any], datetime]]] = {}
+    for item, dt in valid_entries:
+        key = (dt.year, dt.month)
+        if key not in by_month:
+            by_month[key] = []
+        by_month[key].append((item, dt))
+
+    for (year, month), month_items in by_month.items():
+        months_diff = (now_utc.year - year) * 12 + (now_utc.month - month)
+        if 0 <= months_diff <= monthly_retention_months:
+            month_items.sort(key=lambda pair: pair[1], reverse=True)
+            chosen_item, _ = month_items[0]
+            chosen_id = chosen_item["backup_id"]
+            protected_ids.add(chosen_id)
+            if chosen_id not in category_map or category_map[chosen_id] == "RECENT_MIN_RETAINED":
+                category_map[chosen_id] = "MONTHLY_RECOVERY_POINT"
+
+    # Rule E: Separate prunable vs surviving
+    prunable = []
+    surviving = list(unparseable_entries)  # Unparseable/corrupted items are NEVER pruned
+
+    for item, dt in valid_entries:
+        bid = item["backup_id"]
+        if bid in protected_ids:
+            surviving.append(item)
+        else:
+            category_map[bid] = "EXPIRED"
+            prunable.append(item)
+
+    return {
+        "prunable": prunable,
+        "surviving": surviving,
+        "protected_count": len(surviving),
+        "category_map": category_map,
+        "daily_retention_days": daily_retention_days,
+        "monthly_retention_months": monthly_retention_months,
+        "min_retained": min_retained
+    }
+
+
 def prune_expired_s3_backups(
     s3_client=None,
     bucket: Optional[str] = None,
     retention_days: Optional[int] = None,
-    min_retained: Optional[int] = None
+    min_retained: Optional[int] = None,
+    monthly_retention_months: Optional[int] = None,
+    now_utc: Optional[datetime] = None
 ) -> Dict[str, Any]:
-    """Prunes expired backups from S3 preserving min_retained backups."""
+    """Prunes expired backups from S3 preserving daily, monthly, and min_retained backups."""
     if bucket and s3_client:
         b = bucket
         s3 = s3_client
@@ -1173,80 +1378,101 @@ def prune_expired_s3_backups(
         b = bucket or cfg["bucket"]
         s3 = s3_client or get_s3_client(cfg)
 
-    if retention_days is None:
-        try:
-            retention_days = int(os.environ.get("BACKUP_RETENTION_DAYS", DEFAULT_RETENTION_DAYS))
-        except (ValueError, TypeError):
-            retention_days = DEFAULT_RETENTION_DAYS
-    retention_days = max(retention_days, MIN_ENFORCED_RETENTION_DAYS)
-
-    if min_retained is None:
-        try:
-            min_retained = int(os.environ.get("MIN_BACKUPS_RETAINED", DEFAULT_MIN_BACKUPS_RETAINED))
-        except (ValueError, TypeError):
-            min_retained = DEFAULT_MIN_BACKUPS_RETAINED
-    min_retained = max(min_retained, MIN_ENFORCED_RETAINED_COUNT)
-
-    manifest = get_backups_manifest(s3_client=s3, bucket=b)
-    if len(manifest) <= min_retained:
+    try:
+        manifest = get_backups_manifest(s3_client=s3, bucket=b, include_classification=False)
+    except Exception as e:
         return {
             "pruned_count": 0,
             "pruned_backups": [],
-            "surviving_count": len(manifest),
-            "retention_days": retention_days,
-            "min_retained": min_retained,
-            "errors": []
+            "surviving_count": 0,
+            "retention_days": retention_days or DEFAULT_DAILY_RETENTION_DAYS,
+            "daily_retention_days": retention_days or DEFAULT_DAILY_RETENTION_DAYS,
+            "monthly_retention_months": monthly_retention_months or DEFAULT_MONTHLY_RETENTION_MONTHS,
+            "min_retained": min_retained or DEFAULT_MIN_BACKUPS_RETAINED,
+            "errors": [f"Aborted S3 pruning: failed to retrieve manifest safely: {e}"]
         }
 
-    manifest.sort(key=lambda x: x.get("created_at", ""), reverse=True)
-    now_utc = datetime.now(timezone.utc)
-    cutoff_time = now_utc - timedelta(days=retention_days)
+    if not isinstance(manifest, list):
+        return {
+            "pruned_count": 0,
+            "pruned_backups": [],
+            "surviving_count": 0,
+            "retention_days": retention_days or DEFAULT_DAILY_RETENTION_DAYS,
+            "daily_retention_days": retention_days or DEFAULT_DAILY_RETENTION_DAYS,
+            "monthly_retention_months": monthly_retention_months or DEFAULT_MONTHLY_RETENTION_MONTHS,
+            "min_retained": min_retained or DEFAULT_MIN_BACKUPS_RETAINED,
+            "errors": ["Aborted S3 pruning: manifest is invalid or malformed."]
+        }
 
-    protected_backups = manifest[:min_retained]
-    candidate_backups = manifest[min_retained:]
+    classification = classify_backups_for_retention(
+        manifest=manifest,
+        daily_retention_days=retention_days,
+        monthly_retention_months=monthly_retention_months,
+        min_retained=min_retained,
+        now_utc=now_utc
+    )
 
-    surviving_candidates = []
+    prunable_backups = classification["prunable"]
+    surviving_backups = list(classification["surviving"])
     pruned_backups = []
     errors = []
+    manifest_modified = False
 
-    for item in candidate_backups:
-        created_str = item.get("created_at", "")
+    for item in prunable_backups:
+        backup_id = item.get("backup_id")
+        archive_key = item.get("s3_archive_key", f"archives/{backup_id}.enc.bak")
+        meta_key = item.get("s3_metadata_key", f"metadata/{backup_id}.meta.json")
+
+        arch_deleted = False
+        meta_deleted = False
+
         try:
-            created_dt = datetime.fromisoformat(created_str)
-        except Exception:
-            surviving_candidates.append(item)
-            continue
+            s3.delete_object(Bucket=b, Key=archive_key)
+            arch_deleted = True
+        except Exception as e:
+            errors.append(f"Failed to delete {archive_key} in S3: {e}")
 
-        if created_dt < cutoff_time:
-            backup_id = item.get("backup_id")
-            archive_key = item.get("s3_archive_key", f"archives/{backup_id}.enc.bak")
-            meta_key = item.get("s3_metadata_key", f"metadata/{backup_id}.meta.json")
+        try:
+            s3.delete_object(Bucket=b, Key=meta_key)
+            meta_deleted = True
+        except Exception as e:
+            errors.append(f"Failed to delete {meta_key} in S3: {e}")
 
-            delete_failed = False
-            for k in [archive_key, meta_key]:
-                try:
-                    s3.delete_object(Bucket=b, Key=k)
-                except Exception as e:
-                    errors.append(f"Failed to delete {k} in S3: {e}")
-                    delete_failed = True
-
-            if not delete_failed:
-                pruned_backups.append(backup_id)
-            else:
-                surviving_candidates.append(item)
+        if arch_deleted and meta_deleted:
+            pruned_backups.append(backup_id)
+            manifest_modified = True
+        elif arch_deleted and not meta_deleted:
+            # Archive file is gone; backup is no longer complete or recoverable.
+            # Do NOT report as a healthy surviving backup in the manifest.
+            pruned_backups.append(backup_id)
+            manifest_modified = True
+            errors.append(f"Partial pruning for {backup_id}: archive deleted but metadata deletion failed.")
+        elif not arch_deleted and meta_deleted:
+            # Metadata was deleted, but archive deletion failed.
+            # Record state accurately so manifest does not falsely indicate complete healthy backup.
+            corrupted_item = dict(item)
+            corrupted_item["status"] = "INCOMPLETE_ORPHANED_ARCHIVE"
+            corrupted_item["tier1_verified"] = False
+            corrupted_item["tier2_verified"] = False
+            corrupted_item["error"] = "Metadata was deleted but archive deletion failed."
+            surviving_backups.append(corrupted_item)
+            manifest_modified = True
+            errors.append(f"Partial pruning for {backup_id}: metadata deleted but archive deletion failed.")
         else:
-            surviving_candidates.append(item)
+            # Both deletions failed; files remain intact.
+            surviving_backups.append(item)
 
-    if pruned_backups:
-        final_manifest = protected_backups + surviving_candidates
-        _save_backups_manifest(final_manifest, s3_client=s3, bucket=b)
+    if manifest_modified:
+        _save_backups_manifest(surviving_backups, s3_client=s3, bucket=b)
 
     return {
         "pruned_count": len(pruned_backups),
         "pruned_backups": pruned_backups,
-        "surviving_count": len(protected_backups) + len(surviving_candidates),
-        "retention_days": retention_days,
-        "min_retained": min_retained,
+        "surviving_count": len(surviving_backups),
+        "retention_days": classification["daily_retention_days"],
+        "daily_retention_days": classification["daily_retention_days"],
+        "monthly_retention_months": classification["monthly_retention_months"],
+        "min_retained": classification["min_retained"],
         "errors": errors
     }
 
@@ -1400,89 +1626,113 @@ def prune_expired_gdrive_backups(
     service=None,
     root_folder_id: Optional[str] = None,
     retention_days: Optional[int] = None,
-    min_retained: Optional[int] = None
+    min_retained: Optional[int] = None,
+    monthly_retention_months: Optional[int] = None,
+    now_utc: Optional[datetime] = None
 ) -> Dict[str, Any]:
-    """Prunes expired backups from Google Drive while strictly preserving min_retained backups."""
+    """Prunes expired backups from Google Drive while strictly preserving daily, monthly, and min_retained backups."""
     srv = service or get_gdrive_service()
     folders = ensure_gdrive_folders(srv)
     r_id = root_folder_id or folders["root"]
     arch_id = folders["archives"]
     meta_id = folders["metadata"]
 
-    if retention_days is None:
-        try:
-            retention_days = int(os.environ.get("BACKUP_RETENTION_DAYS", DEFAULT_RETENTION_DAYS))
-        except (ValueError, TypeError):
-            retention_days = DEFAULT_RETENTION_DAYS
-    retention_days = max(retention_days, MIN_ENFORCED_RETENTION_DAYS)
-
-    if min_retained is None:
-        try:
-            min_retained = int(os.environ.get("MIN_BACKUPS_RETAINED", DEFAULT_MIN_BACKUPS_RETAINED))
-        except (ValueError, TypeError):
-            min_retained = DEFAULT_MIN_BACKUPS_RETAINED
-    min_retained = max(min_retained, MIN_ENFORCED_RETAINED_COUNT)
-
-    manifest = get_gdrive_manifest(srv, r_id)
-    if len(manifest) <= min_retained:
+    try:
+        manifest = get_gdrive_manifest(srv, r_id)
+    except Exception as e:
         return {
             "pruned_count": 0,
             "pruned_backups": [],
-            "surviving_count": len(manifest),
-            "retention_days": retention_days,
-            "min_retained": min_retained,
-            "errors": []
+            "surviving_count": 0,
+            "retention_days": retention_days or DEFAULT_DAILY_RETENTION_DAYS,
+            "daily_retention_days": retention_days or DEFAULT_DAILY_RETENTION_DAYS,
+            "monthly_retention_months": monthly_retention_months or DEFAULT_MONTHLY_RETENTION_MONTHS,
+            "min_retained": min_retained or DEFAULT_MIN_BACKUPS_RETAINED,
+            "errors": [f"Aborted Google Drive pruning: failed to retrieve manifest safely: {e}"]
         }
 
-    manifest.sort(key=lambda x: x.get("created_at", ""), reverse=True)
-    now_utc = datetime.now(timezone.utc)
-    cutoff_time = now_utc - timedelta(days=retention_days)
+    if not isinstance(manifest, list):
+        return {
+            "pruned_count": 0,
+            "pruned_backups": [],
+            "surviving_count": 0,
+            "retention_days": retention_days or DEFAULT_DAILY_RETENTION_DAYS,
+            "daily_retention_days": retention_days or DEFAULT_DAILY_RETENTION_DAYS,
+            "monthly_retention_months": monthly_retention_months or DEFAULT_MONTHLY_RETENTION_MONTHS,
+            "min_retained": min_retained or DEFAULT_MIN_BACKUPS_RETAINED,
+            "errors": ["Aborted Google Drive pruning: manifest is invalid or malformed."]
+        }
 
-    protected_backups = manifest[:min_retained]
-    candidate_backups = manifest[min_retained:]
+    classification = classify_backups_for_retention(
+        manifest=manifest,
+        daily_retention_days=retention_days,
+        monthly_retention_months=monthly_retention_months,
+        min_retained=min_retained,
+        now_utc=now_utc
+    )
 
-    surviving_candidates = []
+    prunable_backups = classification["prunable"]
+    surviving_backups = list(classification["surviving"])
     pruned_backups = []
     errors = []
+    manifest_modified = False
 
-    for item in candidate_backups:
-        created_str = item.get("created_at", "")
+    for item in prunable_backups:
+        backup_id = item.get("backup_id")
+        arch_name = item.get("archive_filename", f"{backup_id}.enc.bak")
+        meta_name = item.get("metadata_filename", f"{backup_id}.meta.json")
+
+        arch_deleted = False
+        meta_deleted = False
+
         try:
-            created_dt = datetime.fromisoformat(created_str)
-        except Exception:
-            surviving_candidates.append(item)
-            continue
+            delete_gdrive_file(srv, arch_id, arch_name)
+            arch_deleted = True
+        except Exception as e:
+            errors.append(f"Failed to delete archive {arch_name} for {backup_id} in Google Drive: {e}")
 
-        if created_dt < cutoff_time:
-            backup_id = item.get("backup_id")
-            arch_name = item.get("archive_filename", f"{backup_id}.enc.bak")
-            meta_name = item.get("metadata_filename", f"{backup_id}.meta.json")
+        try:
+            delete_gdrive_file(srv, meta_id, meta_name)
+            meta_deleted = True
+        except Exception as e:
+            errors.append(f"Failed to delete metadata {meta_name} for {backup_id} in Google Drive: {e}")
 
-            delete_failed = False
-            try:
-                delete_gdrive_file(srv, arch_id, arch_name)
-                delete_gdrive_file(srv, meta_id, meta_name)
-            except Exception as e:
-                errors.append(f"Failed to delete {backup_id} in Google Drive: {e}")
-                delete_failed = True
-
-            if not delete_failed:
-                pruned_backups.append(backup_id)
-            else:
-                surviving_candidates.append(item)
+        if arch_deleted and meta_deleted:
+            pruned_backups.append(backup_id)
+            manifest_modified = True
+        elif arch_deleted and not meta_deleted:
+            # Archive was deleted, but metadata deletion failed.
+            # Do NOT report this in manifest as a complete, recoverable backup.
+            pruned_backups.append(backup_id)
+            manifest_modified = True
+            errors.append(f"Partial pruning for {backup_id}: archive deleted but metadata deletion failed.")
+        elif not arch_deleted and meta_deleted:
+            # Metadata was deleted, but archive deletion failed.
+            # Archive file still exists as an orphan, but metadata was deleted.
+            # Do NOT report in manifest as a complete, verified backup.
+            corrupted_item = dict(item)
+            corrupted_item["status"] = "INCOMPLETE_ORPHANED_ARCHIVE"
+            corrupted_item["tier1_verified"] = False
+            corrupted_item["tier2_verified"] = False
+            corrupted_item["error"] = "Metadata was deleted but archive deletion failed."
+            surviving_backups.append(corrupted_item)
+            manifest_modified = True
+            errors.append(f"Partial pruning for {backup_id}: metadata deleted but archive deletion failed.")
         else:
-            surviving_candidates.append(item)
+            # Both deletions failed (e.g. network/auth error). Files remain intact.
+            surviving_backups.append(item)
 
-    if pruned_backups:
-        final_manifest = protected_backups + surviving_candidates
-        save_gdrive_manifest(final_manifest, srv, r_id)
+    if manifest_modified:
+        save_gdrive_manifest(surviving_backups, srv, r_id)
 
     return {
         "pruned_count": len(pruned_backups),
         "pruned_backups": pruned_backups,
-        "surviving_count": len(protected_backups) + len(surviving_candidates),
-        "retention_days": retention_days,
-        "min_retained": min_retained,
+        "surviving_count": len(surviving_backups),
+        "retention_days": classification["daily_retention_days"],
+        "daily_retention_days": classification["daily_retention_days"],
+        "monthly_retention_months": classification["monthly_retention_months"],
+        "min_retained": classification["min_retained"],
         "errors": errors
     }
 
@@ -1576,25 +1826,43 @@ def get_backups_manifest(
     s3_client=None,
     gdrive_service=None,
     bucket: Optional[str] = None,
-    gdrive_folder_id: Optional[str] = None
+    gdrive_folder_id: Optional[str] = None,
+    include_classification: bool = True
 ) -> List[Dict[str, Any]]:
     """Fetches backup manifest from the active storage provider (Google Drive or S3)."""
     if (s3_client is not None or bucket is not None) and gdrive_service is None and gdrive_folder_id is None:
-        return get_s3_manifest(s3_client=s3_client, bucket=bucket)
-    if (gdrive_service is not None or gdrive_folder_id is not None) and s3_client is None and bucket is None:
+        raw_manifest = get_s3_manifest(s3_client=s3_client, bucket=bucket)
+    elif (gdrive_service is not None or gdrive_folder_id is not None) and s3_client is None and bucket is None:
         srv = gdrive_service or get_gdrive_service()
         folders = ensure_gdrive_folders(srv)
         r_id = gdrive_folder_id or folders["root"]
-        return get_gdrive_manifest(srv, r_id)
-    provider = get_storage_provider()
-    if provider == "gdrive":
-        srv = gdrive_service or get_gdrive_service()
-        folders = ensure_gdrive_folders(srv)
-        r_id = gdrive_folder_id or folders["root"]
-        return get_gdrive_manifest(srv, r_id)
-    elif provider == "s3":
-        return get_s3_manifest(s3_client=s3_client, bucket=bucket)
-    return []
+        raw_manifest = get_gdrive_manifest(srv, r_id)
+    else:
+        provider = get_storage_provider()
+        if provider == "gdrive":
+            srv = gdrive_service or get_gdrive_service()
+            folders = ensure_gdrive_folders(srv)
+            r_id = gdrive_folder_id or folders["root"]
+            raw_manifest = get_gdrive_manifest(srv, r_id)
+        elif provider == "s3":
+            raw_manifest = get_s3_manifest(s3_client=s3_client, bucket=bucket)
+        else:
+            raw_manifest = []
+
+    if include_classification and raw_manifest:
+        try:
+            classification = classify_backups_for_retention(raw_manifest)
+            cmap = classification.get("category_map", {})
+            annotated = []
+            for item in raw_manifest:
+                item_copy = dict(item)
+                item_copy["retention_category"] = cmap.get(item.get("backup_id"), "DAILY")
+                annotated.append(item_copy)
+            return annotated
+        except Exception:
+            return raw_manifest
+
+    return raw_manifest
 
 
 def _save_backups_manifest(
@@ -1718,7 +1986,9 @@ def prune_expired_backups(
     bucket: Optional[str] = None,
     gdrive_folder_id: Optional[str] = None,
     retention_days: Optional[int] = None,
-    min_retained: Optional[int] = None
+    min_retained: Optional[int] = None,
+    monthly_retention_months: Optional[int] = None,
+    now_utc: Optional[datetime] = None
 ) -> Dict[str, Any]:
     """Prunes expired backups using the active storage provider."""
     if (s3_client is not None or bucket is not None) and gdrive_service is None and gdrive_folder_id is None:
@@ -1726,14 +1996,18 @@ def prune_expired_backups(
             s3_client=s3_client,
             bucket=bucket,
             retention_days=retention_days,
-            min_retained=min_retained
+            min_retained=min_retained,
+            monthly_retention_months=monthly_retention_months,
+            now_utc=now_utc
         )
     if (gdrive_service is not None or gdrive_folder_id is not None) and s3_client is None and bucket is None:
         return prune_expired_gdrive_backups(
             service=gdrive_service,
             root_folder_id=gdrive_folder_id,
             retention_days=retention_days,
-            min_retained=min_retained
+            min_retained=min_retained,
+            monthly_retention_months=monthly_retention_months,
+            now_utc=now_utc
         )
     provider = get_storage_provider()
     if provider == "gdrive":
@@ -1741,14 +2015,18 @@ def prune_expired_backups(
             service=gdrive_service,
             root_folder_id=gdrive_folder_id,
             retention_days=retention_days,
-            min_retained=min_retained
+            min_retained=min_retained,
+            monthly_retention_months=monthly_retention_months,
+            now_utc=now_utc
         )
     elif provider == "s3":
         return prune_expired_s3_backups(
             s3_client=s3_client,
             bucket=bucket,
             retention_days=retention_days,
-            min_retained=min_retained
+            min_retained=min_retained,
+            monthly_retention_months=monthly_retention_months,
+            now_utc=now_utc
         )
     return {
         "pruned_count": 0,

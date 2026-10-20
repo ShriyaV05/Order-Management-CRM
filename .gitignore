@@ -23,3 +23,6 @@ backups/
 
 # Untracked raw upload images in root (tracked cleanly inside static/assets/flavours/)
 /*.PNG
+
+# Local database utility scripts
+reset_database.py

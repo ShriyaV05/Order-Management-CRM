@@ -239,3 +239,79 @@ class OrderCustomerFlowTestCase(unittest.TestCase):
         row = cursor.fetchone()
         self.assertEqual(row["customer_name"], "Ramesh K. (Updated)")
         self.assertEqual(row["phone"], "9876543210")
+
+    def test_06_manual_delivery_fee_creation_and_editing(self):
+        """Manual delivery fee is properly considered and added to the total amount both with and without combo offers."""
+        # 1. Normal pricing (2 bottles: 298.0) + manual delivery fee 55.0 => Final = 353.0
+        payload_normal = {
+            "customer_name": "Sanjay Testing",
+            "phone": "9123456789",
+            "address": "45 Lake View Road",
+            "pin_code": "600028",
+            "state": "Tamil Nadu",
+            "district": "Chennai",
+            "payment": "Paid",
+            "delivery_fee": 55.0,
+            "apply_combo": False,
+            "items": [
+                {"flavour": "Tomato", "quantity": 1},
+                {"flavour": "Cheese", "quantity": 1}
+            ]
+        }
+        res = self.client.post("/api/orders", json=payload_normal)
+        self.assertEqual(res.status_code, 200, f"Order creation failed: {res.text}")
+        normal_order = res.json()
+        oid_normal = normal_order["order_id"]
+        self.assertEqual(normal_order["delivery_fee"], 55.0)
+        self.assertEqual(normal_order["final_amount"], 353.0)
+
+        # 2. Combo pricing (2 bottles: 289.0) + manual delivery fee 55.0 => Final = 344.0
+        payload_combo = {
+            "customer_name": "Priya Testing",
+            "phone": "9234567890",
+            "address": "88 Beach Road",
+            "pin_code": "600041",
+            "state": "Tamil Nadu",
+            "district": "Chennai",
+            "payment": "Paid",
+            "delivery_fee": 55.0,
+            "apply_combo": True,
+            "combo_type": "2_BOTTLE",
+            "items": [
+                {"flavour": "Sour Cream", "quantity": 1},
+                {"flavour": "Peri Peri", "quantity": 1}
+            ]
+        }
+        res2 = self.client.post("/api/orders", json=payload_combo)
+        self.assertEqual(res2.status_code, 200, f"Combo order creation failed: {res2.text}")
+        combo_order = res2.json()
+        self.assertEqual(combo_order["delivery_fee"], 55.0)
+        self.assertEqual(combo_order["final_amount"], 344.0)
+
+        # 3. Edit normal order to update manual delivery fee from 55.0 to 45.0 => Final = 343.0
+        edit_payload = {
+            "customer_name": "Sanjay Testing",
+            "phone": "9123456789",
+            "address": "45 Lake View Road",
+            "pin_code": "600028",
+            "state": "Tamil Nadu",
+            "district": "Chennai",
+            "payment": "Paid",
+            "delivery_fee": 45.0,
+            "apply_combo": False,
+            "items": [
+                {"flavour": "Tomato", "quantity": 1},
+                {"flavour": "Cheese", "quantity": 1}
+            ]
+        }
+        res3 = self.client.put(f"/api/orders/{oid_normal}", json=edit_payload)
+        self.assertEqual(res3.status_code, 200, f"Edit order failed: {res3.text}")
+
+        # Verify details endpoint returns updated delivery fee and final amount
+        res4 = self.client.get(f"/api/orders/{oid_normal}")
+        self.assertEqual(res4.status_code, 200)
+        details = res4.json()["order"]
+        self.assertEqual(details["delivery_fee"], 45.0)
+        self.assertEqual(details["product_amount"], 298.0)
+        self.assertEqual(details["final_amount"], 343.0)
+

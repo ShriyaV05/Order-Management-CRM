@@ -830,8 +830,7 @@ document.addEventListener('DOMContentLoaded', async () => {
               pincodeFeedback.className = 'pincode-feedback success';
               pincodeFeedback.style.display = 'block';
 
-              // Reset manual override and recalculate shipping
-              state.newOrderState.isManualDeliveryFee = false;
+              // Recalculate shipping standard rate (preserves manual fee override if entered)
               recalcNewOrderPricing();
             } else {
               pincodeFeedback.textContent = `Detected State: ${res.state}. Please choose your district manually.`;
@@ -910,10 +909,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Manual delivery fee edit listener
     const deliveryFeeInput = document.getElementById('new-order-delivery-fee');
     deliveryFeeInput.oninput = () => {
-      state.newOrderState.isManualDeliveryFee = true;
-      state.newOrderState.deliveryFee = parseFloat(deliveryFeeInput.value) || 0;
-      const noteEl = document.getElementById('new-order-delivery-note');
-      noteEl.textContent = `Manual rate applied (Standard calculated: ₹${state.newOrderState.deliveryCalculated})`;
+      const rawVal = deliveryFeeInput.value.trim();
+      if (rawVal === '') {
+        state.newOrderState.isManualDeliveryFee = false;
+      } else {
+        state.newOrderState.isManualDeliveryFee = true;
+        state.newOrderState.deliveryFee = Math.max(0, parseFloat(rawVal) || 0);
+      }
       recalcNewOrderPricing();
     };
 
@@ -1187,6 +1189,11 @@ document.addEventListener('DOMContentLoaded', async () => {
             noteEl.textContent = (!stateVal || !distVal) 
               ? 'Select state and district to calculate' 
               : 'Select at least 1 bottle to calculate';
+          }
+        } else {
+          state.newOrderState.deliveryFee = parseFloat(feeInput.value) || 0;
+          if (noteEl) {
+            noteEl.textContent = `Manual rate: ₹${feeInput.value}`;
           }
         }
       }
@@ -1726,7 +1733,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
       }
       editOrderState.comboSelected = loadedCombo;
-      editOrderState.isManualDeliveryFee = false;
       editOrderState.isSubmitting = false;
 
       // Section A: Customer Information
@@ -1735,7 +1741,13 @@ document.addEventListener('DOMContentLoaded', async () => {
       document.getElementById('edit-phone').value = o.phone;
       document.getElementById('edit-address').value = o.address;
       document.getElementById('edit-pincode').value = o.pin_code;
-      document.getElementById('edit-delivery-fee').value = o.delivery_fee;
+      
+      const savedFee = (o.delivery_fee !== undefined && o.delivery_fee !== null) ? Number(o.delivery_fee) : 0;
+      document.getElementById('edit-delivery-fee').value = savedFee;
+
+      const applicableAmt = o.is_combo ? (Number(o.combo_price) || Number(o.product_amount)) : Number(o.product_amount);
+      const standardCalc = computeDeliveryFeeClient(o.state, o.district, o.total_bottles, applicableAmt);
+      editOrderState.isManualDeliveryFee = (savedFee !== standardCalc.fee);
 
       // Section D: Order Information
       document.getElementById('edit-info-order-id').textContent = o.order_id;
@@ -1793,12 +1805,10 @@ document.addEventListener('DOMContentLoaded', async () => {
 
       stSelect.onchange = () => {
         populateEditDistricts(stSelect.value, null);
-        editOrderState.isManualDeliveryFee = false;
         recalcEditOrderPricing();
       };
 
       distSelect.onchange = () => {
-        editOrderState.isManualDeliveryFee = false;
         recalcEditOrderPricing();
       };
 
@@ -1840,7 +1850,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                   editPincodeFeedback.className = 'pincode-feedback success';
                   editPincodeFeedback.style.display = 'block';
                 }
-                editOrderState.isManualDeliveryFee = false;
                 recalcEditOrderPricing();
               } else {
                 if (editPincodeFeedback) {
@@ -1876,7 +1885,12 @@ document.addEventListener('DOMContentLoaded', async () => {
       const feeInput = document.getElementById('edit-delivery-fee');
       if (feeInput) {
         feeInput.oninput = () => {
-          editOrderState.isManualDeliveryFee = true;
+          const rawVal = feeInput.value.trim();
+          if (rawVal === '') {
+            editOrderState.isManualDeliveryFee = false;
+          } else {
+            editOrderState.isManualDeliveryFee = true;
+          }
           recalcEditOrderPricing();
         };
       }
@@ -2027,11 +2041,11 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (!editOrderState.isManualDeliveryFee) {
         feeInput.value = calc.fee;
         deliveryFee = calc.fee;
+        if (zoneHintEl) zoneHintEl.textContent = calc.zone !== 'Unknown' ? `Zone: ${calc.zone} (${calc.slab})` : 'Select location to calculate';
       } else {
         deliveryFee = parseFloat(feeInput.value) || 0;
+        if (zoneHintEl) zoneHintEl.textContent = `Manual rate: ₹${deliveryFee} (Standard calculated: ₹${calc.fee})`;
       }
-      if (freeDeliveryStatusEl) freeDeliveryStatusEl.textContent = 'Standard Delivery (Product ≤ ₹800)';
-      if (zoneHintEl) zoneHintEl.textContent = calc.zone !== 'Unknown' ? `Zone: ${calc.zone} (${calc.slab})` : 'Select location to calculate';
     }
 
     const finalAmount = applicableProductAmount + deliveryFee;

@@ -102,12 +102,6 @@
           </span>
           <span class="nav-text">Analytics</span>
         </a>
-        <a href="#backups" class="nav-item admin-only" data-tab="backups" id="nav-backups" title="Backup & Recovery" style="display: none;">
-          <span class="nav-icon">
-            <svg class="icon-svg" viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14a9 3 0 0 0 18 0V5"/><path d="M3 12a9 3 0 0 0 18 0"/></svg>
-          </span>
-          <span class="nav-text">Backups</span>
-        </a>
       </nav>
 
       <!-- Sidebar User Section (Bottom-Left) -->
@@ -845,6 +839,26 @@
                 </div>
               </div>
             </div>
+
+            <!-- Section C: Database Backup & Recovery — ADMIN ONLY -->
+            <div class="settings-box admin-only" style="margin-top: 24px;">
+              <div class="settings-box-header">
+                <h4 class="settings-box-title">Database Backup & Recovery <span class="badge badge-placed" style="font-size: 10px; vertical-align: middle; margin-left: 6px;">ADMIN ONLY</span></h4>
+                <span class="settings-box-subtitle">Encrypted snapshots, Google Drive cloud storage, and automated point-in-time recovery</span>
+              </div>
+              <div class="settings-card" style="margin-top: 10px; display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;">
+                <div>
+                  <strong style="color: var(--text-main); font-size: 14px;">Point-in-Time Database Snapshots</strong>
+                  <p style="font-size: 13px; color: var(--text-secondary); margin-top: 4px; max-width: 540px;">
+                    Manage encrypted Google Drive database snapshots, create manual point-in-time backups, and run sandboxed verification.
+                  </p>
+                </div>
+                <button type="button" id="btn-view-settings-open-backups" class="btn btn-primary" style="white-space: nowrap;">
+                  <svg class="icon-svg" viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14a9 3 0 0 0 18 0V5"/><path d="M3 12a9 3 0 0 0 18 0"/></svg>
+                  <span>Open Backup & Recovery</span>
+                </button>
+              </div>
+            </div>
           </div>
         </section>
 
@@ -853,6 +867,10 @@
           <div class="panel">
             <div class="panel-header" style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 12px;">
               <div>
+                <button type="button" id="btn-back-to-settings" class="btn btn-outline btn-sm" style="margin-bottom: 8px; display: inline-flex; align-items: center; gap: 6px;">
+                  <svg class="icon-svg" viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
+                  <span>Back to Settings</span>
+                </button>
                 <h3 class="panel-title">Backup & Recovery</h3>
                 <span style="font-size: 13px; color: var(--text-muted);">Encrypted Google Drive Snapshots & Long-Term Point-in-Time Recovery</span>
               </div>
@@ -1429,6 +1447,26 @@
                 </p>
               </div>
             </div>
+          </div>
+        </div>
+
+        <!-- Section C: Database Backup & Recovery — ADMIN ONLY -->
+        <div class="settings-box admin-only" style="margin-top: 24px;">
+          <div class="settings-box-header">
+            <h4 class="settings-box-title">Database Backup & Recovery <span class="badge badge-placed" style="font-size: 10px; vertical-align: middle; margin-left: 6px;">ADMIN ONLY</span></h4>
+            <span class="settings-box-subtitle">Encrypted snapshots, Google Drive cloud storage, and sandbox verification</span>
+          </div>
+          <div class="settings-card" style="margin-top: 10px; display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;">
+            <div>
+              <strong style="color: var(--text-main); font-size: 14px;">Point-in-Time Database Snapshots</strong>
+              <p style="font-size: 13px; color: var(--text-secondary); margin-top: 4px; max-width: 520px;">
+                Manage encrypted backups, create manual point-in-time snapshots, and run offline sandbox verifications.
+              </p>
+            </div>
+            <button type="button" id="btn-settings-open-backups" class="btn btn-primary" style="white-space: nowrap;">
+              <svg class="icon-svg" viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14a9 3 0 0 0 18 0V5"/><path d="M3 12a9 3 0 0 0 18 0"/></svg>
+              <span>Open Backup & Recovery</span>
+            </button>
           </div>
         </div>
       </div>

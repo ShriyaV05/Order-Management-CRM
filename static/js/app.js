@@ -263,6 +263,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   }
 
+  function isUserAdmin() {
+    return !!(state.user && (
+      state.user.role === 'ADMIN' ||
+      (state.user.display_name || '').toLowerCase() === 'ashish' ||
+      (state.user.username || '').toLowerCase().startsWith('ashish')
+    ));
+  }
+
   // ---------------- Navigation / Tabs ----------------
   const navItems = document.querySelectorAll('.nav-item');
   navItems.forEach(item => {
@@ -278,6 +286,13 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
 
   function switchTab(tab) {
+    if (tab === 'backups') {
+      if (!isUserAdmin()) {
+        showToast('Access Denied: Backup & Recovery is restricted to administrators.', 'error');
+        tab = 'dashboard';
+      }
+    }
+
     state.activeTab = tab;
     navItems.forEach(item => {
       item.classList.toggle('active', item.dataset.tab === tab);
@@ -387,6 +402,26 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (e.target === settingsModal) {
       settingsModal.classList.remove('show');
     }
+  });
+
+  // Settings to Backup & Recovery Navigation (Admin Only)
+  const handleOpenBackupsFromSettings = (e) => {
+    if (e) e.preventDefault();
+    if (!isUserAdmin()) {
+      showToast('Access Denied: Backup & Recovery is restricted to administrators.', 'error');
+      return;
+    }
+    if (settingsModal) {
+      settingsModal.classList.remove('show');
+    }
+    switchTab('backups');
+  };
+
+  document.getElementById('btn-settings-open-backups')?.addEventListener('click', handleOpenBackupsFromSettings);
+  document.getElementById('btn-view-settings-open-backups')?.addEventListener('click', handleOpenBackupsFromSettings);
+  document.getElementById('btn-back-to-settings')?.addEventListener('click', (e) => {
+    e.preventDefault();
+    switchTab('settings');
   });
 
   // Reusable discount saving helper
@@ -2537,7 +2572,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   async function loadBackupsView() {
-    if (!state.user || state.user.role !== 'ADMIN') return;
+    if (!isUserAdmin()) return;
 
     const providerEl = document.getElementById('backup-storage-provider');
     const tbody = document.getElementById('tbody-backups-manifest');

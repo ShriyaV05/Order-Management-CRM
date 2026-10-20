@@ -71,6 +71,23 @@ document.addEventListener('DOMContentLoaded', async () => {
   const loginOverlay = document.getElementById('login-overlay');
   const loginForm = document.getElementById('login-form');
   const loginError = document.getElementById('login-error');
+  const btnLoginSubmit = document.getElementById('btn-login-submit');
+
+  function setLoginButtonLoading(isLoading) {
+    if (!btnLoginSubmit) return;
+    if (isLoading) {
+      btnLoginSubmit.disabled = true;
+      btnLoginSubmit.innerHTML = `
+        <svg class="icon-svg spin" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 12a9 9 0 1 1-6.219-8.56"/>
+        </svg>
+        <span>Signing In...</span>
+      `;
+    } else {
+      btnLoginSubmit.disabled = false;
+      btnLoginSubmit.innerHTML = `<span>Sign In</span>`;
+    }
+  }
 
   function updateAuthUI() {
     const isActive = api.isSessionActive();
@@ -78,9 +95,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     const token = api.getToken();
 
     if (!isActive || !state.user || !token) {
+      setLoginButtonLoading(false);
+      document.body.classList.add('auth-required');
       loginOverlay.style.display = 'flex';
       return;
     }
+    document.body.classList.remove('auth-required');
     loginOverlay.style.display = 'none';
 
     // Record activity timestamp on successful verification
@@ -190,6 +210,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     const username = document.getElementById('login-username').value;
     const password = document.getElementById('login-password').value;
 
+    setLoginButtonLoading(true);
+
     try {
       await api.login(username, password);
       showToast('Logged in successfully!');
@@ -198,6 +220,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     } catch (err) {
       loginError.textContent = err.message || 'Login failed';
       loginError.style.display = 'block';
+    } finally {
+      if (!api.isSessionActive()) {
+        setLoginButtonLoading(false);
+      } else {
+        setTimeout(() => setLoginButtonLoading(false), 500);
+      }
     }
   });
 

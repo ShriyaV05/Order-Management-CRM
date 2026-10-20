@@ -8,12 +8,12 @@
   <meta http-equiv="Expires" content="0">
   <title>POPCONE Orders & Sales CRM</title>
   <meta name="description" content="Production-ready Order Management, Inventory Tracking, and Sales Analytics CRM for POPCONE.">
-  <link rel="stylesheet" href="/static/css/styles.css?v=20261017_02">
+  <link rel="stylesheet" href="/static/css/styles.css?v=20261020_02">
   <link rel="icon" href="/logo.jpg" type="image/jpeg">
   <link rel="shortcut icon" href="/logo.jpg" type="image/jpeg">
   <link rel="apple-touch-icon" href="/logo.jpg">
 </head>
-<body>
+<body class="auth-required">
   <!-- Toast Notifications Container -->
   <div id="toast-container" class="toast-container"></div>
 
@@ -51,7 +51,9 @@
             </button>
           </div>
         </div>
-        <button type="submit" class="btn btn-primary btn-lg" style="width: 100%;">Sign In</button>
+        <button type="submit" id="btn-login-submit" class="btn btn-primary btn-lg" style="width: 100%; display: inline-flex; align-items: center; justify-content: center; gap: 8px;">
+          <span>Sign In</span>
+        </button>
       </form>
     </div>
   </div>
@@ -1568,6 +1570,6 @@
   <!-- Scripts (Cache-busted) -->
   <script src="/static/js/xlsx.full.min.js?v=20261016_09"></script>
   <script src="/static/js/api.js?v=20261016_09"></script>
-  <script src="/static/js/app.js?v=20261016_09"></script>
+  <script src="/static/js/app.js?v=20261020_02"></script>
 </body>
 </html>

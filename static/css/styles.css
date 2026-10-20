@@ -77,17 +77,32 @@ body {
   overflow: hidden;
 }
 
-/* ---------------- Auth Modal / Screen ---------------- */
+/* ---------------- Auth Modal / Screen (Frosted Translucent Privacy Backdrop) ---------------- */
+body.auth-required #app-container {
+  filter: blur(28px);
+  opacity: 0.15;
+  pointer-events: none;
+  user-select: none;
+  transition: filter 0.3s ease, opacity 0.3s ease;
+}
+
 .login-overlay {
   position: fixed;
   inset: 0;
-  background: linear-gradient(135deg, rgba(9, 44, 107, 0.95), rgba(13, 71, 161, 0.92));
-  backdrop-filter: blur(8px);
+  background: linear-gradient(135deg, rgba(9, 44, 107, 0.94), rgba(13, 71, 161, 0.90));
+  backdrop-filter: blur(36px) saturate(180%);
+  -webkit-backdrop-filter: blur(36px) saturate(180%);
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 9999;
   padding: 20px;
+}
+
+@supports not ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {
+  .login-overlay {
+    background: linear-gradient(135deg, #092c6b, #0d47a1);
+  }
 }
 
 .login-card {

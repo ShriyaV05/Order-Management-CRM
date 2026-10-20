@@ -2161,7 +2161,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   });
 
-  // ---------------- 7. INVENTORY PAGE ----------------
+  function getFlavourBottleImage(flavour) {
+    const f = (flavour || '').toLowerCase();
+    if (f.includes('tomato')) return '/static/assets/flavours/spanish_tomato.png';
+    if (f.includes('cheese')) return '/static/assets/flavours/cheddar_cheese.png';
+    if (f.includes('sour cream') || f.includes('cream')) return '/static/assets/flavours/sour_cream.png';
+    if (f.includes('peri')) return '/static/assets/flavours/peri_peri.png';
+    return '/static/assets/flavours/spanish_tomato.png';
+  }
+
   function renderInventoryUI(data) {
     if (!data) return;
     const stockGrid = document.getElementById('inventory-stock-grid');
@@ -2175,14 +2183,21 @@ document.addEventListener('DOMContentLoaded', async () => {
           ? `<span class="stock-card-status danger"><svg class="icon-svg" style="width:14px;height:14px;" viewBox="0 0 24 24"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" x2="12" y1="9" y2="13"/><line x1="12" x2="12.01" y1="17" y2="17"/></svg> Low Stock (&le; 10)</span>`
           : `<span class="stock-card-status safe"><svg class="icon-svg" style="width:14px;height:14px;" viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg> In Stock</span>`;
 
+        const bottleImg = getFlavourBottleImage(s.flavour);
+
         return `
           <div class="stock-card ${isLow ? 'low-stock' : ''}">
-            <div class="stock-card-flavour">${s.flavour}</div>
-            <div>
-              <span class="stock-card-qty">${s.current_stock}</span>
-              <span class="stock-card-unit">bottles</span>
+            <div class="stock-card-content">
+              <div class="stock-card-flavour">${escapeHtml(s.flavour)}</div>
+              <div>
+                <span class="stock-card-qty">${s.current_stock}</span>
+                <span class="stock-card-unit">bottles</span>
+              </div>
+              ${statusHtml}
             </div>
-            ${statusHtml}
+            <div class="stock-card-image-wrap">
+              <img src="${bottleImg}" alt="${escapeHtml(s.flavour)} Bottle" class="stock-card-bottle-img" loading="lazy">
+            </div>
           </div>
         `;
       }).join('');

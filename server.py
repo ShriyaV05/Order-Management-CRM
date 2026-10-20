@@ -801,15 +801,25 @@ def get_dashboard_stats(current_user: Dict[str, Any] = Depends(get_current_user)
 @app.get("/api/orders/check-phone")
 def check_phone(phone: str, exclude_order_id: Optional[str] = None):
     cleaned_phone = "".join(filter(str.isdigit, phone or ""))
-    if not cleaned_phone:
+    if not cleaned_phone or len(cleaned_phone) < 10:
         return {"exists": False}
     
     conn = get_db()
     cursor = conn.cursor()
     if exclude_order_id:
-        cursor.execute("SELECT order_id FROM orders WHERE phone = ? AND order_id != ? LIMIT 1;", (cleaned_phone, exclude_order_id))
+        cursor.execute("""
+            SELECT order_id, customer_name, address, pin_code, state, district
+            FROM orders
+            WHERE phone = ? AND order_id != ?
+            ORDER BY id DESC LIMIT 1;
+        """, (cleaned_phone, exclude_order_id))
     else:
-        cursor.execute("SELECT order_id FROM orders WHERE phone = ? LIMIT 1;", (cleaned_phone,))
+        cursor.execute("""
+            SELECT order_id, customer_name, address, pin_code, state, district
+            FROM orders
+            WHERE phone = ?
+            ORDER BY id DESC LIMIT 1;
+        """, (cleaned_phone,))
     row = cursor.fetchone()
     conn.close()
 
@@ -817,7 +827,12 @@ def check_phone(phone: str, exclude_order_id: Optional[str] = None):
         return {
             "exists": True,
             "order_id": row["order_id"],
-            "message": f"This phone number is already associated with Order ID: {row['order_id']}"
+            "customer_name": row["customer_name"],
+            "address": row["address"],
+            "pin_code": row["pin_code"],
+            "state": row["state"],
+            "district": row["district"],
+            "message": f"This phone number is associated with Order #{row['order_id']} ({row['customer_name']})."
         }
     return {"exists": False}
 
@@ -994,16 +1009,6 @@ def create_order(req: CreateOrderRequest, current_user: Dict[str, Any] = Depends
 
     conn = get_db()
     cursor = conn.cursor()
-
-    # Rule: Phone number uniqueness
-    cursor.execute("SELECT order_id FROM orders WHERE phone = ? LIMIT 1;", (cleaned_phone,))
-    existing = cursor.fetchone()
-    if existing:
-        conn.close()
-        raise HTTPException(
-            status_code=400,
-            detail=f"This phone number is already associated with Order ID: {existing['order_id']}"
-        )
 
     # Filter items with quantity > 0
     valid_items = [it for it in req.items if it.quantity > 0]
@@ -1252,16 +1257,6 @@ def edit_order(order_id: str, req: EditOrderRequest, current_user: Dict[str, Any
     if not existing_order:
         conn.close()
         raise HTTPException(status_code=404, detail="Order not found")
-
-    # Check phone uniqueness excluding this order
-    cursor.execute("SELECT order_id FROM orders WHERE phone = ? AND order_id != ? LIMIT 1;", (cleaned_phone, order_id))
-    phone_conflict = cursor.fetchone()
-    if phone_conflict:
-        conn.close()
-        raise HTTPException(
-            status_code=400,
-            detail=f"This phone number is already associated with Order ID: {phone_conflict['order_id']}"
-        )
 
     # Valid items
     new_items_dict = {it.flavour: it.quantity for it in req.items if it.quantity > 0}

@@ -382,6 +382,8 @@ def _init_db_unlocked():
     );
     """)
 
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_orders_phone ON orders(phone);")
+
     _add_column_if_missing(cursor, "orders", "discount_per_bottle", "discount_per_bottle REAL NOT NULL DEFAULT 0.0")
     _add_column_if_missing(cursor, "orders", "total_discount", "total_discount REAL NOT NULL DEFAULT 0.0")
     _add_column_if_missing(cursor, "orders", "normal_product_amount", "normal_product_amount REAL NOT NULL DEFAULT 0.0")

@@ -8,7 +8,7 @@
   <meta http-equiv="Expires" content="0">
   <title>POPCONE Orders & Sales CRM</title>
   <meta name="description" content="Production-ready Order Management, Inventory Tracking, and Sales Analytics CRM for POPCONE.">
-  <link rel="stylesheet" href="/static/css/styles.css?v=20261020_02">
+  <link rel="stylesheet" href="/static/css/styles.css?v=20261020_03">
   <link rel="icon" href="/logo.jpg" type="image/jpeg">
   <link rel="shortcut icon" href="/logo.jpg" type="image/jpeg">
   <link rel="apple-touch-icon" href="/logo.jpg">
@@ -228,6 +228,9 @@
                   <label class="form-label" for="new-order-phone">Phone Number <span class="required">*</span></label>
                   <input type="tel" id="new-order-phone" class="form-control" placeholder="10-digit Mobile Number" required pattern="[0-9]{10,12}">
                   <span id="new-order-phone-error" class="error-feedback"></span>
+                  <div id="new-order-phone-alert" class="phone-repeat-alert" style="display: none; margin-top: 6px; padding: 6px 10px; background: #eff6ff; border: 1px solid #bfdbfe; border-radius: var(--radius-sm); font-size: 12px; color: #1e40af; line-height: 1.4;">
+                    <span id="new-order-phone-alert-text"></span>
+                  </div>
                 </div>
                 <div class="form-group span-2">
                   <label class="form-label" for="new-order-address">Delivery Address <span class="required">*</span></label>
@@ -1570,6 +1573,6 @@
   <!-- Scripts (Cache-busted) -->
   <script src="/static/js/xlsx.full.min.js?v=20261016_09"></script>
   <script src="/static/js/api.js?v=20261016_09"></script>
-  <script src="/static/js/app.js?v=20261020_02"></script>
+  <script src="/static/js/app.js?v=20261020_03"></script>
 </body>
 </html>

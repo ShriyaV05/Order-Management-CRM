@@ -709,31 +709,77 @@ document.addEventListener('DOMContentLoaded', async () => {
       }
     };
 
-    // Phone Unique Check
+    // Fast Silent Phone Lookup for Repeat Customer
     const phoneInput = document.getElementById('new-order-phone');
     const phoneError = document.getElementById('new-order-phone-error');
-    phoneInput.onblur = async () => {
-      const val = phoneInput.value.trim();
-      if (val.length >= 10) {
-        try {
-          const check = await api.checkPhone(val);
-          if (check.exists) {
-            phoneError.textContent = check.message;
-            phoneError.classList.add('show');
-            phoneInput.classList.add('is-invalid');
-          } else {
-            phoneError.classList.remove('show');
-            phoneInput.classList.remove('is-invalid');
+    const phoneAlert = document.getElementById('new-order-phone-alert');
+    const phoneAlertText = document.getElementById('new-order-phone-alert-text');
+    let lastCheckedPhone = '';
+
+    const performSilentPhoneLookup = async () => {
+      const val = (phoneInput.value || '').replace(/\D/g, '');
+      if (val.length < 10) {
+        if (phoneAlert) phoneAlert.style.display = 'none';
+        return;
+      }
+      if (val === lastCheckedPhone) return;
+      lastCheckedPhone = val;
+
+      try {
+        const check = await api.checkPhone(val);
+        if (check && check.exists) {
+          if (phoneAlert && phoneAlertText) {
+            phoneAlertText.innerHTML = `<strong>ℹ️ Repeat Customer:</strong> This phone number is associated with Order #<strong>${escapeHtml(check.order_id)}</strong>${check.customer_name ? ` (${escapeHtml(check.customer_name)})` : ''}.`;
+            phoneAlert.style.display = 'block';
           }
-        } catch (e) {
-          console.error(e);
+          phoneError.classList.remove('show');
+          phoneInput.classList.remove('is-invalid');
+
+          // Auto-fill customer details if not already typed
+          const nameInput = document.getElementById('new-order-customer');
+          const addrInput = document.getElementById('new-order-address');
+          const pinInput = document.getElementById('new-order-pincode');
+          const stateSelect = document.getElementById('new-order-state');
+          const distSelect = document.getElementById('new-order-district');
+
+          if (nameInput && (!nameInput.value.trim() || nameInput.dataset.autofilled === 'true') && check.customer_name) {
+            nameInput.value = check.customer_name;
+            nameInput.dataset.autofilled = 'true';
+          }
+          if (addrInput && (!addrInput.value.trim() || addrInput.dataset.autofilled === 'true') && check.address) {
+            addrInput.value = check.address;
+            addrInput.dataset.autofilled = 'true';
+          }
+          if (pinInput && (!pinInput.value.trim() || pinInput.dataset.autofilled === 'true') && check.pin_code) {
+            pinInput.value = check.pin_code;
+            pinInput.dataset.autofilled = 'true';
+            if (check.state && stateSelect) {
+              stateSelect.value = check.state;
+              populateDistricts(check.state, check.district || 'Chennai');
+              if (check.district && distSelect) {
+                distSelect.value = check.district;
+              }
+            }
+          }
+        } else {
+          if (phoneAlert) phoneAlert.style.display = 'none';
         }
+      } catch (e) {
+        console.error('Silent phone lookup error:', e);
       }
     };
 
+    phoneInput.onblur = performSilentPhoneLookup;
     phoneInput.oninput = () => {
       phoneError.classList.remove('show');
       phoneInput.classList.remove('is-invalid');
+      const digits = (phoneInput.value || '').replace(/\D/g, '');
+      if (digits.length === 10) {
+        performSilentPhoneLookup();
+      } else if (digits.length < 10) {
+        lastCheckedPhone = '';
+        if (phoneAlert) phoneAlert.style.display = 'none';
+      }
     };
 
     // Automatic Indian PIN Code Lookup (Requirement 9)
@@ -1217,17 +1263,13 @@ document.addEventListener('DOMContentLoaded', async () => {
       });
       document.getElementById('new-order-delivery-fee').value = 0;
       document.getElementById('pincode-feedback').style.display = 'none';
+      const phoneAlertEl = document.getElementById('new-order-phone-alert');
+      if (phoneAlertEl) phoneAlertEl.style.display = 'none';
       populateDistricts('Tamil Nadu', 'Chennai');
       recalcNewOrderPricing();
 
     } catch (err) {
-      if (err.message && err.message.includes('associated with Order ID')) {
-        phoneError.textContent = err.message;
-        phoneError.classList.add('show');
-        document.getElementById('new-order-phone').classList.add('is-invalid');
-      } else {
-        showToast(err.message || 'Failed to create order', 'danger');
-      }
+      showToast(err.message || 'Failed to create order', 'danger');
     } finally {
       state.newOrderState.isSubmitting = false;
       if (submitBtn) submitBtn.disabled = false;

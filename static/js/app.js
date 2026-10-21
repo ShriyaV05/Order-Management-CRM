@@ -1566,7 +1566,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     const headers = [
-      'Order ID', 'Date', 'Customer', 'Phone', 'District', 'State',
+      'Order ID', 'Date', 'Customer', 'Phone', 'Address', 'PIN Code', 'District', 'State',
       'Bottles', 'Weight', 'Product Amount (₹)', 'Delivery Fee (₹)', 'Final Amount (₹)', 'Payment Mode',
       'Dispatch Status', 'Created By', 'Edited By'
     ];
@@ -1576,6 +1576,8 @@ document.addEventListener('DOMContentLoaded', async () => {
       o.date,
       o.customer,
       o.phone,
+      o.address || '',
+      o.pin_code || '',
       o.district,
       o.state,
       Number(o.bottles) || 0,

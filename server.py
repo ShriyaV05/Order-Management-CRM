@@ -1551,6 +1551,15 @@ def add_or_adjust_stock(req: StockMovementRequest, current_user: Dict[str, Any] 
     old_stock = curr["current_stock"]
     # Both Stock Added (+qty) and Adjustment (+/- qty) add the signed integer directly to stock
     new_stock = old_stock + qty
+
+    # Safety validation: prevent stock from becoming negative
+    if new_stock < 0:
+        conn.close()
+        raise HTTPException(
+            status_code=400,
+            detail=f"Adjustment exceeds available stock. Current stock for {flavour} is {old_stock}, requested adjustment is {qty:+d} (resulting in {new_stock}). Stock cannot be negative."
+        )
+
     now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
     try:

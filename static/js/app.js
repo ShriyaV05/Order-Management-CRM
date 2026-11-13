@@ -2265,8 +2265,61 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // Stock Movement Modal (Stock Added / Adjustment) - Admin (Ashish) Only
   const stockMovementModal = document.getElementById('modal-stock-movement');
+  const movementTypeSelect = document.getElementById('movement-type');
+  const movementQtyInput = document.getElementById('movement-quantity');
+  const movementQtyHint = document.getElementById('movement-quantity-hint');
+  const movementRefInput = document.getElementById('movement-reference');
+
+  function updateStockMovementValidation() {
+    if (!movementTypeSelect || !movementQtyInput) return;
+    const isAdjustment = movementTypeSelect.value === 'Adjustment';
+
+    if (isAdjustment) {
+      movementQtyInput.removeAttribute('min');
+      movementQtyInput.placeholder = 'e.g. +5 or -3 (Non-zero integer)';
+      if (movementQtyHint) {
+        movementQtyHint.textContent = 'Enter positive (+qty) or negative (-qty) adjustment. Zero is not allowed.';
+      }
+      if (movementRefInput && (!movementRefInput.value || movementRefInput.placeholder.includes('Supplier Inward'))) {
+        movementRefInput.placeholder = 'e.g. Stock Take Reconciliation, Damaged / Expired';
+      }
+    } else {
+      movementQtyInput.min = '1';
+      movementQtyInput.placeholder = 'Positive quantity (min 1)';
+      if (movementQtyHint) {
+        movementQtyHint.textContent = 'Enter inward stock quantity (minimum 1)';
+      }
+      if (movementRefInput && (!movementRefInput.value || movementRefInput.placeholder.includes('Stock Take'))) {
+        movementRefInput.placeholder = 'e.g. Batch #104, Supplier Inward';
+      }
+    }
+    validateMovementQtyInput();
+  }
+
+  function validateMovementQtyInput() {
+    if (!movementQtyInput || !movementTypeSelect) return;
+    const val = parseInt(movementQtyInput.value);
+    if (movementTypeSelect.value === 'Adjustment') {
+      if (!isNaN(val) && val === 0) {
+        movementQtyInput.setCustomValidity('Adjustment quantity cannot be 0. Enter a positive or negative number.');
+      } else {
+        movementQtyInput.setCustomValidity('');
+      }
+    } else {
+      if (!isNaN(val) && val < 1) {
+        movementQtyInput.setCustomValidity('Value must be greater than or equal to 1.');
+      } else {
+        movementQtyInput.setCustomValidity('');
+      }
+    }
+  }
+
+  movementTypeSelect?.addEventListener('change', updateStockMovementValidation);
+  movementQtyInput?.addEventListener('input', validateMovementQtyInput);
+
   document.getElementById('btn-open-stock-movement')?.addEventListener('click', () => {
     document.getElementById('form-stock-movement').reset();
+    updateStockMovementValidation();
     stockMovementModal.classList.add('show');
   });
 
@@ -2280,6 +2333,16 @@ document.addEventListener('DOMContentLoaded', async () => {
     const type = document.getElementById('movement-type').value;
     const quantity = parseInt(document.getElementById('movement-quantity').value);
     const reference = document.getElementById('movement-reference').value.trim() || 'Manual stock update';
+
+    if (type === 'Stock Added' && (isNaN(quantity) || quantity < 1)) {
+      showToast('Quantity for Stock Added must be at least 1', 'danger');
+      return;
+    }
+
+    if (type === 'Adjustment' && (isNaN(quantity) || quantity === 0)) {
+      showToast('Adjustment quantity cannot be 0. Enter a positive or negative integer.', 'danger');
+      return;
+    }
 
     try {
       await api.addOrAdjustStock({ flavour, movement_type: type, quantity, reference });

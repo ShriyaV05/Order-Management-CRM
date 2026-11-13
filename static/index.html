@@ -1508,7 +1508,8 @@
           </div>
           <div class="form-group" style="margin-bottom: 14px;">
             <label class="form-label" for="movement-quantity">Quantity (Bottles)</label>
-            <input type="number" id="movement-quantity" class="form-control" placeholder="Positive quantity" required min="1">
+            <input type="number" id="movement-quantity" class="form-control" placeholder="Positive quantity (min 1)" required min="1" step="1">
+            <small id="movement-quantity-hint" style="display: block; margin-top: 4px; font-size: 11px; color: var(--text-secondary);">Enter inward stock quantity (minimum 1)</small>
           </div>
           <div class="form-group">
             <label class="form-label" for="movement-reference">Reference / Notes</label>

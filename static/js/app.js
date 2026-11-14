@@ -1645,7 +1645,24 @@ document.addEventListener('DOMContentLoaded', async () => {
         document.getElementById('detail-product-amount').textContent = `₹${o.product_amount.toLocaleString('en-IN')}${discNote}`;
       }
 
-      document.getElementById('detail-delivery-fee').textContent = o.delivery_fee === 0 ? '₹0 (Free Delivery)' : `₹${o.delivery_fee.toLocaleString('en-IN')}`;
+      const actualFeeEl = document.getElementById('detail-delivery-fee-actual');
+      if (actualFeeEl) {
+        if (o.actual_delivery_fee !== null && o.actual_delivery_fee !== undefined) {
+          actualFeeEl.textContent = o.actual_delivery_fee === 0 ? '₹0 (Free Delivery)' : `₹${Number(o.actual_delivery_fee).toLocaleString('en-IN')}`;
+        } else {
+          actualFeeEl.textContent = '—';
+        }
+      }
+
+      const collectedFeeEl = document.getElementById('detail-delivery-fee-collected');
+      if (collectedFeeEl) {
+        collectedFeeEl.textContent = o.delivery_fee === 0 ? '₹0 (Free Delivery)' : `₹${Number(o.delivery_fee).toLocaleString('en-IN')}`;
+      }
+
+      const legacyFeeEl = document.getElementById('detail-delivery-fee');
+      if (legacyFeeEl) {
+        legacyFeeEl.textContent = o.delivery_fee === 0 ? '₹0 (Free Delivery)' : `₹${Number(o.delivery_fee).toLocaleString('en-IN')}`;
+      }
       document.getElementById('detail-final-amount').textContent = `₹${o.final_amount.toLocaleString('en-IN')}`;
       document.getElementById('detail-payment-method').textContent = o.payment;
 

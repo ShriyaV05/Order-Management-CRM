@@ -75,6 +75,7 @@ class OrderCustomerFlowTestCase(unittest.TestCase):
             unit_price REAL NOT NULL,
             product_amount REAL NOT NULL,
             delivery_fee REAL NOT NULL,
+            actual_delivery_fee REAL DEFAULT NULL,
             final_amount REAL NOT NULL,
             payment TEXT NOT NULL,
             dispatch_state TEXT NOT NULL,

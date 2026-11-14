@@ -1069,9 +1069,11 @@ def create_order(req: CreateOrderRequest, current_user: Dict[str, Any] = Depends
 
     # Requirement 8: Free Delivery if applicable product amount strictly exceeds Rs.800
     if applicable_product_amount > 800.0:
+        actual_delivery_fee = 0.0
         delivery_fee = 0.0
     else:
         calc = calculate_delivery_fee(req.state, req.district, total_bottles, applicable_product_amount)
+        actual_delivery_fee = float(calc["fee"])
         # Preserve legitimate manual delivery fee override if provided and applicable_product_amount <= 800
         delivery_fee = float(req.delivery_fee) if req.delivery_fee is not None else calc["fee"]
 
@@ -1098,16 +1100,16 @@ def create_order(req: CreateOrderRequest, current_user: Dict[str, Any] = Depends
         INSERT INTO orders (
             order_id, customer_name, phone, address, pin_code, state, district,
             total_bottles, total_weight_grams, unit_price, product_amount,
-            delivery_fee, final_amount, payment, dispatch_state,
+            delivery_fee, actual_delivery_fee, final_amount, payment, dispatch_state,
             created_by, created_at, edited_by, edited_at,
             discount_per_bottle, total_discount, normal_product_amount,
             is_combo, combo_type, combo_price
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
         """, (
             new_order_id, req.customer_name.strip(), cleaned_phone, req.address.strip(),
             req.pin_code.strip(), req.state.strip(), req.district.strip(),
             total_bottles, total_weight_grams, original_unit_price, applicable_product_amount,
-            delivery_fee, final_amount, req.payment, "PLACED",
+            delivery_fee, actual_delivery_fee, final_amount, req.payment, "PLACED",
             current_user["display_name"], now_str, current_user["display_name"], now_str,
             discount_per_bottle, total_discount, normal_product_amount,
             is_combo, combo_type, combo_price
@@ -1207,6 +1209,7 @@ def get_order_details(order_id: str, current_user: Dict[str, Any] = Depends(get_
     is_combo = bool(order["is_combo"]) if "is_combo" in order.keys() and order["is_combo"] is not None else False
     combo_type = str(order["combo_type"] or "") if "combo_type" in order.keys() else ""
     combo_price = float(order["combo_price"]) if "combo_price" in order.keys() and order["combo_price"] is not None else 0.0
+    actual_delivery_fee = float(order["actual_delivery_fee"]) if "actual_delivery_fee" in order.keys() and order["actual_delivery_fee"] is not None else None
 
     return {
         "order": {
@@ -1230,6 +1233,7 @@ def get_order_details(order_id: str, current_user: Dict[str, Any] = Depends(get_
             "combo_price": combo_price,
             "product_amount": order["product_amount"],
             "delivery_fee": order["delivery_fee"],
+            "actual_delivery_fee": actual_delivery_fee,
             "final_amount": order["final_amount"],
             "payment": order["payment"],
             "dispatch_state": order["dispatch_state"],
@@ -1309,9 +1313,11 @@ def edit_order(order_id: str, req: EditOrderRequest, current_user: Dict[str, Any
 
     # Free delivery rule (> Rs.800)
     if applicable_product_amount > 800.0:
+        actual_delivery_fee = 0.0
         delivery_fee = 0.0
     else:
         calc = calculate_delivery_fee(req.state, req.district, total_bottles, applicable_product_amount)
+        actual_delivery_fee = float(calc["fee"])
         delivery_fee = float(req.delivery_fee) if req.delivery_fee is not None else calc["fee"]
 
     final_amount = applicable_product_amount + delivery_fee
@@ -1329,14 +1335,14 @@ def edit_order(order_id: str, req: EditOrderRequest, current_user: Dict[str, Any
         UPDATE orders
         SET customer_name = ?, phone = ?, address = ?, pin_code = ?, state = ?, district = ?,
             total_bottles = ?, total_weight_grams = ?, product_amount = ?, delivery_fee = ?,
-            final_amount = ?, payment = ?, edited_by = ?, edited_at = ?,
+            actual_delivery_fee = ?, final_amount = ?, payment = ?, edited_by = ?, edited_at = ?,
             discount_per_bottle = ?, total_discount = ?, normal_product_amount = ?,
             is_combo = ?, combo_type = ?, combo_price = ?
         WHERE order_id = ?;
         """, (
             req.customer_name.strip(), cleaned_phone, req.address.strip(), req.pin_code.strip(),
             req.state.strip(), req.district.strip(), total_bottles, total_weight_grams,
-            applicable_product_amount, delivery_fee, final_amount, req.payment,
+            applicable_product_amount, delivery_fee, actual_delivery_fee, final_amount, req.payment,
             current_user["display_name"], now_str,
             historical_discount, total_discount, normal_product_amount,
             is_combo, combo_type, combo_price,

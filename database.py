@@ -274,6 +274,9 @@ def _init_db_unlocked():
     conn = get_db()
     cursor = conn.cursor()
 
+    # Additive schema migration: ensure actual_delivery_fee exists in orders table
+    _add_column_if_missing(cursor, "orders", "actual_delivery_fee", "actual_delivery_fee REAL DEFAULT NULL")
+
     # Fast path: check if database schema has already been initialized and seeded
     try:
         cursor.execute("SELECT value FROM settings WHERE key = 'bottle_price' LIMIT 1;")
@@ -349,6 +352,7 @@ def _init_db_unlocked():
         unit_price REAL NOT NULL,
         product_amount REAL NOT NULL,
         delivery_fee REAL NOT NULL,
+        actual_delivery_fee REAL DEFAULT NULL,
         final_amount REAL NOT NULL,
         payment TEXT NOT NULL CHECK(payment IN ('Paid', 'COD')),
         dispatch_state TEXT NOT NULL CHECK(dispatch_state IN ('PLACED', 'DISPATCHED')),
@@ -390,6 +394,7 @@ def _init_db_unlocked():
     _add_column_if_missing(cursor, "orders", "is_combo", "is_combo INTEGER NOT NULL DEFAULT 0")
     _add_column_if_missing(cursor, "orders", "combo_type", "combo_type TEXT NOT NULL DEFAULT ''")
     _add_column_if_missing(cursor, "orders", "combo_price", "combo_price REAL NOT NULL DEFAULT 0.0")
+    _add_column_if_missing(cursor, "orders", "actual_delivery_fee", "actual_delivery_fee REAL DEFAULT NULL")
 
     now_str = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
 

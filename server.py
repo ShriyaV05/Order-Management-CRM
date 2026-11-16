@@ -1001,6 +1001,47 @@ def get_orders(
         "total_count": len(orders_list)
     }
 
+@app.get("/api/orders/shipping-manifest")
+def get_shipping_manifest(current_user: Dict[str, Any] = Depends(get_current_user)):
+    """
+    Read-only endpoint retrieving all orders for courier shipping manifest export.
+    Returns every order across all dates, statuses, and customers.
+    """
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT order_id, customer_name, created_at, phone, address, pin_code, district, state,
+               total_weight_grams, actual_delivery_fee, delivery_fee
+        FROM orders
+        ORDER BY created_at DESC, id DESC;
+    """)
+    rows = cursor.fetchall()
+    conn.close()
+
+    manifest = []
+    for r in rows:
+        total_w = int(r["total_weight_grams"]) if "total_weight_grams" in r.keys() and r["total_weight_grams"] is not None else 0
+        weight_str = f"{total_w}g" if total_w < 1000 else (f"{total_w // 1000}kg" if total_w % 1000 == 0 else f"{total_w / 1000:.2f}kg")
+
+        actual_fee = float(r["actual_delivery_fee"]) if "actual_delivery_fee" in r.keys() and r["actual_delivery_fee"] is not None else None
+        collected_fee = float(r["delivery_fee"]) if "delivery_fee" in r.keys() and r["delivery_fee"] is not None else 0.0
+
+        manifest.append({
+            "order_id": r["order_id"],
+            "name": r["customer_name"] or "",
+            "date": r["created_at"] or "",
+            "phone": r["phone"] or "",
+            "address": r["address"] or "",
+            "pin_code": r["pin_code"] or "",
+            "district": r["district"] or "",
+            "state": r["state"] or "",
+            "weight": weight_str,
+            "actual_delivery_fee": actual_fee,
+            "collected_delivery_fee": collected_fee
+        })
+
+    return {"manifest": manifest, "total_count": len(manifest)}
+
 @app.post("/api/orders")
 def create_order(req: CreateOrderRequest, current_user: Dict[str, Any] = Depends(get_current_user)):
     cleaned_phone = "".join(filter(str.isdigit, req.phone or ""))

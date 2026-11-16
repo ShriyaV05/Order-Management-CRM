@@ -226,6 +226,10 @@ const api = {
     return this.request(`/orders?${query.toString()}`);
   },
 
+  async getShippingManifest() {
+    return this.request('/orders/shipping-manifest');
+  },
+
   async getOrder(orderId) {
     return this.request(`/orders/${encodeURIComponent(orderId)}`);
   },

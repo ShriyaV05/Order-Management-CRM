@@ -1594,6 +1594,74 @@ document.addEventListener('DOMContentLoaded', async () => {
     exportToGoogleSheets(`POPCONE_Orders_Export_${new Date().toISOString().slice(0, 10)}.xlsx`, 'Orders', headers, rows);
   });
 
+  // Dedicated Shipping Manifest Export
+  const btnExportShippingManifest = document.getElementById('btn-export-shipping-manifest');
+  if (btnExportShippingManifest) {
+    btnExportShippingManifest.addEventListener('click', async () => {
+      const origHtml = btnExportShippingManifest.innerHTML;
+      try {
+        btnExportShippingManifest.disabled = true;
+        btnExportShippingManifest.innerHTML = `
+          <svg class="icon-svg spinner" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke-dasharray="32" stroke-linecap="round"/></svg>
+          <span>Exporting...</span>
+        `;
+
+        const res = await api.getShippingManifest();
+        if (!res || !res.manifest || res.manifest.length === 0) {
+          showToast('No orders found to export', 'warning');
+          return;
+        }
+
+        const headers = [
+          'ORDER ID',
+          'NAME',
+          'DATE',
+          'PHONE NO',
+          'ADDRESS',
+          'PIN CODE',
+          'DISTRICT',
+          'STATE',
+          'WEIGHT',
+          'DELIVERY FEE (ACTUAL)',
+          'DELIVERY FEE (COLLECTED)'
+        ];
+
+        const rows = res.manifest.map(m => {
+          let actualFeeStr = '—';
+          if (m.actual_delivery_fee !== null && m.actual_delivery_fee !== undefined) {
+            actualFeeStr = `₹${Number(m.actual_delivery_fee).toLocaleString('en-IN')}`;
+          }
+          const collectedFeeStr = `₹${Number(m.collected_delivery_fee || 0).toLocaleString('en-IN')}`;
+
+          return [
+            m.order_id,
+            m.name || '',
+            m.date || '',
+            m.phone || '',
+            m.address || '',
+            m.pin_code || '',
+            m.district || '',
+            m.state || '',
+            m.weight || '',
+            actualFeeStr,
+            collectedFeeStr
+          ];
+        });
+
+        const todayStr = new Date().toISOString().slice(0, 10);
+        const filename = `POPCONE_Shipping_Manifest_${todayStr}.xlsx`;
+
+        exportShippingManifestExcel(filename, 'Shipping Manifest', headers, rows);
+      } catch (err) {
+        console.error('Failed to export shipping manifest:', err);
+        showToast(err.message || 'Failed to export shipping manifest', 'error');
+      } finally {
+        btnExportShippingManifest.disabled = false;
+        btnExportShippingManifest.innerHTML = origHtml;
+      }
+    });
+  }
+
   // ---------------- 4. ORDER DETAILS MODAL ----------------
   const orderDetailsModal = document.getElementById('modal-order-details');
 
@@ -2737,6 +2805,54 @@ document.addEventListener('DOMContentLoaded', async () => {
     link.click();
     document.body.removeChild(link);
     showToast(`Exported ${filename}`);
+  }
+
+  function exportShippingManifestExcel(filename, sheetName, headers, rows) {
+    const cleanFilename = filename.endsWith('.xlsx') ? filename : filename.replace(/\.csv$/i, '') + '.xlsx';
+
+    const cleanRows = rows.map(r => r.map(cell => {
+      if (typeof cell === 'string') {
+        let trimmed = cell.trim();
+        if (trimmed.startsWith('"') && trimmed.endsWith('"')) {
+          trimmed = trimmed.slice(1, -1).replace(/""/g, '"');
+        }
+        return trimmed;
+      }
+      return cell;
+    }));
+
+    if (window.XLSX && XLSX.utils) {
+      try {
+        const aoa = [headers, ...cleanRows];
+        const ws = XLSX.utils.aoa_to_sheet(aoa);
+
+        // Readable column widths for Shipping Manifest:
+        // [ORDER ID, NAME, DATE, PHONE NO, ADDRESS, PIN CODE, DISTRICT, STATE, WEIGHT, DELIVERY FEE (ACTUAL), DELIVERY FEE (COLLECTED)]
+        const defaultColWidths = [14, 24, 20, 16, 45, 12, 20, 20, 12, 24, 26];
+        const colWidths = headers.map((h, i) => {
+          let maxLen = defaultColWidths[i] || String(h).length;
+          for (const r of cleanRows) {
+            const valStr = String(r[i] !== undefined && r[i] !== null ? r[i] : '');
+            if (valStr.length + 3 > maxLen) {
+              maxLen = Math.min(valStr.length + 3, 60);
+            }
+          }
+          return { wch: maxLen };
+        });
+        ws['!cols'] = colWidths;
+
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, sheetName || 'Shipping Manifest');
+        XLSX.writeFile(wb, cleanFilename);
+        showToast(`Exported ${cleanFilename}`);
+        return;
+      } catch (err) {
+        console.error('Shipping Manifest XLSX export failed, fallback to CSV:', err);
+      }
+    }
+
+    // Fallback if XLSX library unavailable
+    downloadCSV(cleanFilename.replace('.xlsx', '.csv'), headers, cleanRows);
   }
 
   // ---------------- 8. BACKUP & RECOVERY (ADMIN ONLY) ----------------

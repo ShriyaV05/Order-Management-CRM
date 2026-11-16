@@ -2675,27 +2675,129 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
 
     // 2. Weekly Section Content
+    const weeklyData = data.weekly_report || [];
+    const wFlavourTbody = document.getElementById('analytics-selected-week-flavour-tbody');
     const weeklyTbody = document.getElementById('analytics-weekly-tbody');
-    const weeklyData = data.weekly_report;
-    if (weeklyData && weeklyData.length > 0) {
-      weeklyTbody.innerHTML = weeklyData.map(w => `
-        <tr>
-          <td><strong>${w.week_label}</strong></td>
-          <td>${w.tomato}</td>
-          <td>${w.cheese}</td>
-          <td>${w.sour_cream}</td>
-          <td>${w.peri_peri}</td>
-          <td><strong>${w.total_bottles}</strong></td>
-          <td>₹${w.revenue.toLocaleString('en-IN')}</td>
-          <td><strong>${w.most_purchased_flavour}</strong></td>
-        </tr>
-      `).join('');
+
+    if (weeklyData.length > 0) {
+      if (state.analyticsWeek === undefined || state.analyticsWeek === null || !weeklyData.some(w => w.week_num === state.analyticsWeek)) {
+        state.analyticsWeek = weeklyData[weeklyData.length - 1].week_num;
+      }
+      const selectedWeek = weeklyData.find(w => w.week_num === state.analyticsWeek) || weeklyData[weeklyData.length - 1];
+
+      // Update weekly detail card header
+      const weekTitleEl = document.getElementById('analytics-week-detail-title');
+      if (weekTitleEl) {
+        weekTitleEl.textContent = `${selectedWeek.week_label} - Flavour Sales`;
+      }
+
+      // Replicate Monthly flavour breakdown table identically for selected week
+      if (wFlavourTbody) {
+        const wTotBottles = selectedWeek.total_bottles || 1;
+        const wFlavours = [
+          { name: 'Tomato', qty: selectedWeek.tomato, rev: selectedWeek.tomato_revenue },
+          { name: 'Cheese', qty: selectedWeek.cheese, rev: selectedWeek.cheese_revenue },
+          { name: 'Sour Cream', qty: selectedWeek.sour_cream, rev: selectedWeek.sour_cream_revenue },
+          { name: 'Peri Peri', qty: selectedWeek.peri_peri, rev: selectedWeek.peri_peri_revenue }
+        ];
+
+        wFlavourTbody.innerHTML = wFlavours.map(f => {
+          const share = selectedWeek.total_bottles > 0 ? Math.round((f.qty / wTotBottles) * 100) : 0;
+          return `
+            <tr>
+              <td><strong>${f.name}</strong></td>
+              <td>${f.qty}</td>
+              <td>₹${f.rev.toLocaleString('en-IN')}</td>
+              <td>${share}%</td>
+            </tr>
+          `;
+        }).join('') + `
+          <tr style="background:#F8FAFC; font-weight:700;">
+            <td>TOTAL</td>
+            <td>${selectedWeek.total_bottles}</td>
+            <td>₹${selectedWeek.revenue.toLocaleString('en-IN')}</td>
+            <td>100%</td>
+          </tr>
+        `;
+      }
+
+      // Multi-week performance overview table
+      weeklyTbody.innerHTML = weeklyData.map(w => {
+        const isSelected = w.week_num === state.analyticsWeek;
+        return `
+          <tr style="${isSelected ? 'background: #EFF6FF; font-weight: 700;' : ''}" data-week-select="${w.week_num}">
+            <td><strong>${w.week_label}</strong> ${isSelected ? '<span class="badge badge-paid">Selected</span>' : ''}</td>
+            <td>${w.tomato}</td>
+            <td>${w.cheese}</td>
+            <td>${w.sour_cream}</td>
+            <td>${w.peri_peri}</td>
+            <td><strong>${w.total_bottles}</strong></td>
+            <td>₹${w.revenue.toLocaleString('en-IN')}</td>
+            <td><strong>${w.most_purchased_flavour}</strong></td>
+          </tr>
+        `;
+      }).join('');
+
+      // Allow clicking a row in the weekly table to select that week
+      weeklyTbody.querySelectorAll('tr[data-week-select]').forEach(row => {
+        row.style.cursor = 'pointer';
+        row.addEventListener('click', () => {
+          const wNum = parseInt(row.dataset.weekSelect);
+          if (!isNaN(wNum)) {
+            state.analyticsWeek = wNum;
+            renderAnalyticsView();
+          }
+        });
+      });
     } else {
+      const weekTitleEl = document.getElementById('analytics-week-detail-title');
+      if (weekTitleEl) {
+        weekTitleEl.textContent = `Weekly Flavour Breakdown`;
+      }
+      if (wFlavourTbody) {
+        wFlavourTbody.innerHTML = `<tr><td colspan="4" style="text-align:center; padding: 24px; color:var(--text-secondary);">No weekly flavour data recorded for ${state.analyticsYear}</td></tr>`;
+      }
       weeklyTbody.innerHTML = `<tr><td colspan="8" style="text-align:center; padding: 28px; color:var(--text-secondary);">No weekly data recorded for ${state.analyticsYear}</td></tr>`;
     }
 
     // 3. Annual Section Content
     const ann = data.annual_report;
+    const annTitleEl = document.getElementById('analytics-annual-detail-title');
+    if (annTitleEl) {
+      annTitleEl.textContent = `${ann.year} Full Year - Flavour Sales`;
+    }
+
+    // Replicate Monthly flavour breakdown table identically for entire year
+    const annFlavourTbody = document.getElementById('analytics-selected-annual-flavour-tbody');
+    if (annFlavourTbody && ann) {
+      const annTotBottles = ann.total_bottles || 1;
+      const annFlavours = [
+        { name: 'Tomato', qty: ann.tomato_bottles, rev: ann.tomato_revenue },
+        { name: 'Cheese', qty: ann.cheese_bottles, rev: ann.cheese_revenue },
+        { name: 'Sour Cream', qty: ann.sour_cream_bottles, rev: ann.sour_cream_revenue },
+        { name: 'Peri Peri', qty: ann.peri_peri_bottles, rev: ann.peri_peri_revenue }
+      ];
+
+      annFlavourTbody.innerHTML = annFlavours.map(f => {
+        const share = ann.total_bottles > 0 ? Math.round((f.qty / annTotBottles) * 100) : 0;
+        return `
+          <tr>
+            <td><strong>${f.name}</strong></td>
+            <td>${f.qty}</td>
+            <td>₹${f.rev.toLocaleString('en-IN')}</td>
+            <td>${share}%</td>
+          </tr>
+        `;
+      }).join('') + `
+        <tr style="background:#F8FAFC; font-weight:700;">
+          <td>TOTAL</td>
+          <td>${ann.total_bottles}</td>
+          <td>₹${ann.total_revenue.toLocaleString('en-IN')}</td>
+          <td>100%</td>
+        </tr>
+      `;
+    }
+
     const annualTbody = document.getElementById('analytics-annual-tbody');
     annualTbody.innerHTML = `
       <tr style="background:#FFF9C4; font-weight:700;">

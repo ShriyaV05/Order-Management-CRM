@@ -700,10 +700,34 @@
 
           <!-- Section 2: Weekly Breakdown View -->
           <div id="analytics-section-weekly" class="analytics-subview" style="display: none;">
+            <!-- Active Week Flavour Breakdown Card -->
+            <div class="panel">
+              <div class="panel-header">
+                <h3 class="panel-title" id="analytics-week-detail-title">Weekly Flavour Breakdown</h3>
+                <span style="font-size: 13px; color: var(--text-secondary);" id="analytics-week-detail-subtitle">Real-time CRM order revenue</span>
+              </div>
+              <div class="table-responsive">
+                <table class="crm-table">
+                  <thead>
+                    <tr>
+                      <th>Flavour</th>
+                      <th>Bottles Sold</th>
+                      <th>Revenue (₹)</th>
+                      <th>Sales Share</th>
+                    </tr>
+                  </thead>
+                  <tbody id="analytics-selected-week-flavour-tbody">
+                    <!-- Rendered dynamically -->
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <!-- Full Year Weekly Overview Table -->
             <div class="panel">
               <div class="panel-header">
                 <h3 class="panel-title">Weekly Sales Performance</h3>
-                <span style="font-size: 13px; color: var(--text-secondary);">Week-by-week sales &amp; volume analysis</span>
+                <span style="font-size: 13px; color: var(--text-secondary);">Click any row to view week details</span>
               </div>
               <div class="table-responsive">
                 <table class="crm-table">
@@ -729,6 +753,30 @@
 
           <!-- Section 3: Annual Breakdown View -->
           <div id="analytics-section-annual" class="analytics-subview" style="display: none;">
+            <!-- Active Year Flavour Breakdown Card -->
+            <div class="panel">
+              <div class="panel-header">
+                <h3 class="panel-title" id="analytics-annual-detail-title">Annual Flavour Breakdown</h3>
+                <span style="font-size: 13px; color: var(--text-secondary);" id="analytics-annual-detail-subtitle">Real-time CRM order revenue</span>
+              </div>
+              <div class="table-responsive">
+                <table class="crm-table">
+                  <thead>
+                    <tr>
+                      <th>Flavour</th>
+                      <th>Bottles Sold</th>
+                      <th>Revenue (₹)</th>
+                      <th>Sales Share</th>
+                    </tr>
+                  </thead>
+                  <tbody id="analytics-selected-annual-flavour-tbody">
+                    <!-- Rendered dynamically -->
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <!-- Full Year Annual Overview Table -->
             <div class="panel">
               <div class="panel-header">
                 <h3 class="panel-title">Annual Performance Summary</h3>
@@ -1584,6 +1632,6 @@
   <!-- Scripts (Cache-busted) -->
   <script src="/static/js/xlsx.full.min.js?v=20261016_09"></script>
   <script src="/static/js/api.js?v=20261116_01"></script>
-  <script src="/static/js/app.js?v=20261116_01"></script>
+  <script src="/static/js/app.js?v=20261116_02"></script>
 </body>
 </html>

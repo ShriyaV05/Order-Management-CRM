@@ -1567,28 +1567,103 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     const headers = [
       'Order ID', 'Date', 'Customer', 'Phone', 'Address', 'PIN Code', 'District', 'State',
-      'Bottles', 'Weight', 'Product Amount (₹)', 'Delivery Fee (₹)', 'Final Amount (₹)', 'Payment Mode',
-      'Dispatch Status', 'Created By', 'Edited By'
+      'Bottles', 'Tomato', 'Cheese', 'Sour Cream', 'Peri Peri', 'Weight', 'Product Amount (₹)',
+      'Delivery Fee (₹)', 'Final Amount (₹)', 'Payment Mode', 'Dispatch Status', 'Created By', 'Edited By'
     ];
 
-    const rows = state.orders.map(o => [
-      o.order_id,
-      o.date,
-      o.customer,
-      o.phone,
-      o.address || '',
-      o.pin_code || '',
-      o.district,
-      o.state,
-      Number(o.bottles) || 0,
-      o.weight,
-      Number(o.product) || 0,
-      Number(o.delivery) || 0,
-      Number(o.final) || 0,
-      o.payment,
-      o.dispatch,
-      o.created_by,
-      o.edited_by
+    let totalBottles = 0;
+    let totalTomato = 0;
+    let totalCheese = 0;
+    let totalSourCream = 0;
+    let totalPeriPeri = 0;
+    let totalProduct = 0;
+    let totalDelivery = 0;
+    let totalFinal = 0;
+
+    const rows = state.orders.map(o => {
+      let tomatoQty = 0;
+      let cheeseQty = 0;
+      let sourCreamQty = 0;
+      let periPeriQty = 0;
+
+      if (Array.isArray(o.items)) {
+        o.items.forEach(it => {
+          const flv = (it.flavour || '').trim().toLowerCase();
+          const q = Number(it.quantity) || 0;
+          if (flv === 'tomato') {
+            tomatoQty += q;
+          } else if (flv === 'cheese' || flv === 'cheddar cheese') {
+            cheeseQty += q;
+          } else if (flv === 'sour cream' || flv === 'sour cream & onion' || flv === 'sour cream and onion') {
+            sourCreamQty += q;
+          } else if (flv === 'peri peri') {
+            periPeriQty += q;
+          }
+        });
+      }
+
+      const bottles = Number(o.bottles) || 0;
+      const product = Number(o.product) || 0;
+      const delivery = Number(o.delivery) || 0;
+      const finalAmt = Number(o.final) || 0;
+
+      totalBottles += bottles;
+      totalTomato += tomatoQty;
+      totalCheese += cheeseQty;
+      totalSourCream += sourCreamQty;
+      totalPeriPeri += periPeriQty;
+      totalProduct += product;
+      totalDelivery += delivery;
+      totalFinal += finalAmt;
+
+      return [
+        o.order_id,
+        o.date,
+        o.customer,
+        o.phone,
+        o.address || '',
+        o.pin_code || '',
+        o.district,
+        o.state,
+        bottles,
+        tomatoQty,
+        cheeseQty,
+        sourCreamQty,
+        periPeriQty,
+        o.weight,
+        product,
+        delivery,
+        finalAmt,
+        o.payment,
+        o.dispatch,
+        o.created_by,
+        o.edited_by
+      ];
+    });
+
+    // Add TOTAL row at the bottom of the exported sheet
+    rows.push([
+      'TOTAL',
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
+      totalBottles,
+      totalTomato,
+      totalCheese,
+      totalSourCream,
+      totalPeriPeri,
+      '',
+      Math.round(totalProduct * 100) / 100,
+      Math.round(totalDelivery * 100) / 100,
+      Math.round(totalFinal * 100) / 100,
+      '',
+      '',
+      '',
+      ''
     ]);
 
     exportToGoogleSheets(`POPCONE_Orders_Export_${new Date().toISOString().slice(0, 10)}.xlsx`, 'Orders', headers, rows);

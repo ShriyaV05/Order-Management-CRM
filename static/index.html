@@ -8,7 +8,7 @@
   <meta http-equiv="Expires" content="0">
   <title>POPCONE Orders & Sales CRM</title>
   <meta name="description" content="Production-ready Order Management, Inventory Tracking, and Sales Analytics CRM for POPCONE.">
-  <link rel="stylesheet" href="/static/css/styles.css?v=20261020_04">
+  <link rel="stylesheet" href="/static/css/styles.css?v=20261117_02">
   <link rel="icon" href="/logo.jpg" type="image/jpeg">
   <link rel="shortcut icon" href="/logo.jpg" type="image/jpeg">
   <link rel="apple-touch-icon" href="/logo.jpg">
@@ -136,6 +136,7 @@
             </svg>
           </button>
           <h2 id="header-page-title" class="page-title">Dashboard</h2>
+          <div id="header-sync-status" class="sync-indicator" style="display: none;"></div>
         </div>
         <div class="header-actions">
           <button id="btn-open-settings" class="btn btn-outline btn-sm" title="Settings">
@@ -152,27 +153,27 @@
         <section id="view-dashboard" class="view-page">
           <!-- KPI Cards Grid (ONLY 5 specific KPIs preserved) -->
           <div class="kpi-grid">
-            <div class="kpi-card accent-yellow">
+            <div class="kpi-card accent-yellow stagger-card stagger-1">
               <span class="kpi-label">Total Revenue</span>
               <span id="kpi-total-revenue" class="kpi-value">₹0</span>
               <span class="kpi-subtext">Cumulative Sales</span>
             </div>
-            <div class="kpi-card">
+            <div class="kpi-card stagger-card stagger-2">
               <span class="kpi-label">Total Orders</span>
               <span id="kpi-total-orders" class="kpi-value">0</span>
               <span class="kpi-subtext">All Time Orders</span>
             </div>
-            <div class="kpi-card">
+            <div class="kpi-card stagger-card stagger-3">
               <span class="kpi-label">Bottles Sold</span>
               <span id="kpi-bottles-sold" class="kpi-value">0</span>
               <span class="kpi-subtext">Across All Flavours</span>
             </div>
-            <div class="kpi-card">
+            <div class="kpi-card stagger-card stagger-4">
               <span class="kpi-label">Paid Orders</span>
               <span id="kpi-paid-orders" class="kpi-value">0</span>
               <span class="kpi-subtext">Prepaid / Settled</span>
             </div>
-            <div class="kpi-card">
+            <div class="kpi-card stagger-card stagger-5">
               <span class="kpi-label">COD Orders</span>
               <span id="kpi-cod-orders" class="kpi-value">0</span>
               <span class="kpi-subtext">Cash on Delivery</span>
@@ -180,7 +181,7 @@
           </div>
 
           <!-- Recent Orders Panel -->
-          <div class="panel">
+          <div class="panel stagger-card stagger-6">
             <div class="panel-header">
               <h3 class="panel-title">Recent Orders</h3>
               <div style="display: flex; gap: 10px;">
@@ -617,27 +618,27 @@
 
           <!-- Active Period Summary Banner / KPIs -->
           <div class="kpi-grid analytics-kpi-grid">
-            <div class="kpi-card accent-yellow" id="card-analytics-revenue">
+            <div class="kpi-card accent-yellow stagger-card stagger-1" id="card-analytics-revenue">
               <span class="kpi-label" id="analytics-kpi-revenue-label">Product Revenue</span>
               <span id="analytics-total-revenue" class="kpi-value">₹0</span>
               <span class="kpi-subtext" id="analytics-kpi-revenue-subtext">Product Order Revenue</span>
             </div>
-            <div class="kpi-card" id="card-analytics-shipping">
+            <div class="kpi-card stagger-card stagger-2" id="card-analytics-shipping">
               <span class="kpi-label" id="analytics-kpi-shipping-label">Shipping Costs</span>
               <span id="analytics-total-shipping" class="kpi-value">₹0</span>
               <span class="kpi-subtext" id="analytics-kpi-shipping-subtext">Recorded Delivery Fees</span>
             </div>
-            <div class="kpi-card">
+            <div class="kpi-card stagger-card stagger-3">
               <span class="kpi-label">Bottles Sold</span>
               <span id="analytics-total-bottles" class="kpi-value">0</span>
               <span class="kpi-subtext">Across All Flavours</span>
             </div>
-            <div class="kpi-card">
+            <div class="kpi-card stagger-card stagger-4">
               <span class="kpi-label">Total Orders</span>
               <span id="analytics-total-orders" class="kpi-value">0</span>
               <span class="kpi-subtext">Recorded Orders</span>
             </div>
-            <div class="kpi-card">
+            <div class="kpi-card stagger-card stagger-5">
               <span class="kpi-label">Top Flavour</span>
               <span id="analytics-most-purchased" class="kpi-value" style="font-size: 20px;">None</span>
               <span class="kpi-subtext">Highest Demand</span>
@@ -1630,8 +1631,7 @@
   </div>
 
   <!-- Scripts (Cache-busted) -->
-  <script src="/static/js/xlsx.full.min.js?v=20261016_09"></script>
   <script src="/static/js/api.js?v=20261116_01"></script>
-  <script src="/static/js/app.js?v=20261117_01"></script>
+  <script src="/static/js/app.js?v=20261117_02"></script>
 </body>
 </html>

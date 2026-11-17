@@ -47,6 +47,132 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   };
 
+  // ---------------- High-Performance In-Memory Cache ----------------
+  const cache = {
+    dashboard: null,
+    analytics: {},
+    orders: null,
+    inventory: null
+  };
+
+  function invalidateCache(types = ['dashboard', 'analytics', 'orders', 'inventory']) {
+    if (types.includes('dashboard')) cache.dashboard = null;
+    if (types.includes('analytics')) cache.analytics = {};
+    if (types.includes('orders')) cache.orders = null;
+    if (types.includes('inventory')) cache.inventory = null;
+  }
+
+  // ---------------- UI Sync Status Indicator (Toolbar) ----------------
+  const syncStatusEl = document.getElementById('header-sync-status');
+  function setSyncStatus(status, retryCallback = null) {
+    if (!syncStatusEl) return;
+    if (status === 'syncing') {
+      syncStatusEl.className = 'sync-indicator syncing';
+      syncStatusEl.innerHTML = `<span class="sync-dot"></span><span>Syncing...</span>`;
+      syncStatusEl.style.display = 'inline-flex';
+    } else if (status === 'cached') {
+      syncStatusEl.className = 'sync-indicator cached-warning';
+      syncStatusEl.innerHTML = `<span class="sync-dot"></span><span>Cached data</span> <button type="button" class="btn-sync-retry" id="btn-sync-retry">Retry</button>`;
+      syncStatusEl.style.display = 'inline-flex';
+      const retryBtn = document.getElementById('btn-sync-retry');
+      if (retryBtn && retryCallback) {
+        retryBtn.onclick = (e) => {
+          e.preventDefault();
+          retryCallback();
+        };
+      }
+    } else {
+      syncStatusEl.style.display = 'none';
+    }
+  }
+
+  // ---------------- Smooth Non-Blocking Count-Up Animation ----------------
+  function prefersReducedMotion() {
+    return window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  }
+
+  function animateValue(element, endVal, duration = 480, prefix = '', suffix = '') {
+    if (!element) return;
+    const numEnd = typeof endVal === 'number' ? endVal : (parseFloat(endVal) || 0);
+
+    if (prefersReducedMotion() || isNaN(numEnd)) {
+      element.textContent = `${prefix}${numEnd.toLocaleString('en-IN')}${suffix}`;
+      element.dataset.currentVal = String(numEnd);
+      return;
+    }
+
+    const startVal = parseFloat(element.dataset.currentVal) || 0;
+    element.dataset.currentVal = String(numEnd);
+
+    if (startVal === numEnd) {
+      element.textContent = `${prefix}${numEnd.toLocaleString('en-IN')}${suffix}`;
+      return;
+    }
+
+    const startTime = performance.now();
+    function step(now) {
+      const elapsed = now - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+      const ease = 1 - Math.pow(1 - progress, 3); // Cubic ease-out
+      const current = Math.round(startVal + (numEnd - startVal) * ease);
+      element.textContent = `${prefix}${current.toLocaleString('en-IN')}${suffix}`;
+      if (progress < 1) {
+        requestAnimationFrame(step);
+      } else {
+        element.textContent = `${prefix}${numEnd.toLocaleString('en-IN')}${suffix}`;
+      }
+    }
+    requestAnimationFrame(step);
+  }
+
+  // ---------------- Lazy-Load XLSX Library On-Demand ----------------
+  let xlsxLoadingPromise = null;
+  function loadXLSX() {
+    if (window.XLSX && window.XLSX.utils) {
+      return Promise.resolve(window.XLSX);
+    }
+    if (!xlsxLoadingPromise) {
+      xlsxLoadingPromise = new Promise((resolve, reject) => {
+        const script = document.createElement('script');
+        script.src = '/static/js/xlsx.full.min.js?v=20261016_09';
+        script.onload = () => {
+          if (window.XLSX && window.XLSX.utils) {
+            resolve(window.XLSX);
+          } else {
+            xlsxLoadingPromise = null;
+            if (script.parentNode) script.parentNode.removeChild(script);
+            reject(new Error('XLSX failed to initialize'));
+          }
+        };
+        script.onerror = () => {
+          xlsxLoadingPromise = null;
+          if (script.parentNode) script.parentNode.removeChild(script);
+          reject(new Error('Failed to load XLSX script'));
+        };
+        document.head.appendChild(script);
+      }).catch(err => {
+        xlsxLoadingPromise = null;
+        throw err;
+      });
+    }
+    return xlsxLoadingPromise;
+  }
+
+  // Hook bottle price mutation to safely invalidate cached calculations
+  if (api.updateBottlePrice) {
+    const origUpdateBottlePrice = api.updateBottlePrice.bind(api);
+    api.updateBottlePrice = async function(price) {
+      const res = await origUpdateBottlePrice(price);
+      if (res && res.success) {
+        invalidateCache(['dashboard', 'analytics']);
+        if (typeof refreshGlobalSettings === 'function') {
+          await refreshGlobalSettings();
+        }
+      }
+      return res;
+    };
+  }
+
   // Toast Helper (Clean SVG Icons, NO Emojis)
   function showToast(message, type = 'success') {
     const container = document.getElementById('toast-container');
@@ -327,7 +453,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
 
     document.querySelectorAll('.view-page').forEach(page => {
-      page.style.display = page.id === `view-${tab}` ? 'block' : 'none';
+      const isTarget = page.id === `view-${tab}`;
+      page.style.display = isTarget ? 'block' : 'none';
+      if (isTarget && !prefersReducedMotion()) {
+        page.style.animation = 'none';
+        void page.offsetHeight; // trigger smooth reflow
+        page.style.animation = '';
+      }
     });
 
     // Header title
@@ -468,6 +600,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     try {
       const res = await api.updateDiscount(discountVal);
+      invalidateCache(['dashboard', 'analytics']);
       showToast(`Discount per bottle updated to ₹${res.discount_per_bottle}`);
       await refreshGlobalSettings();
 
@@ -593,17 +726,17 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (!data) return;
     const kpis = data.kpis || { total_revenue: 0, total_orders: 0, bottles_sold: 0, paid_orders: 0, cod_orders: 0 };
 
-    // KPI Cards
+    // KPI Cards with smooth non-blocking count-up animation
     const revEl = document.getElementById('kpi-total-revenue');
-    if (revEl) revEl.textContent = `₹${(kpis.total_revenue || 0).toLocaleString('en-IN')}`;
+    if (revEl) animateValue(revEl, kpis.total_revenue || 0, 480, '₹');
     const ordEl = document.getElementById('kpi-total-orders');
-    if (ordEl) ordEl.textContent = kpis.total_orders || 0;
+    if (ordEl) animateValue(ordEl, kpis.total_orders || 0, 480);
     const btlEl = document.getElementById('kpi-bottles-sold');
-    if (btlEl) btlEl.textContent = kpis.bottles_sold || 0;
+    if (btlEl) animateValue(btlEl, kpis.bottles_sold || 0, 480);
     const paidEl = document.getElementById('kpi-paid-orders');
-    if (paidEl) paidEl.textContent = kpis.paid_orders || 0;
+    if (paidEl) animateValue(paidEl, kpis.paid_orders || 0, 480);
     const codEl = document.getElementById('kpi-cod-orders');
-    if (codEl) codEl.textContent = kpis.cod_orders || 0;
+    if (codEl) animateValue(codEl, kpis.cod_orders || 0, 480);
 
     // Top Selling Flavour (Requirement 8)
     const mostFlv = data.most_purchased_flavour;
@@ -638,24 +771,44 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   }
 
-  async function loadDashboard() {
+  let dashboardRequestId = 0;
+  async function loadDashboard(forceRefresh = false) {
     if (!api.getToken()) return;
-    if (state.dashboardData) {
-      renderDashboardUI(state.dashboardData);
+
+    const currentReqId = ++dashboardRequestId;
+
+    // Fast path: Render cached data immediately for instant tab switching
+    if (cache.dashboard && !forceRefresh) {
+      renderDashboardUI(cache.dashboard);
     }
+
+    setSyncStatus('syncing');
+
     try {
       const data = await api.getDashboardStats();
       if (!data) return;
+      cache.dashboard = data;
+      if (currentReqId !== dashboardRequestId) return;
       state.dashboardData = data;
       renderDashboardUI(data);
+      setSyncStatus('idle');
     } catch (err) {
+      if (currentReqId !== dashboardRequestId) return;
       console.error('Error loading dashboard:', err);
-      if (!api.getToken() || (err.message && (err.message.includes('Session expired') || err.message.includes('unauthorized') || err.message.includes('401')))) {
-        return;
+      // Retain previously displayed data if available and offer retry
+      if (cache.dashboard || state.dashboardData) {
+        setSyncStatus('cached', () => loadDashboard(true));
+      } else {
+        setSyncStatus('idle');
+        if (!api.getToken() || (err.message && (err.message.includes('Session expired') || err.message.includes('unauthorized') || err.message.includes('401')))) {
+          return;
+        }
+        showToast('Failed to load dashboard data', 'danger');
       }
-      showToast('Failed to load dashboard data', 'danger');
     }
   }
+
+  const loadDashboardStats = loadDashboard;
 
   // Quick Action Buttons
   document.getElementById('btn-dashboard-new-order')?.addEventListener('click', () => switchTab('new-order'));
@@ -1256,6 +1409,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (submitBtn) submitBtn.disabled = true;
 
       const res = await api.createOrder(payload);
+      invalidateCache(['dashboard', 'orders', 'analytics', 'inventory']);
       showToast(`Order ${res.order_id} created successfully!`);
 
       // Reset form to blank
@@ -1393,6 +1547,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         const oid = btn.dataset.toggleId;
         try {
           const res = await api.toggleDispatch(oid);
+          invalidateCache(['dashboard', 'orders']);
           showToast(`Order ${oid} status: ${res.dispatch_state}`);
           await loadOrders();
         } catch (err) {
@@ -1834,6 +1989,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       toggleBtn.onclick = async () => {
         try {
           await api.toggleDispatch(o.order_id);
+          invalidateCache(['dashboard', 'orders']);
           showToast(`Order ${o.order_id} dispatch updated`);
           await openOrderDetails(o.order_id);
           await loadOrders();
@@ -2296,6 +2452,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (saveLabel) saveLabel.textContent = 'Saving Changes...';
 
       await api.editOrder(oid, payload);
+      invalidateCache(['dashboard', 'orders', 'analytics', 'inventory']);
       showToast(`Order ${oid} updated successfully!`);
       editOrderModal.classList.remove('show');
       await loadOrders();
@@ -2327,6 +2484,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (!pendingDeleteOrderId) return;
     try {
       await api.deleteOrder(pendingDeleteOrderId);
+      invalidateCache(['dashboard', 'orders', 'analytics', 'inventory']);
       showToast(`Order ${pendingDeleteOrderId} deleted and stock restored`);
       deleteOrderModal.classList.remove('show');
       await loadOrders();
@@ -2506,6 +2664,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     try {
       await api.addOrAdjustStock({ flavour, movement_type: type, quantity, reference });
+      invalidateCache(['dashboard', 'inventory']);
       showToast(`Updated ${flavour} stock`);
       stockMovementModal.classList.remove('show');
       await loadInventory();
@@ -2527,6 +2686,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   document.getElementById('btn-confirm-reset-stock').addEventListener('click', async () => {
     try {
       await api.resetInventory();
+      invalidateCache(['dashboard', 'inventory']);
       showToast('All flavour stock quantities set to 0');
       resetStockModal.classList.remove('show');
       await loadInventory();
@@ -2583,14 +2743,36 @@ document.addEventListener('DOMContentLoaded', async () => {
     renderAnalyticsView();
   });
 
-  async function loadAnalytics() {
+  let analyticsRequestId = 0;
+
+  async function loadAnalytics(forceRefresh = false) {
     if (!api.getToken()) return;
-    if (state.analyticsData) {
+    const year = state.analyticsYear;
+    const month = state.analyticsMonth;
+    const cacheKey = `${year}_${month}`;
+
+    const currentReqId = ++analyticsRequestId;
+
+    // Fast path: Render cached data immediately for instant tab switching
+    if (cache.analytics && cache.analytics[cacheKey] && !forceRefresh) {
+      state.analyticsData = cache.analytics[cacheKey];
       renderAnalyticsView();
     }
+
+    setSyncStatus('syncing');
+
     try {
-      const year = state.analyticsYear;
-      const data = await api.getAnalytics(year, state.analyticsMonth);
+      const data = await api.getAnalytics(year, month);
+      if (!cache.analytics) cache.analytics = {};
+      cache.analytics[cacheKey] = data;
+
+      // Selection validation & race condition check:
+      // If a newer request was dispatched or the user switched year/month while waiting,
+      // discard this older response from active state/UI rendering.
+      if (currentReqId !== analyticsRequestId || state.analyticsYear !== year || state.analyticsMonth !== month) {
+        return;
+      }
+
       state.analyticsData = data;
 
       // Populate year selector
@@ -2603,7 +2785,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         yearSelect.onchange = () => {
           state.analyticsYear = parseInt(yearSelect.value);
           updateAnalyticsExportLabel();
-          loadAnalytics();
+          loadAnalytics(true);
         };
       }
 
@@ -2612,13 +2794,21 @@ document.addEventListener('DOMContentLoaded', async () => {
 
       updateAnalyticsExportLabel();
       renderAnalyticsView();
+      setSyncStatus('idle');
 
     } catch (err) {
+      if (currentReqId !== analyticsRequestId) return;
       console.error('Error loading analytics:', err);
-      if (!api.getToken() || (err.message && (err.message.includes('Session expired') || err.message.includes('unauthorized') || err.message.includes('401')))) {
-        return;
+      // Retain previously displayed data if available and offer retry
+      if (cache.analytics && cache.analytics[cacheKey]) {
+        setSyncStatus('cached', () => loadAnalytics(true));
+      } else {
+        setSyncStatus('idle');
+        if (!api.getToken() || (err.message && (err.message.includes('Session expired') || err.message.includes('unauthorized') || err.message.includes('401')))) {
+          return;
+        }
+        showToast('Failed to load analytics data', 'danger');
       }
-      showToast('Failed to load analytics data', 'danger');
     }
   }
 
@@ -2636,54 +2826,57 @@ document.addEventListener('DOMContentLoaded', async () => {
     };
 
     // Update Top KPIs depending on Active Mode
+    let currentRevenue = 0;
     let currentShipping = 0;
+    let currentBottles = 0;
+    let currentOrders = 0;
+    let currentTopFlavour = 'None';
     const shippingEl = document.getElementById('analytics-total-shipping');
     const shippingLabel = document.getElementById('analytics-kpi-shipping-label');
     const shippingSubtext = document.getElementById('analytics-kpi-shipping-subtext');
 
     if (mode === 'monthly') {
+      currentRevenue = selectedMonth.revenue || 0;
       currentShipping = selectedMonth.shipping_costs || 0;
+      currentBottles = selectedMonth.total_bottles || 0;
+      currentOrders = selectedMonth.total_orders || 0;
+      currentTopFlavour = selectedMonth.most_purchased_flavour !== 'None' ? selectedMonth.most_purchased_flavour : 'None';
+
       document.getElementById('analytics-kpi-revenue-label').textContent = `${selectedMonth.month_name} Product Revenue`;
       document.getElementById('analytics-kpi-revenue-subtext').textContent = `${selectedMonth.month_name} ${state.analyticsYear} Total Revenue`;
-      document.getElementById('analytics-total-revenue').textContent = `₹${selectedMonth.revenue.toLocaleString('en-IN')}`;
       if (shippingLabel) shippingLabel.textContent = `${selectedMonth.month_name} Shipping Costs`;
       if (shippingSubtext) shippingSubtext.textContent = `Recorded Delivery Fees (${selectedMonth.month_name})`;
-      document.getElementById('analytics-total-bottles').textContent = selectedMonth.total_bottles;
-      document.getElementById('analytics-total-orders').textContent = selectedMonth.total_orders;
-      document.getElementById('analytics-most-purchased').textContent = selectedMonth.most_purchased_flavour !== 'None'
-        ? selectedMonth.most_purchased_flavour
-        : 'None';
     } else if (mode === 'annual') {
       const ann = data.annual_report;
+      currentRevenue = ann.total_revenue || 0;
       currentShipping = ann.shipping_costs || 0;
+      currentBottles = ann.total_bottles || 0;
+      currentOrders = ann.total_orders || 0;
+      currentTopFlavour = ann.most_purchased_flavour !== 'None' ? ann.most_purchased_flavour : 'None';
+
       document.getElementById('analytics-kpi-revenue-label').textContent = 'Annual Product Revenue';
       document.getElementById('analytics-kpi-revenue-subtext').textContent = `Full Year ${state.analyticsYear} Total Revenue`;
-      document.getElementById('analytics-total-revenue').textContent = `₹${ann.total_revenue.toLocaleString('en-IN')}`;
       if (shippingLabel) shippingLabel.textContent = 'Annual Shipping Costs';
       if (shippingSubtext) shippingSubtext.textContent = `Full Year ${state.analyticsYear} Delivery Fees`;
-      document.getElementById('analytics-total-bottles').textContent = ann.total_bottles;
-      document.getElementById('analytics-total-orders').textContent = ann.total_orders;
-      document.getElementById('analytics-most-purchased').textContent = ann.most_purchased_flavour !== 'None'
-        ? ann.most_purchased_flavour
-        : 'None';
     } else {
       // Weekly mode
-      const totalWeeklyRev = data.weekly_report.reduce((acc, w) => acc + w.revenue, 0);
-      const totalWeeklyBottles = data.weekly_report.reduce((acc, w) => acc + w.total_bottles, 0);
+      currentRevenue = data.weekly_report.reduce((acc, w) => acc + w.revenue, 0);
+      currentBottles = data.weekly_report.reduce((acc, w) => acc + w.total_bottles, 0);
       currentShipping = data.weekly_report.reduce((acc, w) => acc + (w.shipping_costs || 0), 0);
+      currentOrders = data.overview.total_orders || 0;
+      currentTopFlavour = data.overview.most_purchased_flavour !== 'None' ? data.overview.most_purchased_flavour : 'None';
+
       document.getElementById('analytics-kpi-revenue-label').textContent = 'Weekly Product Revenue';
       document.getElementById('analytics-kpi-revenue-subtext').textContent = `Weeks in ${state.analyticsYear} Total Revenue`;
-      document.getElementById('analytics-total-revenue').textContent = `₹${totalWeeklyRev.toLocaleString('en-IN')}`;
       if (shippingLabel) shippingLabel.textContent = 'Weekly Shipping Costs';
       if (shippingSubtext) shippingSubtext.textContent = `Weeks in ${state.analyticsYear} Delivery Fees`;
-      document.getElementById('analytics-total-bottles').textContent = totalWeeklyBottles;
-      document.getElementById('analytics-total-orders').textContent = data.overview.total_orders;
-      document.getElementById('analytics-most-purchased').textContent = data.overview.most_purchased_flavour !== 'None'
-        ? data.overview.most_purchased_flavour
-        : 'None';
     }
 
-    if (shippingEl) shippingEl.textContent = `₹${currentShipping.toLocaleString('en-IN')}`;
+    animateValue(document.getElementById('analytics-total-revenue'), currentRevenue, 480, '₹');
+    animateValue(shippingEl, currentShipping, 480, '₹');
+    animateValue(document.getElementById('analytics-total-bottles'), currentBottles, 480);
+    animateValue(document.getElementById('analytics-total-orders'), currentOrders, 480);
+    document.getElementById('analytics-most-purchased').textContent = currentTopFlavour;
 
     // 1. Monthly Section Content
     document.getElementById('analytics-month-detail-title').textContent = `${selectedMonth.month_name} ${state.analyticsYear} - Flavour Sales`;
@@ -2928,7 +3121,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   });
 
-  function exportToGoogleSheets(filename, sheetName, headers, rows) {
+  async function exportToGoogleSheets(filename, sheetName, headers, rows) {
     const cleanFilename = filename.endsWith('.xlsx') ? filename : filename.replace(/\.csv$/i, '') + '.xlsx';
 
     const cleanRows = rows.map(r => r.map(cell => {
@@ -2942,8 +3135,9 @@ document.addEventListener('DOMContentLoaded', async () => {
       return cell;
     }));
 
-    if (window.XLSX && XLSX.utils) {
-      try {
+    try {
+      await loadXLSX();
+      if (window.XLSX && XLSX.utils) {
         const aoa = [headers, ...cleanRows];
         const ws = XLSX.utils.aoa_to_sheet(aoa);
 
@@ -2963,9 +3157,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         XLSX.writeFile(wb, cleanFilename);
         showToast(`Exported ${cleanFilename} (Ready for Google Sheets!)`);
         return;
-      } catch (err) {
-        console.error('XLSX export failed, fallback to CSV:', err);
       }
+    } catch (err) {
+      console.error('XLSX export failed, fallback to CSV:', err);
     }
 
     // Fallback if XLSX library unavailable
@@ -2984,7 +3178,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     showToast(`Exported ${filename}`);
   }
 
-  function exportShippingManifestExcel(filename, sheetName, headers, rows) {
+  async function exportShippingManifestExcel(filename, sheetName, headers, rows) {
     const cleanFilename = filename.endsWith('.xlsx') ? filename : filename.replace(/\.csv$/i, '') + '.xlsx';
 
     const cleanRows = rows.map(r => r.map(cell => {
@@ -2998,8 +3192,9 @@ document.addEventListener('DOMContentLoaded', async () => {
       return cell;
     }));
 
-    if (window.XLSX && XLSX.utils) {
-      try {
+    try {
+      await loadXLSX();
+      if (window.XLSX && XLSX.utils) {
         const aoa = [headers, ...cleanRows];
         const ws = XLSX.utils.aoa_to_sheet(aoa);
 
@@ -3023,9 +3218,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         XLSX.writeFile(wb, cleanFilename);
         showToast(`Exported ${cleanFilename}`);
         return;
-      } catch (err) {
-        console.error('Shipping Manifest XLSX export failed, fallback to CSV:', err);
       }
+    } catch (err) {
+      console.error('Shipping Manifest XLSX export failed, fallback to CSV:', err);
     }
 
     // Fallback if XLSX library unavailable

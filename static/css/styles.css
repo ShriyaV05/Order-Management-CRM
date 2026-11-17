@@ -2319,3 +2319,273 @@ body.auth-required #app-container {
   animation: spin 1s linear infinite;
   display: inline-block;
 }
+
+/* ==========================================================
+   UI/UX & PERFORMANCE ENHANCEMENTS
+   Smooth Transitions, Staggered Entrances & Glassmorphism
+   ========================================================== */
+
+/* ---------------- 1. Smooth Page & View Transitions ---------------- */
+.view-page {
+  animation: viewFadeIn 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  will-change: opacity, transform;
+}
+
+@keyframes viewFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ---------------- 2. Staggered Card Entrances ---------------- */
+.stagger-card {
+  animation: cardEntrance 0.3s cubic-bezier(0.16, 1, 0.3, 1) both;
+  will-change: opacity, transform;
+}
+
+.stagger-1 { animation-delay: 0.02s; }
+.stagger-2 { animation-delay: 0.06s; }
+.stagger-3 { animation-delay: 0.10s; }
+.stagger-4 { animation-delay: 0.14s; }
+.stagger-5 { animation-delay: 0.18s; }
+.stagger-6 { animation-delay: 0.22s; }
+
+@keyframes cardEntrance {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* ---------------- 3. Skeleton Loading Shimmer States ---------------- */
+.skeleton-box {
+  display: inline-block;
+  height: 1em;
+  position: relative;
+  overflow: hidden;
+  background-color: #E2E8F0;
+  border-radius: var(--radius-sm);
+  vertical-align: middle;
+}
+
+.skeleton-box::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(255, 255, 255, 0.65) 50%,
+    rgba(255, 255, 255, 0) 100%
+  );
+  animation: skeletonShimmer 1.4s infinite ease-in-out;
+}
+
+@keyframes skeletonShimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+.skeleton-kpi-value {
+  width: 90px;
+  height: 28px;
+  border-radius: 6px;
+  margin: 4px 0;
+}
+
+.skeleton-text {
+  width: 70%;
+  height: 14px;
+  margin-top: 4px;
+}
+
+/* ---------------- 4. Background Sync Indicator ---------------- */
+.sync-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: var(--radius-full);
+  margin-left: 12px;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+  user-select: none;
+}
+
+.sync-indicator.syncing {
+  background: rgba(13, 71, 161, 0.08);
+  color: var(--primary-blue);
+  border: 1px solid rgba(13, 71, 161, 0.15);
+}
+
+.sync-indicator.cached-warning {
+  background: #FFFBEB;
+  color: #B45309;
+  border: 1px solid #FCD34D;
+}
+
+.sync-indicator .sync-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.sync-indicator.syncing .sync-dot {
+  animation: pulseDot 1.2s infinite ease-in-out;
+}
+
+@keyframes pulseDot {
+  0%, 100% { opacity: 0.3; transform: scale(0.8); }
+  50% { opacity: 1; transform: scale(1.25); }
+}
+
+.btn-sync-retry {
+  background: transparent;
+  border: none;
+  color: #B45309;
+  font-weight: 700;
+  text-decoration: underline;
+  cursor: pointer;
+  padding: 0 4px;
+  font-size: 11px;
+  line-height: 1;
+}
+
+.btn-sync-retry:hover {
+  color: #78350F;
+}
+
+/* ---------------- 5. Refined Micro-Interactions & Hover Dynamics ---------------- */
+.kpi-card {
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.2s ease;
+}
+
+.kpi-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 10px 22px -3px rgba(13, 71, 161, 0.12), 0 3px 8px -2px rgba(0, 0, 0, 0.04);
+  border-color: #CBD5E1;
+}
+
+.btn {
+  transition: transform 0.12s ease, box-shadow 0.15s ease, background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.btn:active {
+  transform: scale(0.975);
+}
+
+.crm-table tbody tr {
+  transition: background-color 0.14s ease;
+}
+
+.crm-table tbody tr:hover {
+  background-color: rgba(241, 245, 249, 0.85);
+}
+
+/* ---------------- 6. Analytics Page Glassmorphism Redesign ---------------- */
+#view-analytics .panel {
+  background: rgba(255, 255, 255, 0.78);
+  backdrop-filter: blur(14px) saturate(160%);
+  -webkit-backdrop-filter: blur(14px) saturate(160%);
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  box-shadow: 0 10px 30px -4px rgba(13, 71, 161, 0.06), 0 2px 8px -1px rgba(0, 0, 0, 0.03);
+  border-radius: var(--radius-lg);
+}
+
+#view-analytics .kpi-card {
+  background: rgba(255, 255, 255, 0.75);
+  backdrop-filter: blur(14px) saturate(160%);
+  -webkit-backdrop-filter: blur(14px) saturate(160%);
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  border-radius: var(--radius-md);
+  box-shadow: 0 8px 24px -3px rgba(13, 71, 161, 0.07), 0 2px 6px -1px rgba(0, 0, 0, 0.03);
+  transition: transform 0.22s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.22s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.2s ease;
+}
+
+#view-analytics .kpi-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 14px 28px -3px rgba(13, 71, 161, 0.15), 0 4px 12px -2px rgba(255, 206, 71, 0.25);
+  border-color: rgba(255, 206, 71, 0.7);
+}
+
+#view-analytics .kpi-card.accent-yellow::after {
+  background: linear-gradient(180deg, #FFD54F 0%, #FFCE47 100%);
+  width: 5px;
+  box-shadow: 0 0 10px rgba(255, 213, 79, 0.5);
+}
+
+#view-analytics .kpi-card::after {
+  background: linear-gradient(180deg, #1565C0 0%, #0D47A1 100%);
+  width: 5px;
+  box-shadow: 0 0 10px rgba(13, 71, 161, 0.35);
+}
+
+#view-analytics .btn-group {
+  background: rgba(241, 245, 249, 0.75);
+  padding: 3px;
+  border-radius: var(--radius-full);
+  border: 1px solid rgba(226, 232, 240, 0.85);
+  display: inline-flex;
+  gap: 2px;
+}
+
+#view-analytics .analytics-mode-btn {
+  border-radius: var(--radius-full);
+  border: none;
+  padding: 6px 14px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-secondary);
+  background: transparent;
+  transition: all 0.18s ease;
+}
+
+#view-analytics .analytics-mode-btn.active {
+  background: var(--primary-blue);
+  color: #FFFFFF;
+  box-shadow: 0 2px 8px rgba(13, 71, 161, 0.35);
+}
+
+#view-analytics .analytics-mode-btn:not(.active):hover {
+  background: rgba(255, 255, 255, 0.95);
+  color: var(--primary-blue);
+}
+
+#view-analytics .crm-table thead th {
+  background: rgba(248, 250, 252, 0.88);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border-bottom: 2px solid rgba(226, 232, 240, 0.85);
+}
+
+/* ---------------- 7. Accessibility & Reduced Motion ---------------- */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  .stagger-card,
+  .view-page {
+    opacity: 1 !important;
+    transform: none !important;
+    animation: none !important;
+  }
+  .skeleton-box::after {
+    animation: none !important;
+  }
+}

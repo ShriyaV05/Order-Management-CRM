@@ -103,6 +103,27 @@ class ShippingManifestTestCase(unittest.TestCase):
             10, 1000, 1490.0, 0.0, 0.0,
             1490.0, 'Paid', 'PLACED', 'admin', '2026-11-15 09:15:00'
         );
+
+        CREATE TABLE IF NOT EXISTS order_items (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            order_id TEXT NOT NULL,
+            flavour TEXT NOT NULL,
+            quantity INTEGER NOT NULL,
+            unit_price REAL NOT NULL,
+            line_amount REAL NOT NULL
+        );
+
+        INSERT INTO order_items (order_id, flavour, quantity, unit_price, line_amount) VALUES
+        ('ORD0001', 'Tomato', 1, 149.0, 149.0),
+        ('ORD0001', 'Cheese', 1, 149.0, 149.0),
+        ('ORD0002', 'Tomato', 1, 149.0, 149.0),
+        ('ORD0002', 'Cheese', 1, 149.0, 149.0),
+        ('ORD0002', 'Sour Cream', 1, 149.0, 149.0),
+        ('ORD0002', 'Peri Peri', 1, 149.0, 149.0),
+        ('ORD0003', 'Tomato', 4, 149.0, 596.0),
+        ('ORD0003', 'Cheese', 3, 149.0, 447.0),
+        ('ORD0003', 'Sour Cream', 2, 149.0, 298.0),
+        ('ORD0003', 'Peri Peri', 1, 149.0, 149.0);
         """)
         cls.raw_db.commit()
 
@@ -193,6 +214,24 @@ class ShippingManifestTestCase(unittest.TestCase):
         self.assertEqual(len(rahul_orders), 2)
         order_ids = {item["order_id"] for item in rahul_orders}
         self.assertEqual(order_ids, {"ORD0001", "ORD0003"})
+
+    def test_shipping_manifest_includes_total_bottles_and_flavour_items(self):
+        """Verify manifest items contain total_bottles and items list."""
+        response = self.client.get("/api/orders/shipping-manifest")
+        self.assertEqual(response.status_code, 200)
+        manifest = response.json()["manifest"]
+
+        ord1 = next(item for item in manifest if item["order_id"] == "ORD0001")
+        self.assertEqual(ord1["total_bottles"], 2)
+        self.assertEqual(len(ord1["items"]), 2)
+
+        ord2 = next(item for item in manifest if item["order_id"] == "ORD0002")
+        self.assertEqual(ord2["total_bottles"], 4)
+        self.assertEqual(len(ord2["items"]), 4)
+
+        ord3 = next(item for item in manifest if item["order_id"] == "ORD0003")
+        self.assertEqual(ord3["total_bottles"], 10)
+        self.assertEqual(len(ord3["items"]), 4)
 
 if __name__ == "__main__":
     unittest.main()

@@ -1005,18 +1005,33 @@ def get_orders(
 def get_shipping_manifest(current_user: Dict[str, Any] = Depends(get_current_user)):
     """
     Read-only endpoint retrieving all orders for courier shipping manifest export.
-    Returns every order across all dates, statuses, and customers.
+    Returns every order across all dates, statuses, and customers, including total_bottles
+    and flavour line items from order_items.
     """
     conn = get_db()
     cursor = conn.cursor()
     cursor.execute("""
         SELECT order_id, customer_name, created_at, phone, address, pin_code, district, state,
-               total_weight_grams, actual_delivery_fee, delivery_fee
+               total_bottles, total_weight_grams, actual_delivery_fee, delivery_fee
         FROM orders
         ORDER BY created_at DESC, id DESC;
     """)
     rows = cursor.fetchall()
+
+    # Get items for all orders (read-only query grouped by order_id)
+    cursor.execute("SELECT order_id, flavour, quantity FROM order_items WHERE quantity > 0;")
+    all_items = cursor.fetchall()
     conn.close()
+
+    items_by_order: Dict[str, List[Dict[str, Any]]] = {}
+    for it in all_items:
+        oid = it["order_id"]
+        if oid not in items_by_order:
+            items_by_order[oid] = []
+        items_by_order[oid].append({
+            "flavour": it["flavour"],
+            "quantity": it["quantity"]
+        })
 
     manifest = []
     for r in rows:
@@ -1025,6 +1040,9 @@ def get_shipping_manifest(current_user: Dict[str, Any] = Depends(get_current_use
 
         actual_fee = float(r["actual_delivery_fee"]) if "actual_delivery_fee" in r.keys() and r["actual_delivery_fee"] is not None else None
         collected_fee = float(r["delivery_fee"]) if "delivery_fee" in r.keys() and r["delivery_fee"] is not None else 0.0
+
+        total_b = int(r["total_bottles"]) if "total_bottles" in r.keys() and r["total_bottles"] is not None else None
+        oid = r["order_id"]
 
         manifest.append({
             "order_id": r["order_id"],
@@ -1036,6 +1054,8 @@ def get_shipping_manifest(current_user: Dict[str, Any] = Depends(get_current_use
             "district": r["district"] or "",
             "state": r["state"] or "",
             "weight": weight_str,
+            "total_bottles": total_b,
+            "items": items_by_order.get(oid, []),
             "actual_delivery_fee": actual_fee,
             "collected_delivery_fee": collected_fee
         })

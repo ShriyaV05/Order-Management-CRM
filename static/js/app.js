@@ -1852,11 +1852,47 @@ document.addEventListener('DOMContentLoaded', async () => {
           'DISTRICT',
           'STATE',
           'WEIGHT',
+          'NO. OF BOTTLES',
+          'TOMATO',
+          'CHEESE',
+          'SOUR CREAM',
+          'PERI PERI',
           'DELIVERY FEE (ACTUAL)',
           'DELIVERY FEE (COLLECTED)'
         ];
 
         const rows = res.manifest.map(m => {
+          let tomatoQty = 0;
+          let cheeseQty = 0;
+          let sourCreamQty = 0;
+          let periPeriQty = 0;
+
+          if (Array.isArray(m.items)) {
+            m.items.forEach(it => {
+              const flv = (it.flavour || '').trim().toLowerCase();
+              const q = Number(it.quantity) || 0;
+              if (flv === 'tomato' || flv === 'spanish tomato') {
+                tomatoQty += q;
+              } else if (flv === 'cheese' || flv === 'cheddar cheese') {
+                cheeseQty += q;
+              } else if (flv === 'sour cream' || flv === 'sour cream & onion' || flv === 'sour cream and onion') {
+                sourCreamQty += q;
+              } else if (flv === 'peri peri') {
+                periPeriQty += q;
+              }
+            });
+          }
+
+          const flavourSum = tomatoQty + cheeseQty + sourCreamQty + periPeriQty;
+
+          // Primary source: existing stored total_bottles; fallback: flavour quantity sum if missing/unavailable
+          let noOfBottles;
+          if (m.total_bottles !== null && m.total_bottles !== undefined && !isNaN(Number(m.total_bottles))) {
+            noOfBottles = Number(m.total_bottles);
+          } else {
+            noOfBottles = flavourSum;
+          }
+
           let actualFeeStr = '—';
           if (m.actual_delivery_fee !== null && m.actual_delivery_fee !== undefined) {
             actualFeeStr = `₹${Number(m.actual_delivery_fee).toLocaleString('en-IN')}`;
@@ -1873,6 +1909,11 @@ document.addEventListener('DOMContentLoaded', async () => {
             m.district || '',
             m.state || '',
             m.weight || '',
+            noOfBottles,
+            tomatoQty,
+            cheeseQty,
+            sourCreamQty,
+            periPeriQty,
             actualFeeStr,
             collectedFeeStr
           ];
@@ -3199,8 +3240,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         const ws = XLSX.utils.aoa_to_sheet(aoa);
 
         // Readable column widths for Shipping Manifest:
-        // [ORDER ID, NAME, DATE, PHONE NO, ADDRESS, PIN CODE, DISTRICT, STATE, WEIGHT, DELIVERY FEE (ACTUAL), DELIVERY FEE (COLLECTED)]
-        const defaultColWidths = [14, 24, 20, 16, 45, 12, 20, 20, 12, 24, 26];
+        // [ORDER ID, NAME, DATE, PHONE NO, ADDRESS, PIN CODE, DISTRICT, STATE, WEIGHT, NO. OF BOTTLES, TOMATO, CHEESE, SOUR CREAM, PERI PERI, DELIVERY FEE (ACTUAL), DELIVERY FEE (COLLECTED)]
+        const defaultColWidths = [14, 24, 20, 16, 45, 12, 20, 20, 12, 16, 12, 12, 14, 12, 24, 26];
         const colWidths = headers.map((h, i) => {
           let maxLen = defaultColWidths[i] || String(h).length;
           for (const r of cleanRows) {

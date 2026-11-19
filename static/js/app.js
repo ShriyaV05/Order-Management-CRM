@@ -2014,13 +2014,17 @@ document.addEventListener('DOMContentLoaded', async () => {
       dispatchBadge.className = `badge ${o.dispatch_state === 'DISPATCHED' ? 'badge-dispatched' : 'badge-placed'}`;
 
       // Ordered Products: ONLY ordered flavours (> 0 quantity)
+      const isCombo = Boolean(o.is_combo);
+      const discountedUnitRate = Math.max(0, (Number(o.unit_price || 160) - Number(o.discount_per_bottle || 0)));
+      const unitRateDisplay = isCombo ? '—' : `₹${discountedUnitRate}`;
+
       const productsTbody = document.getElementById('detail-products-tbody');
-      productsTbody.innerHTML = o.items.map(it => `
+      productsTbody.innerHTML = (o.items || []).map(it => `
         <tr>
           <td><strong>${it.flavour}</strong></td>
           <td>${it.quantity}</td>
-          <td>₹${it.unit_price}</td>
-          <td><strong>₹${it.line_amount}</strong></td>
+          <td>${unitRateDisplay}</td>
+          <td>${isCombo ? '—' : `<strong>₹${it.line_amount}</strong>`}</td>
         </tr>
       `).join('');
 

@@ -1416,13 +1416,56 @@ document.addEventListener('DOMContentLoaded', async () => {
       items
     };
 
-    const submitBtn = document.querySelector('#form-new-order button[type="submit"]');
+    const submitBtn = document.getElementById('btn-submit-new-order') || document.querySelector('#form-new-order button[type="submit"]');
+    const originalBtnHtml = `
+      <svg class="icon-svg" viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+      <span>Confirm &amp; Create Order</span>
+    `;
+
+    const setButtonLoading = () => {
+      if (!submitBtn) return;
+      submitBtn.disabled = true;
+      submitBtn.classList.remove('is-success');
+      submitBtn.classList.add('is-loading');
+      submitBtn.innerHTML = `
+        <svg class="icon-svg btn-icon-spinner" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-opacity="0.25" fill="none"/>
+          <path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" stroke-linecap="round" fill="none"/>
+        </svg>
+        <span>Saving Order...</span>
+      `;
+    };
+
+    const setButtonSuccess = () => {
+      if (!submitBtn) return;
+      submitBtn.disabled = true;
+      submitBtn.classList.remove('is-loading');
+      submitBtn.classList.add('is-success');
+      submitBtn.innerHTML = `
+        <svg class="icon-svg btn-icon-success" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="20 6 9 17 4 12"/>
+        </svg>
+        <span>Order Created!</span>
+      `;
+    };
+
+    const resetButton = () => {
+      if (!submitBtn) return;
+      submitBtn.disabled = false;
+      submitBtn.classList.remove('is-loading', 'is-success');
+      submitBtn.innerHTML = originalBtnHtml;
+    };
 
     try {
       state.newOrderState.isSubmitting = true;
-      if (submitBtn) submitBtn.disabled = true;
+      setButtonLoading();
 
       const res = await api.createOrder(payload);
+
+      // Requirement 3: Briefly show checkmark with "Order Created!" before following the existing success flow
+      setButtonSuccess();
+      await new Promise(r => setTimeout(r, 800));
+
       invalidateCache(['dashboard', 'orders', 'analytics', 'inventory']);
       showToast(`Order ${res.order_id} created successfully!`);
 
@@ -1447,12 +1490,22 @@ document.addEventListener('DOMContentLoaded', async () => {
       showToast(err.message || 'Failed to create order', 'danger');
     } finally {
       state.newOrderState.isSubmitting = false;
-      if (submitBtn) submitBtn.disabled = false;
+      resetButton();
     }
   });
 
   // Reset form handler
   document.getElementById('form-new-order').addEventListener('reset', () => {
+    state.newOrderState.isSubmitting = false;
+    const submitBtn = document.getElementById('btn-submit-new-order') || document.querySelector('#form-new-order button[type="submit"]');
+    if (submitBtn) {
+      submitBtn.disabled = false;
+      submitBtn.classList.remove('is-loading', 'is-success');
+      submitBtn.innerHTML = `
+        <svg class="icon-svg" viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+        <span>Confirm &amp; Create Order</span>
+      `;
+    }
     state.newOrderState.flavours = { 'Tomato': 0, 'Cheese': 0, 'Sour Cream': 0, 'Peri Peri': 0 };
     state.newOrderState.comboSelected = null;
     state.newOrderState.isManualDeliveryFee = false;

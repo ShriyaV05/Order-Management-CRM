@@ -3054,6 +3054,60 @@ body.auth-required #app-container {
   transition: color 0.2s ease, transform 0.2s ease;
 }
 
+/* Confirm & Create Order Button Loading & Success States */
+#btn-submit-new-order {
+  min-width: 236px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  position: relative;
+  transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+#btn-submit-new-order.is-loading {
+  background-color: var(--primary-blue);
+  opacity: 0.92;
+  cursor: not-allowed;
+  pointer-events: none;
+  box-shadow: 0 4px 14px rgba(13, 71, 161, 0.25);
+}
+
+#btn-submit-new-order.is-success {
+  background-color: var(--success-green) !important;
+  border-color: #059669 !important;
+  color: #FFFFFF !important;
+  box-shadow: 0 4px 14px rgba(16, 185, 129, 0.35);
+  pointer-events: none;
+}
+
+#btn-submit-new-order .btn-icon-spinner {
+  animation: btnSpinnerRotate 0.75s linear infinite;
+  display: inline-block;
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+}
+
+@keyframes btnSpinnerRotate {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+#btn-submit-new-order .btn-icon-success {
+  animation: successIconPop 0.28s cubic-bezier(0.16, 1, 0.3, 1) both;
+  display: inline-block;
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+}
+
+@keyframes successIconPop {
+  0% { transform: scale(0.6); opacity: 0; }
+  70% { transform: scale(1.2); }
+  100% { transform: scale(1); opacity: 1; }
+}
+
 /* ---------------- 12. Orders Table & Filter Toolbar Dynamics ---------------- */
 .table-toolbar {
   transition: background-color 0.2s ease, box-shadow 0.2s ease;
@@ -3239,7 +3293,9 @@ body.auth-required #app-container {
   .modal-backdrop.show .order-detail-header-card,
   .modal-backdrop.show .detail-info-grid,
   .modal-backdrop.show .ordered-products-table,
-  .modal-backdrop.show .edit-section-card {
+  .modal-backdrop.show .edit-section-card,
+  #btn-submit-new-order .btn-icon-spinner,
+  #btn-submit-new-order .btn-icon-success {
     opacity: 1 !important;
     transform: none !important;
     animation: none !important;

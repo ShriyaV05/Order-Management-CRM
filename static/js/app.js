@@ -224,6 +224,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       setLoginButtonLoading(false);
       document.body.classList.add('auth-required');
       loginOverlay.style.display = 'flex';
+      clearLoginForm();
       return;
     }
     document.body.classList.remove('auth-required');
@@ -261,6 +262,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   window.addEventListener('auth-changed', (e) => {
     updateAuthUI();
     if (e.detail && e.detail.expired) {
+      clearLoginForm();
+      setTimeout(clearLoginForm, 50);
       showToast('Your session timed out after 10 minutes of inactivity. Please login again.', 'warning');
     }
   });
@@ -330,6 +333,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   }
 
+  function clearLoginForm() {
+    const uInput = document.getElementById('login-username');
+    const pInput = document.getElementById('login-password');
+    if (uInput) uInput.value = '';
+    if (pInput) pInput.value = '';
+    if (loginForm) loginForm.reset();
+    resetLoginPasswordVisibility();
+  }
+
   loginForm.addEventListener('submit', async (e) => {
     e.preventDefault();
     loginError.style.display = 'none';
@@ -341,7 +353,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     try {
       await api.login(username, password);
       showToast('Logged in successfully!');
-      resetLoginPasswordVisibility();
+      clearLoginForm();
       updateAuthUI();
     } catch (err) {
       loginError.textContent = err.message || 'Login failed';
@@ -357,7 +369,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   document.getElementById('btn-logout').addEventListener('click', async () => {
     await api.logout();
-    resetLoginPasswordVisibility();
+    clearLoginForm();
     showToast('Logged out');
     updateAuthUI();
   });
@@ -3803,4 +3815,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Initial Setup on Page Load
   ensureLocationsLoaded();
   updateAuthUI();
+  if (!api.isSessionActive()) {
+    setTimeout(clearLoginForm, 100);
+    setTimeout(clearLoginForm, 300);
+  }
 });

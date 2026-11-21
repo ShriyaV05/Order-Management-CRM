@@ -472,7 +472,21 @@ document.addEventListener('DOMContentLoaded', async () => {
       settings: 'Settings',
       backups: 'Backup & Recovery'
     };
-    document.getElementById('header-page-title').textContent = titles[tab] || 'POPCONE CRM';
+    // Header title with smooth micro-transition
+    const headerTitleEl = document.getElementById('header-page-title');
+    if (headerTitleEl) {
+      if (!prefersReducedMotion()) {
+        headerTitleEl.style.opacity = '0';
+        headerTitleEl.style.transform = 'translateY(-3px)';
+        setTimeout(() => {
+          headerTitleEl.textContent = titles[tab] || 'POPCONE CRM';
+          headerTitleEl.style.opacity = '1';
+          headerTitleEl.style.transform = 'translateY(0)';
+        }, 80);
+      } else {
+        headerTitleEl.textContent = titles[tab] || 'POPCONE CRM';
+      }
+    }
 
     // Load tab-specific data
     if (tab === 'dashboard') loadDashboard();

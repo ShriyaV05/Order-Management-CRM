@@ -2785,7 +2785,445 @@ body.auth-required #app-container {
   border: 1px solid #BBF7D0;
 }
 
-/* ---------------- 8. Accessibility & Reduced Motion ---------------- */
+/* ==========================================================
+   POPCONE PREMIUM SAAS ANIMATION & VISUAL ENHANCEMENTS
+   Fluid Transitions, Glassmorphism & Micro-Interactions
+   Pure CSS3 + Hardware-Accelerated Transforms (Zero Dependencies)
+   ========================================================== */
+
+/* ---------------- 9. Sidebar Navigation & Global Header Polish ---------------- */
+.sidebar {
+  transition: width 0.24s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.sidebar-logo {
+  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.25s ease;
+}
+
+.sidebar-header:hover .sidebar-logo {
+  transform: scale(1.06) rotate(-2deg);
+  box-shadow: 0 0 14px rgba(255, 213, 79, 0.45);
+}
+
+.nav-item {
+  position: relative;
+  overflow: hidden;
+  transition: background-color 0.2s cubic-bezier(0.16, 1, 0.3, 1),
+              color 0.2s cubic-bezier(0.16, 1, 0.3, 1),
+              transform 0.18s cubic-bezier(0.16, 1, 0.3, 1),
+              box-shadow 0.2s cubic-bezier(0.16, 1, 0.3, 1),
+              border-color 0.2s ease;
+}
+
+.nav-item:hover {
+  background-color: rgba(255, 255, 255, 0.08);
+  color: #FFFFFF;
+  transform: translateX(3px);
+}
+
+.nav-item:hover .nav-icon svg {
+  transform: scale(1.14);
+  stroke: var(--accent-yellow);
+}
+
+.nav-item.active {
+  background: linear-gradient(90deg, rgba(13, 71, 161, 0.95) 0%, rgba(21, 101, 192, 0.85) 100%);
+  color: var(--accent-yellow);
+  box-shadow: 0 4px 14px rgba(9, 44, 107, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 213, 79, 0.35);
+  transform: translateX(0);
+}
+
+.nav-item.active::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 15%;
+  height: 70%;
+  width: 4px;
+  background: linear-gradient(180deg, #FFD54F 0%, #FFCE47 100%);
+  border-radius: 0 4px 4px 0;
+  box-shadow: 0 0 10px rgba(255, 213, 79, 0.7);
+}
+
+.nav-icon svg {
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), stroke 0.2s ease;
+}
+
+.btn-sidebar-action {
+  transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.btn-sidebar-action:hover {
+  background: rgba(239, 68, 68, 0.15);
+  color: #FCA5A5;
+  transform: translateX(2px);
+}
+
+.top-header {
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(12px) saturate(160%);
+  -webkit-backdrop-filter: blur(12px) saturate(160%);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03), 0 4px 12px rgba(13, 71, 161, 0.02);
+  transition: background-color 0.2s ease, border-color 0.2s ease;
+}
+
+.page-title {
+  transition: opacity 0.18s ease, transform 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.btn-toggle-sidebar {
+  transition: transform 0.15s ease, background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.btn-toggle-sidebar:active {
+  transform: scale(0.92);
+}
+
+/* ---------------- 10. Fluid Modal Choreography ---------------- */
+.modal-backdrop {
+  background: rgba(15, 23, 42, 0.65);
+  backdrop-filter: blur(8px) saturate(130%);
+  -webkit-backdrop-filter: blur(8px) saturate(130%);
+  transition: opacity 0.24s cubic-bezier(0.16, 1, 0.3, 1),
+              backdrop-filter 0.24s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.modal-container {
+  transform: scale(0.95) translateY(12px);
+  opacity: 0;
+  border-top: 4px solid var(--primary-blue);
+  box-shadow: 0 24px 48px -12px rgba(13, 71, 161, 0.2), 0 8px 24px -4px rgba(0, 0, 0, 0.12);
+  transition: transform 0.28s cubic-bezier(0.16, 1, 0.3, 1),
+              opacity 0.24s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.modal-backdrop.show .modal-container {
+  transform: scale(1) translateY(0);
+  opacity: 1;
+}
+
+/* Staggered modal inner sections */
+.modal-backdrop.show .order-detail-header-card {
+  animation: modalCascadeFade 0.26s 0.04s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.modal-backdrop.show .detail-info-grid {
+  animation: modalCascadeFade 0.26s 0.08s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.modal-backdrop.show .ordered-products-table {
+  animation: modalCascadeFade 0.26s 0.12s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.modal-backdrop.show .edit-section-card {
+  animation: modalCascadeFade 0.26s 0.06s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes modalCascadeFade {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.modal-close {
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), background-color 0.15s ease, color 0.15s ease;
+}
+
+.modal-close:hover {
+  transform: rotate(90deg) scale(1.08);
+}
+
+.order-detail-header-card {
+  background: linear-gradient(135deg, rgba(13, 71, 161, 0.04) 0%, rgba(21, 101, 192, 0.08) 100%);
+  border: 1px solid rgba(13, 71, 161, 0.12);
+  border-radius: var(--radius-md);
+  transition: box-shadow 0.2s ease;
+}
+
+.order-detail-header-card:hover {
+  box-shadow: 0 4px 16px rgba(13, 71, 161, 0.08);
+}
+
+/* ---------------- 11. New Order Form & Interactive Flavour Cards ---------------- */
+#view-new-order .flavour-card {
+  transition: transform 0.22s cubic-bezier(0.16, 1, 0.3, 1),
+              box-shadow 0.22s cubic-bezier(0.16, 1, 0.3, 1),
+              border-color 0.2s ease,
+              background-color 0.2s ease;
+}
+
+#view-new-order .flavour-card:hover {
+  transform: translateY(-4px);
+  border-color: var(--primary-blue);
+  box-shadow: 0 10px 24px -4px rgba(13, 71, 161, 0.12), 0 2px 6px rgba(0, 0, 0, 0.04);
+}
+
+#view-new-order .flavour-bottle-img {
+  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), filter 0.25s ease;
+}
+
+#view-new-order .flavour-card:hover .flavour-bottle-img {
+  transform: scale(1.08) rotate(2deg);
+  filter: drop-shadow(0 6px 10px rgba(0, 0, 0, 0.12));
+}
+
+.btn-qty {
+  transition: transform 0.12s ease,
+              background-color 0.15s ease,
+              border-color 0.15s ease,
+              color 0.15s ease;
+}
+
+.btn-qty:active {
+  transform: scale(0.88);
+}
+
+.btn-qty:hover {
+  transform: scale(1.06);
+}
+
+/* Phone repeat customer alert smooth reveal */
+.phone-repeat-alert {
+  animation: slideDownAlert 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  will-change: transform, opacity;
+}
+
+@keyframes slideDownAlert {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Combo offers container glow & unfurl */
+.combo-offers-container {
+  transition: transform 0.24s cubic-bezier(0.16, 1, 0.3, 1),
+              box-shadow 0.24s ease,
+              border-color 0.24s ease;
+}
+
+.combo-offers-container:hover {
+  box-shadow: 0 6px 20px rgba(255, 206, 71, 0.25);
+  border-color: #F59E0B;
+}
+
+.btn-combo {
+  transition: transform 0.15s cubic-bezier(0.16, 1, 0.3, 1),
+              box-shadow 0.18s ease,
+              background-color 0.18s ease,
+              border-color 0.18s ease;
+}
+
+.btn-combo:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 14px rgba(245, 158, 11, 0.3);
+  border-color: #D97706;
+}
+
+.btn-combo:active {
+  transform: scale(0.97);
+}
+
+.btn-combo.active {
+  background: linear-gradient(135deg, #FFD54F 0%, #FFCE47 100%);
+  color: #78350F;
+  border-color: #D97706;
+  box-shadow: 0 4px 16px rgba(245, 158, 11, 0.35);
+}
+
+/* Pricing summary card live highlight */
+.pricing-summary-card {
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.pricing-summary-card:hover {
+  box-shadow: 0 8px 24px rgba(13, 71, 161, 0.08);
+}
+
+.pricing-row strong {
+  transition: color 0.2s ease, transform 0.2s ease;
+}
+
+/* ---------------- 12. Orders Table & Filter Toolbar Dynamics ---------------- */
+.table-toolbar {
+  transition: background-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.filter-select,
+.form-control {
+  transition: border-color 0.18s ease, box-shadow 0.18s ease, background-color 0.18s ease;
+}
+
+.filter-select:focus,
+.form-control:focus {
+  border-color: var(--primary-blue);
+  box-shadow: 0 0 0 3px rgba(13, 71, 161, 0.14);
+  outline: none;
+}
+
+.filter-select:hover,
+.form-control:hover:not(:focus) {
+  border-color: #94A3B8;
+}
+
+#custom-date-container {
+  transition: opacity 0.22s ease, transform 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.crm-table tbody tr {
+  transition: background-color 0.15s ease, transform 0.15s ease;
+}
+
+.crm-table tbody tr:hover {
+  background-color: rgba(241, 245, 249, 0.95);
+}
+
+/* Tactile action buttons in table */
+.action-btn {
+  transition: transform 0.12s ease, background-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.action-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-sm);
+}
+
+.action-btn:active {
+  transform: scale(0.92);
+}
+
+/* Dispatch toggle badge in table */
+.btn-dispatch-toggle {
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.btn-dispatch-toggle:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.btn-dispatch-toggle:active {
+  transform: scale(0.94);
+}
+
+/* Export Buttons Sheen & Lift */
+#btn-export-orders-csv,
+#btn-export-shipping-manifest {
+  position: relative;
+  overflow: hidden;
+  transition: transform 0.18s cubic-bezier(0.16, 1, 0.3, 1),
+              box-shadow 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+#btn-export-orders-csv:hover,
+#btn-export-shipping-manifest:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 18px rgba(245, 158, 11, 0.35);
+}
+
+#btn-export-orders-csv:active,
+#btn-export-shipping-manifest:active {
+  transform: scale(0.97);
+}
+
+/* ---------------- 13. Inventory Stock Cards & Ambient Glow ---------------- */
+.stock-card {
+  transition: transform 0.22s cubic-bezier(0.16, 1, 0.3, 1),
+              box-shadow 0.22s cubic-bezier(0.16, 1, 0.3, 1),
+              border-color 0.2s ease;
+}
+
+.stock-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 28px -4px rgba(13, 71, 161, 0.1), 0 2px 8px rgba(0, 0, 0, 0.04);
+  border-color: #CBD5E1;
+}
+
+.stock-card:hover .stock-card-bottle-img {
+  transform: translateY(-4px) scale(1.08) rotate(2deg);
+  filter: drop-shadow(0 8px 14px rgba(0, 0, 0, 0.14));
+}
+
+.stock-card.low-stock {
+  border: 2px solid var(--danger-red);
+  background: #FFFDFD;
+  animation: ambientWarningGlow 3.2s infinite ease-in-out;
+}
+
+@keyframes ambientWarningGlow {
+  0%, 100% {
+    box-shadow: 0 0 0 1px rgba(239, 68, 68, 0.25), 0 4px 12px rgba(239, 68, 68, 0.08);
+  }
+  50% {
+    box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.45), 0 8px 24px rgba(239, 68, 68, 0.18);
+  }
+}
+
+.stock-card-status {
+  transition: transform 0.15s ease;
+}
+
+.stock-card:hover .stock-card-status {
+  transform: translateX(2px);
+}
+
+/* ---------------- 14. Refined Toast Notification Animation ---------------- */
+.toast {
+  box-shadow: 0 16px 36px -4px rgba(13, 71, 161, 0.16), 0 4px 12px rgba(0, 0, 0, 0.05);
+  border: 1px solid rgba(226, 232, 240, 0.9);
+  animation: toastSlideIn 0.32s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes toastSlideIn {
+  from {
+    transform: translateX(110%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+/* ---------------- 15. Login Screen & Card Elevation ---------------- */
+.login-card {
+  box-shadow: 0 28px 56px -12px rgba(9, 44, 107, 0.38), 0 6px 20px rgba(0, 0, 0, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.7);
+  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.25s ease;
+}
+
+.btn-toggle-password {
+  transition: transform 0.15s ease, color 0.15s ease;
+}
+
+.btn-toggle-password:active {
+  transform: scale(0.88);
+}
+
+#btn-login-submit {
+  transition: transform 0.16s ease, box-shadow 0.16s ease;
+}
+
+#btn-login-submit:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(13, 71, 161, 0.4);
+}
+
+#btn-login-submit:active {
+  transform: scale(0.97);
+}
+
+/* ---------------- 16. Accessibility & Reduced Motion ---------------- */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.01ms !important;
@@ -2794,7 +3232,14 @@ body.auth-required #app-container {
     scroll-behavior: auto !important;
   }
   .stagger-card,
-  .view-page {
+  .view-page,
+  .stock-card.low-stock,
+  .phone-repeat-alert,
+  .toast,
+  .modal-backdrop.show .order-detail-header-card,
+  .modal-backdrop.show .detail-info-grid,
+  .modal-backdrop.show .ordered-products-table,
+  .modal-backdrop.show .edit-section-card {
     opacity: 1 !important;
     transform: none !important;
     animation: none !important;

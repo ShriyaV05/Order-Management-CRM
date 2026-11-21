@@ -68,6 +68,7 @@ class OrderItemInput(BaseModel):
 class CreateOrderRequest(BaseModel):
     customer_name: str
     phone: str
+    alternate_phone: Optional[str] = None
     address: str
     pin_code: str
     state: str
@@ -81,6 +82,7 @@ class CreateOrderRequest(BaseModel):
 class EditOrderRequest(BaseModel):
     customer_name: str
     phone: str
+    alternate_phone: Optional[str] = None
     address: str
     pin_code: str
     state: str
@@ -810,16 +812,16 @@ def check_phone(phone: str, exclude_order_id: Optional[str] = None):
         cursor.execute("""
             SELECT order_id, customer_name, address, pin_code, state, district
             FROM orders
-            WHERE phone = ? AND order_id != ?
+            WHERE (phone = ? OR alternate_phone = ?) AND order_id != ?
             ORDER BY id DESC LIMIT 1;
-        """, (cleaned_phone, exclude_order_id))
+        """, (cleaned_phone, cleaned_phone, exclude_order_id))
     else:
         cursor.execute("""
             SELECT order_id, customer_name, address, pin_code, state, district
             FROM orders
-            WHERE phone = ?
+            WHERE phone = ? OR alternate_phone = ?
             ORDER BY id DESC LIMIT 1;
-        """, (cleaned_phone,))
+        """, (cleaned_phone, cleaned_phone))
     row = cursor.fetchone()
     conn.close()
 
@@ -858,11 +860,11 @@ def get_orders(
     query = "SELECT * FROM orders WHERE 1=1"
     params = []
 
-    # Search filter: Order ID, Customer Name, Phone
+    # Search filter: Order ID, Customer Name, Phone, Alternate Phone
     if search and search.strip():
         s = f"%{search.strip()}%"
-        query += " AND (order_id LIKE ? OR customer_name LIKE ? OR phone LIKE ?)"
-        params.extend([s, s, s])
+        query += " AND (order_id LIKE ? OR customer_name LIKE ? OR phone LIKE ? OR (alternate_phone IS NOT NULL AND alternate_phone LIKE ?))"
+        params.extend([s, s, s, s])
 
     # Payment filter: Paid, COD
     if payment and payment != "All":
@@ -968,6 +970,7 @@ def get_orders(
             "date": r["created_at"],
             "customer": r["customer_name"],
             "phone": r["phone"],
+            "alternate_phone": (r["alternate_phone"] if "alternate_phone" in r.keys() and r["alternate_phone"] is not None else ""),
             "district": r["district"],
             "state": r["state"],
             "address": r["address"],
@@ -1011,7 +1014,7 @@ def get_shipping_manifest(current_user: Dict[str, Any] = Depends(get_current_use
     conn = get_db()
     cursor = conn.cursor()
     cursor.execute("""
-        SELECT order_id, customer_name, created_at, phone, address, pin_code, district, state,
+        SELECT order_id, customer_name, created_at, phone, alternate_phone, address, pin_code, district, state,
                total_bottles, total_weight_grams, actual_delivery_fee, delivery_fee
         FROM orders
         ORDER BY created_at DESC, id DESC;
@@ -1049,6 +1052,7 @@ def get_shipping_manifest(current_user: Dict[str, Any] = Depends(get_current_use
             "name": r["customer_name"] or "",
             "date": r["created_at"] or "",
             "phone": r["phone"] or "",
+            "alternate_phone": (r["alternate_phone"] if "alternate_phone" in r.keys() and r["alternate_phone"] is not None else "") or "",
             "address": r["address"] or "",
             "pin_code": r["pin_code"] or "",
             "district": r["district"] or "",
@@ -1067,6 +1071,14 @@ def create_order(req: CreateOrderRequest, current_user: Dict[str, Any] = Depends
     cleaned_phone = "".join(filter(str.isdigit, req.phone or ""))
     if len(cleaned_phone) < 10:
         raise HTTPException(status_code=400, detail="Please enter a valid 10-digit Indian phone number")
+
+    cleaned_alt_phone = None
+    if req.alternate_phone and req.alternate_phone.strip():
+        cleaned_alt_phone = "".join(filter(str.isdigit, req.alternate_phone))
+        if len(cleaned_alt_phone) < 10:
+            raise HTTPException(status_code=400, detail="Alternate phone number must be a valid 10-digit Indian phone number if provided")
+        if cleaned_alt_phone == cleaned_phone:
+            raise HTTPException(status_code=400, detail="Alternate phone number cannot be the same as the primary phone number")
 
     conn = get_db()
     cursor = conn.cursor()
@@ -1159,15 +1171,15 @@ def create_order(req: CreateOrderRequest, current_user: Dict[str, Any] = Depends
 
         cursor.execute("""
         INSERT INTO orders (
-            order_id, customer_name, phone, address, pin_code, state, district,
+            order_id, customer_name, phone, alternate_phone, address, pin_code, state, district,
             total_bottles, total_weight_grams, unit_price, product_amount,
             delivery_fee, actual_delivery_fee, final_amount, payment, dispatch_state,
             created_by, created_at, edited_by, edited_at,
             discount_per_bottle, total_discount, normal_product_amount,
             is_combo, combo_type, combo_price
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
         """, (
-            new_order_id, req.customer_name.strip(), cleaned_phone, req.address.strip(),
+            new_order_id, req.customer_name.strip(), cleaned_phone, cleaned_alt_phone, req.address.strip(),
             req.pin_code.strip(), req.state.strip(), req.district.strip(),
             total_bottles, total_weight_grams, original_unit_price, applicable_product_amount,
             delivery_fee, actual_delivery_fee, final_amount, req.payment, "PLACED",
@@ -1278,6 +1290,7 @@ def get_order_details(order_id: str, current_user: Dict[str, Any] = Depends(get_
             "date": order["created_at"],
             "customer": order["customer_name"],
             "phone": order["phone"],
+            "alternate_phone": (order["alternate_phone"] if "alternate_phone" in order.keys() and order["alternate_phone"] is not None else ""),
             "address": order["address"],
             "pin_code": order["pin_code"],
             "state": order["state"],
@@ -1312,6 +1325,14 @@ def edit_order(order_id: str, req: EditOrderRequest, current_user: Dict[str, Any
     cleaned_phone = "".join(filter(str.isdigit, req.phone or ""))
     if len(cleaned_phone) < 10:
         raise HTTPException(status_code=400, detail="Please enter a valid 10-digit Indian phone number")
+
+    cleaned_alt_phone = None
+    if req.alternate_phone and req.alternate_phone.strip():
+        cleaned_alt_phone = "".join(filter(str.isdigit, req.alternate_phone))
+        if len(cleaned_alt_phone) < 10:
+            raise HTTPException(status_code=400, detail="Alternate phone number must be a valid 10-digit Indian phone number if provided")
+        if cleaned_alt_phone == cleaned_phone:
+            raise HTTPException(status_code=400, detail="Alternate phone number cannot be the same as the primary phone number")
 
     conn = get_db()
     cursor = conn.cursor()
@@ -1394,14 +1415,14 @@ def edit_order(order_id: str, req: EditOrderRequest, current_user: Dict[str, Any
 
         cursor.execute("""
         UPDATE orders
-        SET customer_name = ?, phone = ?, address = ?, pin_code = ?, state = ?, district = ?,
+        SET customer_name = ?, phone = ?, alternate_phone = ?, address = ?, pin_code = ?, state = ?, district = ?,
             total_bottles = ?, total_weight_grams = ?, product_amount = ?, delivery_fee = ?,
             actual_delivery_fee = ?, final_amount = ?, payment = ?, edited_by = ?, edited_at = ?,
             discount_per_bottle = ?, total_discount = ?, normal_product_amount = ?,
             is_combo = ?, combo_type = ?, combo_price = ?
         WHERE order_id = ?;
         """, (
-            req.customer_name.strip(), cleaned_phone, req.address.strip(), req.pin_code.strip(),
+            req.customer_name.strip(), cleaned_phone, cleaned_alt_phone, req.address.strip(), req.pin_code.strip(),
             req.state.strip(), req.district.strip(), total_bottles, total_weight_grams,
             applicable_product_amount, delivery_fee, actual_delivery_fee, final_amount, req.payment,
             current_user["display_name"], now_str,

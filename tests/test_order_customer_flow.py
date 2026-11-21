@@ -66,6 +66,7 @@ class OrderCustomerFlowTestCase(unittest.TestCase):
             order_id TEXT UNIQUE NOT NULL,
             customer_name TEXT NOT NULL,
             phone TEXT NOT NULL,
+            alternate_phone TEXT DEFAULT NULL,
             address TEXT NOT NULL,
             pin_code TEXT NOT NULL,
             state TEXT NOT NULL,
@@ -315,4 +316,142 @@ class OrderCustomerFlowTestCase(unittest.TestCase):
         self.assertEqual(details["delivery_fee"], 45.0)
         self.assertEqual(details["product_amount"], 298.0)
         self.assertEqual(details["final_amount"], 343.0)
+
+    def test_09_order_with_valid_alternate_phone(self):
+        """Create order with valid alternate phone and verify retrieval in details and list."""
+        payload = {
+            "customer_name": "Kavitha Rajan",
+            "phone": "9840112233",
+            "alternate_phone": "9840998877",
+            "address": "77 North Usman Road",
+            "pin_code": "600017",
+            "state": "Tamil Nadu",
+            "district": "Chennai",
+            "payment": "Paid",
+            "delivery_fee": 0.0,
+            "apply_combo": False,
+            "items": [
+                {"flavour": "Tomato", "quantity": 1}
+            ]
+        }
+        res = self.client.post("/api/orders", json=payload)
+        self.assertEqual(res.status_code, 200, f"Create order with alt phone failed: {res.text}")
+        oid = res.json()["order_id"]
+
+        # Verify get_order details has alternate phone
+        res_det = self.client.get(f"/api/orders/{oid}")
+        self.assertEqual(res_det.status_code, 200)
+        ord_data = res_det.json()["order"]
+        self.assertEqual(ord_data["phone"], "9840112233")
+        self.assertEqual(ord_data["alternate_phone"], "9840998877")
+
+        # Verify get_orders list has alternate phone
+        res_list = self.client.get("/api/orders")
+        self.assertEqual(res_list.status_code, 200)
+        orders = res_list.json()["orders"]
+        matching = [o for o in orders if o["order_id"] == oid]
+        self.assertEqual(len(matching), 1)
+        self.assertEqual(matching[0]["alternate_phone"], "9840998877")
+
+    def test_10_order_with_invalid_alternate_phone_validation(self):
+        """Alternate phone validation catches <10 digits and identical numbers."""
+        base_payload = {
+            "customer_name": "Test Validation",
+            "phone": "9840112233",
+            "address": "Test Address",
+            "pin_code": "600017",
+            "state": "Tamil Nadu",
+            "district": "Chennai",
+            "payment": "COD",
+            "delivery_fee": 30.0,
+            "items": [{"flavour": "Cheese", "quantity": 1}]
+        }
+
+        # 1. Less than 10 digits
+        short_payload = dict(base_payload, alternate_phone="9840")
+        res1 = self.client.post("/api/orders", json=short_payload)
+        self.assertEqual(res1.status_code, 400)
+        self.assertIn("10-digit", res1.json()["detail"])
+
+        # 2. Identical to primary
+        same_payload = dict(base_payload, alternate_phone="9840112233")
+        res2 = self.client.post("/api/orders", json=same_payload)
+        self.assertEqual(res2.status_code, 400)
+        self.assertIn("same as the primary", res2.json()["detail"])
+
+    def test_11_edit_order_add_and_remove_alternate_phone(self):
+        """Add alternate phone to existing order without one, then remove it."""
+        # Create order without alternate phone
+        payload = {
+            "customer_name": "Anand Mohan",
+            "phone": "9789012345",
+            "address": "10 Gandhi Nagar",
+            "pin_code": "600020",
+            "state": "Tamil Nadu",
+            "district": "Chennai",
+            "payment": "Paid",
+            "delivery_fee": 0.0,
+            "items": [{"flavour": "Cheese", "quantity": 1}]
+        }
+        res = self.client.post("/api/orders", json=payload)
+        self.assertEqual(res.status_code, 200)
+        oid = res.json()["order_id"]
+
+        # Verify initially empty alternate phone
+        res_det = self.client.get(f"/api/orders/{oid}")
+        self.assertEqual(res_det.json()["order"]["alternate_phone"], "")
+
+        # 1. Edit to add alternate phone
+        edit_payload_add = dict(payload, alternate_phone="9123456780")
+        res_edit1 = self.client.put(f"/api/orders/{oid}", json=edit_payload_add)
+        self.assertEqual(res_edit1.status_code, 200)
+
+        res_det2 = self.client.get(f"/api/orders/{oid}")
+        self.assertEqual(res_det2.json()["order"]["alternate_phone"], "9123456780")
+
+        # 2. Edit to remove alternate phone (pass None or empty string)
+        edit_payload_rem = dict(payload, alternate_phone="")
+        res_edit2 = self.client.put(f"/api/orders/{oid}", json=edit_payload_rem)
+        self.assertEqual(res_edit2.status_code, 200)
+
+        res_det3 = self.client.get(f"/api/orders/{oid}")
+        self.assertEqual(res_det3.json()["order"]["alternate_phone"], "")
+
+    def test_12_search_by_primary_and_alternate_phone(self):
+        """Orders search matches against both primary and alternate phone numbers."""
+        payload = {
+            "customer_name": "Deepa Sundar",
+            "phone": "9444111222",
+            "alternate_phone": "9444999888",
+            "address": "55 Anna Nagar",
+            "pin_code": "600040",
+            "state": "Tamil Nadu",
+            "district": "Chennai",
+            "payment": "Paid",
+            "delivery_fee": 0.0,
+            "items": [{"flavour": "Tomato", "quantity": 1}]
+        }
+        res = self.client.post("/api/orders", json=payload)
+        self.assertEqual(res.status_code, 200)
+        oid = res.json()["order_id"]
+
+        # Search by primary phone
+        res_search1 = self.client.get("/api/orders?search=9444111222")
+        self.assertEqual(res_search1.status_code, 200)
+        matching1 = [o for o in res_search1.json()["orders"] if o["order_id"] == oid]
+        self.assertEqual(len(matching1), 1)
+
+        # Search by alternate phone
+        res_search2 = self.client.get("/api/orders?search=9444999888")
+        self.assertEqual(res_search2.status_code, 200)
+        matching2 = [o for o in res_search2.json()["orders"] if o["order_id"] == oid]
+        self.assertEqual(len(matching2), 1)
+
+    def test_13_check_phone_matches_alternate(self):
+        """Check phone endpoint detects repeat customer via alternate phone."""
+        res = self.client.get("/api/orders/check-phone?phone=9444999888")
+        self.assertEqual(res.status_code, 200)
+        data = res.json()
+        self.assertTrue(data.get("exists"))
+        self.assertEqual(data.get("customer_name"), "Deepa Sundar")
 

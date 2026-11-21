@@ -3108,6 +3108,41 @@ body.auth-required #app-container {
   100% { transform: scale(1); opacity: 1; }
 }
 
+/* Alternate Phone Styles & Copy Buttons */
+.btn-link-action {
+  transition: opacity 0.18s ease, transform 0.18s ease;
+}
+.btn-link-action:hover {
+  opacity: 0.85;
+  text-decoration: underline;
+}
+
+.btn-copy-phone {
+  transition: all 0.15s ease;
+  border-radius: 4px;
+}
+.btn-copy-phone:hover {
+  background-color: rgba(13, 71, 161, 0.08) !important;
+  color: var(--primary-blue) !important;
+  transform: scale(1.1);
+}
+.btn-copy-phone:active {
+  transform: scale(0.95);
+}
+
+.alt-phone-badge {
+  font-size: 11px;
+  color: var(--text-secondary);
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  background: #f1f5f9;
+  padding: 1px 6px;
+  border-radius: 4px;
+  margin-top: 3px;
+}
+
 /* ---------------- 12. Orders Table & Filter Toolbar Dynamics ---------------- */
 .table-toolbar {
   transition: background-color 0.2s ease, box-shadow 0.2s ease;

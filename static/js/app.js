@@ -949,6 +949,44 @@ document.addEventListener('DOMContentLoaded', async () => {
       }
     };
 
+    // Alternate Phone Toggle for New Order (Requirement 1)
+    const btnAddAltPhone = document.getElementById('btn-add-alt-phone');
+    const btnRemoveAltPhone = document.getElementById('btn-remove-alt-phone');
+    const altPhoneGroup = document.getElementById('new-order-alt-phone-group');
+    const altPhoneTriggerWrap = document.getElementById('new-order-alt-phone-trigger-wrap');
+    const altPhoneInput = document.getElementById('new-order-alt-phone');
+    const altPhoneError = document.getElementById('new-order-alt-phone-error');
+
+    if (btnAddAltPhone && altPhoneGroup && altPhoneTriggerWrap) {
+      btnAddAltPhone.addEventListener('click', () => {
+        altPhoneGroup.style.display = 'block';
+        altPhoneTriggerWrap.style.display = 'none';
+        if (altPhoneInput) altPhoneInput.focus();
+      });
+    }
+
+    if (btnRemoveAltPhone && altPhoneGroup && altPhoneTriggerWrap) {
+      btnRemoveAltPhone.addEventListener('click', () => {
+        if (altPhoneInput) altPhoneInput.value = '';
+        if (altPhoneError) {
+          altPhoneError.textContent = '';
+          altPhoneError.classList.remove('show');
+        }
+        altPhoneGroup.style.display = 'none';
+        altPhoneTriggerWrap.style.display = 'block';
+      });
+    }
+
+    if (altPhoneInput) {
+      altPhoneInput.addEventListener('input', () => {
+        if (altPhoneError) {
+          altPhoneError.textContent = '';
+          altPhoneError.classList.remove('show');
+        }
+        altPhoneInput.classList.remove('is-invalid');
+      });
+    }
+
     // Automatic Indian PIN Code Lookup (Requirement 9)
     const pincodeInput = document.getElementById('new-order-pincode');
     const pincodeSpinner = document.getElementById('pincode-spinner');
@@ -1402,9 +1440,37 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     if (state.newOrderState.isSubmitting) return;
 
+    let altPhone = null;
+    const altInputEl = document.getElementById('new-order-alt-phone');
+    const altErrorEl = document.getElementById('new-order-alt-phone-error');
+    if (altInputEl && altInputEl.value.trim()) {
+      const rawAlt = altInputEl.value.trim().replace(/\D/g, '');
+      const rawPrimary = phone.replace(/\D/g, '');
+      if (rawAlt.length !== 10) {
+        if (altErrorEl) {
+          altErrorEl.textContent = 'Please enter a valid 10-digit mobile number';
+          altErrorEl.classList.add('show');
+        }
+        altInputEl.classList.add('is-invalid');
+        altInputEl.focus();
+        return;
+      }
+      if (rawAlt === rawPrimary) {
+        if (altErrorEl) {
+          altErrorEl.textContent = 'Alternate phone cannot be identical to primary phone';
+          altErrorEl.classList.add('show');
+        }
+        altInputEl.classList.add('is-invalid');
+        altInputEl.focus();
+        return;
+      }
+      altPhone = rawAlt;
+    }
+
     const payload = {
       customer_name: customerName,
       phone,
+      alternate_phone: altPhone,
       address,
       pin_code: pinCode,
       state: stateVal,
@@ -1509,6 +1575,17 @@ document.addEventListener('DOMContentLoaded', async () => {
     state.newOrderState.flavours = { 'Tomato': 0, 'Cheese': 0, 'Sour Cream': 0, 'Peri Peri': 0 };
     state.newOrderState.comboSelected = null;
     state.newOrderState.isManualDeliveryFee = false;
+    const resetAltInput = document.getElementById('new-order-alt-phone');
+    const resetAltGroup = document.getElementById('new-order-alt-phone-group');
+    const resetAltTrigger = document.getElementById('new-order-alt-phone-trigger-wrap');
+    const resetAltError = document.getElementById('new-order-alt-phone-error');
+    if (resetAltInput) resetAltInput.value = '';
+    if (resetAltGroup) resetAltGroup.style.display = 'none';
+    if (resetAltTrigger) resetAltTrigger.style.display = 'block';
+    if (resetAltError) {
+      resetAltError.textContent = '';
+      resetAltError.classList.remove('show');
+    }
     ['Tomato', 'Cheese', 'Sour Cream', 'Peri Peri'].forEach(flv => {
       const id = `qty-${flv.toLowerCase().replace(' ', '-')}`;
       const input = document.getElementById(id);
@@ -1571,7 +1648,10 @@ document.addEventListener('DOMContentLoaded', async () => {
           <td><strong>${o.order_id}</strong></td>
           <td>${o.date.split(' ')[0]}</td>
           <td>${o.customer}</td>
-          <td>${o.phone}</td>
+          <td>
+            <div>${escapeHtml(o.phone)}</div>
+            ${o.alternate_phone ? `<div class="alt-phone-badge" title="Alternate Phone: ${escapeHtml(o.alternate_phone)}">${escapeHtml(o.alternate_phone)}</div>` : ''}
+          </td>
           <td>${o.district}</td>
           <td>${o.state}</td>
           <td><strong>${o.bottles}</strong></td>
@@ -1788,7 +1868,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     const headers = [
-      'Order ID', 'Date', 'Customer', 'Phone', 'Address', 'PIN Code', 'District', 'State',
+      'Order ID', 'Date', 'Customer', 'Phone', 'Alternate Phone', 'Address', 'PIN Code', 'District', 'State',
       'Bottles', 'Tomato', 'Cheese', 'Sour Cream', 'Peri Peri', 'Weight', 'Product Amount (₹)',
       'Delivery Fee (₹)', 'Final Amount (₹)', 'Payment Mode', 'Dispatch Status', 'Created By', 'Edited By'
     ];
@@ -1843,6 +1923,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         o.date,
         o.customer,
         o.phone,
+        o.alternate_phone || '',
         o.address || '',
         o.pin_code || '',
         o.district,
@@ -1914,6 +1995,7 @@ document.addEventListener('DOMContentLoaded', async () => {
           'NAME',
           'DATE',
           'PHONE NO',
+          'ALT PHONE NO',
           'ADDRESS',
           'PIN CODE',
           'DISTRICT',
@@ -1971,6 +2053,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             m.name || '',
             m.date || '',
             m.phone || '',
+            m.alternate_phone || '',
             m.address || '',
             m.pin_code || '',
             m.district || '',
@@ -2011,7 +2094,60 @@ document.addEventListener('DOMContentLoaded', async () => {
       document.getElementById('detail-order-id').textContent = o.order_id;
       document.getElementById('detail-order-date').textContent = o.date;
       document.getElementById('detail-customer-name').textContent = o.customer;
-      document.getElementById('detail-customer-phone').textContent = o.phone;
+      document.getElementById('detail-customer-phone').textContent = o.phone || '-';
+      const altRow = document.getElementById('detail-customer-phone-alt-row');
+      const altPhoneVal = document.getElementById('detail-customer-alt-phone');
+      if (o.alternate_phone && o.alternate_phone.trim()) {
+        if (altPhoneVal) altPhoneVal.textContent = o.alternate_phone.trim();
+        if (altRow) altRow.style.display = 'flex';
+      } else {
+        if (altPhoneVal) altPhoneVal.textContent = '-';
+        if (altRow) altRow.style.display = 'none';
+      }
+
+      // Individual copy icons for primary and alternate phone (Requirement 4)
+      const copyPrimaryBtn = document.getElementById('btn-copy-primary-phone');
+      const copyAltBtn = document.getElementById('btn-copy-alt-phone');
+
+      if (copyPrimaryBtn) {
+        copyPrimaryBtn.onclick = async (e) => {
+          e.stopPropagation();
+          const num = (o.phone || '').trim();
+          if (!num || num === '-') return;
+          try {
+            await navigator.clipboard.writeText(num);
+            showToast(`Primary phone ${num} copied!`, 'success');
+          } catch (_) {
+            const temp = document.createElement('textarea');
+            temp.value = num;
+            document.body.appendChild(temp);
+            temp.select();
+            document.execCommand('copy');
+            document.body.removeChild(temp);
+            showToast(`Primary phone ${num} copied!`, 'success');
+          }
+        };
+      }
+
+      if (copyAltBtn) {
+        copyAltBtn.onclick = async (e) => {
+          e.stopPropagation();
+          const num = (o.alternate_phone || '').trim();
+          if (!num || num === '-') return;
+          try {
+            await navigator.clipboard.writeText(num);
+            showToast(`Alternate phone ${num} copied!`, 'success');
+          } catch (_) {
+            const temp = document.createElement('textarea');
+            temp.value = num;
+            document.body.appendChild(temp);
+            temp.select();
+            document.execCommand('copy');
+            document.body.removeChild(temp);
+            showToast(`Alternate phone ${num} copied!`, 'success');
+          }
+        };
+      }
       document.getElementById('detail-customer-address').textContent = o.address;
       document.getElementById('detail-customer-location').textContent = `${o.district}, ${o.state} - ${o.pin_code}`;
 
@@ -2169,6 +2305,23 @@ document.addEventListener('DOMContentLoaded', async () => {
       document.getElementById('edit-order-id-display').textContent = o.order_id;
       document.getElementById('edit-customer-name').value = o.customer;
       document.getElementById('edit-phone').value = o.phone;
+
+      // Setup Alternate Phone in Edit Modal (Requirements 2 & 3)
+      const editAltGroup = document.getElementById('edit-alt-phone-group');
+      const editAltTrigger = document.getElementById('edit-alt-phone-trigger-wrap');
+      const editAltInput = document.getElementById('edit-alt-phone');
+      const editAltWarning = document.getElementById('edit-alt-phone-warning');
+      if (editAltWarning) editAltWarning.style.display = 'none';
+
+      if (o.alternate_phone && o.alternate_phone.trim()) {
+        if (editAltInput) editAltInput.value = o.alternate_phone.trim();
+        if (editAltGroup) editAltGroup.style.display = 'block';
+        if (editAltTrigger) editAltTrigger.style.display = 'none';
+      } else {
+        if (editAltInput) editAltInput.value = '';
+        if (editAltGroup) editAltGroup.style.display = 'none';
+        if (editAltTrigger) editAltTrigger.style.display = 'block';
+      }
       document.getElementById('edit-address').value = o.address;
       document.getElementById('edit-pincode').value = o.pin_code;
       
@@ -2544,9 +2697,38 @@ document.addEventListener('DOMContentLoaded', async () => {
       return;
     }
 
+    // Alternate Phone Validation in Edit Order
+    let editAltPhone = null;
+    const editAltInputEl = document.getElementById('edit-alt-phone');
+    const editAltWarningEl = document.getElementById('edit-alt-phone-warning');
+    if (editAltWarningEl) editAltWarningEl.style.display = 'none';
+
+    if (editAltInputEl && editAltInputEl.value.trim()) {
+      const rawAlt = editAltInputEl.value.trim().replace(/\D/g, '');
+      const rawPrimary = document.getElementById('edit-phone').value.trim().replace(/\D/g, '');
+      if (rawAlt.length !== 10) {
+        if (editAltWarningEl) {
+          editAltWarningEl.textContent = 'Please enter a valid 10-digit mobile number';
+          editAltWarningEl.style.display = 'block';
+        }
+        editAltInputEl.focus();
+        return;
+      }
+      if (rawAlt === rawPrimary) {
+        if (editAltWarningEl) {
+          editAltWarningEl.textContent = 'Alternate phone cannot be identical to the primary phone';
+          editAltWarningEl.style.display = 'block';
+        }
+        editAltInputEl.focus();
+        return;
+      }
+      editAltPhone = rawAlt;
+    }
+
     const payload = {
       customer_name: document.getElementById('edit-customer-name').value.trim(),
       phone: document.getElementById('edit-phone').value.trim(),
+      alternate_phone: editAltPhone,
       address: document.getElementById('edit-address').value.trim(),
       pin_code: document.getElementById('edit-pincode').value.trim(),
       state: document.getElementById('edit-state').value.trim(),
@@ -2577,6 +2759,37 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (saveLabel) saveLabel.textContent = 'Save Changes';
     }
   });
+
+  // Edit Order Alternate Phone Toggles (Requirements 2 & 3)
+  const btnEditAddAlt = document.getElementById('btn-edit-add-alt-phone');
+  const btnEditRemoveAlt = document.getElementById('btn-edit-remove-alt-phone');
+  const editAltGroup = document.getElementById('edit-alt-phone-group');
+  const editAltTrigger = document.getElementById('edit-alt-phone-trigger-wrap');
+  const editAltInput = document.getElementById('edit-alt-phone');
+  const editAltWarning = document.getElementById('edit-alt-phone-warning');
+
+  if (btnEditAddAlt && editAltGroup && editAltTrigger) {
+    btnEditAddAlt.addEventListener('click', () => {
+      editAltGroup.style.display = 'block';
+      editAltTrigger.style.display = 'none';
+      if (editAltInput) editAltInput.focus();
+    });
+  }
+
+  if (btnEditRemoveAlt && editAltGroup && editAltTrigger) {
+    btnEditRemoveAlt.addEventListener('click', () => {
+      if (editAltInput) editAltInput.value = '';
+      if (editAltWarning) editAltWarning.style.display = 'none';
+      editAltGroup.style.display = 'none';
+      editAltTrigger.style.display = 'block';
+    });
+  }
+
+  if (editAltInput) {
+    editAltInput.addEventListener('input', () => {
+      if (editAltWarning) editAltWarning.style.display = 'none';
+    });
+  }
 
   // ---------------- 6. DELETE ORDER MODAL (Requirement 15) ----------------
   const deleteOrderModal = document.getElementById('modal-delete-order');

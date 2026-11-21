@@ -47,6 +47,7 @@ class ShippingManifestTestCase(unittest.TestCase):
             order_id TEXT UNIQUE NOT NULL,
             customer_name TEXT NOT NULL,
             phone TEXT NOT NULL,
+            alternate_phone TEXT DEFAULT NULL,
             address TEXT NOT NULL,
             pin_code TEXT NOT NULL,
             district TEXT NOT NULL,

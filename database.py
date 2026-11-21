@@ -274,8 +274,13 @@ def _init_db_unlocked():
     conn = get_db()
     cursor = conn.cursor()
 
-    # Additive schema migration: ensure actual_delivery_fee exists in orders table
+    # Additive schema migration: ensure actual_delivery_fee and alternate_phone exist in orders table
     _add_column_if_missing(cursor, "orders", "actual_delivery_fee", "actual_delivery_fee REAL DEFAULT NULL")
+    _add_column_if_missing(cursor, "orders", "alternate_phone", "alternate_phone TEXT DEFAULT NULL")
+    try:
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_orders_alt_phone ON orders(alternate_phone);")
+    except Exception:
+        pass
 
     # Fast path: check if database schema has already been initialized and seeded
     try:
@@ -343,6 +348,7 @@ def _init_db_unlocked():
         order_id TEXT UNIQUE NOT NULL,
         customer_name TEXT NOT NULL,
         phone TEXT NOT NULL,
+        alternate_phone TEXT DEFAULT NULL,
         address TEXT NOT NULL,
         pin_code TEXT NOT NULL,
         state TEXT NOT NULL,
@@ -395,6 +401,11 @@ def _init_db_unlocked():
     _add_column_if_missing(cursor, "orders", "combo_type", "combo_type TEXT NOT NULL DEFAULT ''")
     _add_column_if_missing(cursor, "orders", "combo_price", "combo_price REAL NOT NULL DEFAULT 0.0")
     _add_column_if_missing(cursor, "orders", "actual_delivery_fee", "actual_delivery_fee REAL DEFAULT NULL")
+    _add_column_if_missing(cursor, "orders", "alternate_phone", "alternate_phone TEXT DEFAULT NULL")
+    try:
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_orders_alt_phone ON orders(alternate_phone);")
+    except Exception:
+        pass
 
     now_str = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
 

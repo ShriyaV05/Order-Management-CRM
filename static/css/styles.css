@@ -3592,10 +3592,34 @@ body.auth-required #app-container {
   100% { transform: scale(1); opacity: 1; }
 }
 
-/* ---------------- 11b. New Order View Two-Column Layout & Frosted Glass ---------------- */
+/* ---------------- 11b. New Order View Two-Column Layout & Frosted Glassmorphism ---------------- */
+
+/* Container ambient brand yellow & blue background (strictly scoped to New Order view) */
+.content-scrollable:has(#view-new-order:not([style*="display: none"])) {
+  background: 
+    radial-gradient(ellipse 65% 55% at 5% 10%, rgba(255, 213, 79, 0.16) 0%, transparent 65%),
+    radial-gradient(ellipse 60% 50% at 95% 12%, rgba(13, 71, 161, 0.13) 0%, transparent 65%),
+    radial-gradient(ellipse 55% 45% at 90% 88%, rgba(255, 206, 71, 0.11) 0%, transparent 60%),
+    radial-gradient(ellipse 60% 50% at 10% 90%, rgba(21, 101, 192, 0.09) 0%, transparent 65%),
+    #F4F6FA;
+}
+
 #view-new-order {
   max-width: 1400px;
   margin: 0 auto;
+  position: relative;
+  border-radius: 20px;
+  padding: 16px 20px;
+  background: 
+    radial-gradient(ellipse 70% 60% at 8% 12%, rgba(255, 213, 79, 0.20) 0%, transparent 65%),
+    radial-gradient(ellipse 65% 55% at 92% 15%, rgba(13, 71, 161, 0.15) 0%, transparent 65%),
+    radial-gradient(ellipse 55% 45% at 88% 85%, rgba(255, 206, 71, 0.14) 0%, transparent 60%),
+    radial-gradient(ellipse 60% 50% at 15% 88%, rgba(21, 101, 192, 0.12) 0%, transparent 65%),
+    linear-gradient(135deg, rgba(255, 255, 255, 0.72) 0%, rgba(248, 250, 252, 0.80) 50%, rgba(239, 246, 255, 0.85) 100%);
+  box-shadow: 
+    inset 0 1px 1px 0 rgba(255, 255, 255, 0.95),
+    0 12px 36px -6px rgba(13, 71, 161, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.85);
 }
 
 #view-new-order .new-order-layout-grid {
@@ -3619,14 +3643,17 @@ body.auth-required #app-container {
   height: 100%;
 }
 
-/* Customer Information Card (Compact 3-Column Inputs) */
+/* Customer Information Card (Translucent Frosted Glass) */
 #view-new-order .new-order-customer-card {
-  background: rgba(255, 255, 255, 0.90);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(226, 232, 240, 0.85);
+  background: rgba(255, 255, 255, 0.65);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.90);
   border-radius: var(--radius-lg);
-  box-shadow: 0 4px 18px -2px rgba(13, 71, 161, 0.05), 0 2px 6px -1px rgba(0, 0, 0, 0.02);
+  box-shadow: 
+    inset 0 1px 1px 0 rgba(255, 255, 255, 0.95),
+    0 8px 30px -4px rgba(13, 71, 161, 0.06),
+    0 2px 6px rgba(0, 0, 0, 0.02);
   padding: 12px 18px;
   margin-bottom: 0;
 }
@@ -3671,9 +3698,18 @@ body.auth-required #app-container {
   font-size: 12.5px;
   padding: 5px 10px;
   border-radius: var(--radius-sm);
-  border: 1px solid var(--border-light);
-  background: #ffffff;
-  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+  border: 1px solid rgba(203, 213, 225, 0.75);
+  background: rgba(255, 255, 255, 0.75);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast), background var(--transition-fast);
+}
+
+#view-new-order .new-order-form-grid .form-control:focus {
+  background: rgba(255, 255, 255, 0.95);
+  border-color: var(--primary-blue);
+  box-shadow: 0 0 0 3px rgba(13, 71, 161, 0.12);
+  outline: none;
 }
 
 #view-new-order .new-order-form-grid textarea.form-control {
@@ -3684,20 +3720,17 @@ body.auth-required #app-container {
   padding: 5px 10px;
 }
 
-#view-new-order .new-order-form-grid .form-control:focus {
-  border-color: var(--primary-blue);
-  box-shadow: 0 0 0 3px rgba(13, 71, 161, 0.12);
-  outline: none;
-}
-
-/* Bottle Selection Panel in Left Column (4 Flavour Boxes in 1 Row) */
+/* Bottle Selection Panel (Translucent Frosted Glass) */
 #view-new-order .new-order-flavours-panel {
-  background: rgba(255, 255, 255, 0.90);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(226, 232, 240, 0.85);
+  background: rgba(255, 255, 255, 0.65);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.90);
   border-radius: var(--radius-lg);
-  box-shadow: 0 4px 18px -2px rgba(13, 71, 161, 0.05), 0 2px 6px -1px rgba(0, 0, 0, 0.02);
+  box-shadow: 
+    inset 0 1px 1px 0 rgba(255, 255, 255, 0.95),
+    0 8px 30px -4px rgba(13, 71, 161, 0.06),
+    0 2px 6px rgba(0, 0, 0, 0.02);
   padding: 12px 18px;
   margin-bottom: 0;
 }
@@ -3717,12 +3750,16 @@ body.auth-required #app-container {
   padding: 3px 8px;
 }
 
+/* Translucent Glass Combo Offer Banner */
 #view-new-order .combo-offers-container {
   margin-bottom: 8px;
   padding: 6px 10px;
-  background: linear-gradient(90deg, #FEF3C7 0%, #FFFBEB 100%);
-  border: 1px solid #FCD34D;
+  background: linear-gradient(135deg, rgba(254, 243, 199, 0.82) 0%, rgba(255, 251, 235, 0.72) 100%);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid rgba(252, 211, 77, 0.70);
   border-radius: var(--radius-sm);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9), 0 4px 14px rgba(217, 119, 6, 0.08);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -3758,7 +3795,7 @@ body.auth-required #app-container {
   border-radius: var(--radius-sm);
 }
 
-/* 4 Flavour Boxes in 1 Single Horizontal Row */
+/* 4 Flavour Boxes in 1 Single Horizontal Row (Translucent Glass Tiles) */
 #view-new-order .flavours-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
@@ -3774,17 +3811,24 @@ body.auth-required #app-container {
   gap: 5px;
   padding: 8px 6px;
   position: relative;
-  background: #ffffff;
-  border: 1px solid var(--border-light);
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(14px) saturate(160%);
+  -webkit-backdrop-filter: blur(14px) saturate(160%);
+  border: 1px solid rgba(255, 255, 255, 0.92);
   border-radius: var(--radius-md);
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.02);
-  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+  box-shadow: 
+    inset 0 1px 1px 0 rgba(255, 255, 255, 0.95),
+    0 4px 16px -2px rgba(13, 71, 161, 0.05);
+  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease, background 0.18s ease;
 }
 
 #view-new-order .flavour-card:hover {
   transform: translateY(-2px);
-  border-color: var(--primary-blue);
-  box-shadow: 0 6px 14px -2px rgba(13, 71, 161, 0.10);
+  background: rgba(255, 255, 255, 0.90);
+  border-color: rgba(13, 71, 161, 0.40);
+  box-shadow: 
+    inset 0 1px 1px 0 #ffffff,
+    0 8px 22px -3px rgba(13, 71, 161, 0.12);
 }
 
 #view-new-order .flavour-card-media {
@@ -3793,8 +3837,10 @@ body.auth-required #app-container {
   min-width: 48px;
   min-height: 52px;
   border-radius: var(--radius-sm);
-  background: #fbfbfa;
-  border: 1px solid var(--border-subtle);
+  background: rgba(248, 247, 242, 0.65);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.85);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -3875,8 +3921,8 @@ body.auth-required #app-container {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #f1f5f9;
-  border: 1px solid #cbd5e1;
+  background: rgba(241, 245, 249, 0.82);
+  border: 1px solid rgba(203, 213, 225, 0.8);
   color: var(--text-primary);
   cursor: pointer;
   padding: 0;
@@ -3897,19 +3943,22 @@ body.auth-required #app-container {
   font-weight: 700;
   font-size: 12.5px;
   border-radius: var(--radius-xs);
-  border: 1px solid var(--border-light);
+  border: 1px solid rgba(203, 213, 225, 0.8);
   padding: 0;
-  background: #ffffff;
+  background: rgba(255, 255, 255, 0.82);
 }
 
-/* Right Column: Order Summary Card */
+/* Right Column: Order Summary Card (Translucent Blue Frosted Glass) */
 #view-new-order .new-order-summary-card {
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.96) 0%, rgba(240, 247, 255, 0.90) 100%);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(191, 219, 254, 0.85);
+  background: linear-gradient(160deg, rgba(255, 255, 255, 0.78) 0%, rgba(240, 247, 255, 0.70) 50%, rgba(224, 242, 254, 0.64) 100%);
+  backdrop-filter: blur(22px) saturate(180%);
+  -webkit-backdrop-filter: blur(22px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.92);
   border-radius: var(--radius-lg);
-  box-shadow: 0 4px 20px -2px rgba(13, 71, 161, 0.08), 0 2px 8px -1px rgba(0, 0, 0, 0.03);
+  box-shadow: 
+    inset 0 1px 1px 0 rgba(255, 255, 255, 0.95),
+    0 10px 36px -4px rgba(13, 71, 161, 0.10),
+    0 3px 10px -1px rgba(0, 0, 0, 0.03);
   padding: 14px 18px;
   margin-bottom: 0;
   height: 100%;
@@ -3928,9 +3977,12 @@ body.auth-required #app-container {
 }
 
 #view-new-order .pricing-summary-card-inner {
-  background: rgba(255, 255, 255, 0.72);
-  border: 1px solid rgba(219, 234, 254, 0.95);
+  background: rgba(255, 255, 255, 0.52);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(219, 234, 254, 0.88);
   border-radius: var(--radius-md);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.95), 0 2px 8px rgba(13, 71, 161, 0.04);
   padding: 8px 14px;
   margin-top: 6px;
   flex: 1;
@@ -3984,8 +4036,8 @@ body.auth-required #app-container {
 #view-new-order .delivery-fee-input-wrap {
   display: inline-flex;
   align-items: center;
-  background: #ffffff;
-  border: 1px solid var(--border-light);
+  background: rgba(255, 255, 255, 0.85);
+  border: 1px solid rgba(203, 213, 225, 0.80);
   border-radius: var(--radius-sm);
   padding: 0 6px;
 }

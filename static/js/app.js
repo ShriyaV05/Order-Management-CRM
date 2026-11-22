@@ -1346,6 +1346,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Update Blue Bill Summary Card (Requirement 7)
     // 1. Total number of bottles
     document.getElementById('new-order-bottles-count').textContent = totalBottles;
+    const badgeEl = document.getElementById('new-order-summary-badge');
+    if (badgeEl) {
+      const bottleWord = totalBottles === 1 ? 'Bottle' : 'Bottles';
+      badgeEl.innerHTML = `<span id="new-order-bottles-badge-count">${totalBottles}</span>&nbsp;${bottleWord}`;
+    } else {
+      const badgeCount = document.getElementById('new-order-bottles-badge-count');
+      if (badgeCount) badgeCount.textContent = totalBottles;
+    }
     // 2. Total consignment weight
     document.getElementById('new-order-weight-display').textContent = calc.weightDisplay;
     // 3. Original product amount
@@ -1372,7 +1380,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     // 8. Delivery fee & Free Delivery (Requirement 8)
     const feeInput = document.getElementById('new-order-delivery-fee');
     const noteEl = document.getElementById('new-order-delivery-note');
-    const freeDeliveryBadge = document.getElementById('new-order-free-delivery-badge');
+    const freeDeliveryBadge = document.getElementById('new-order-free-delivery-badge') || document.getElementById('delivery-fee-free-badge');
 
     if (calc.isFree) {
       // Mandatory free delivery: overrides and disables manual fee input

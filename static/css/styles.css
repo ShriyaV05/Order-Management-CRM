@@ -3592,6 +3592,478 @@ body.auth-required #app-container {
   100% { transform: scale(1); opacity: 1; }
 }
 
+/* ---------------- 11b. New Order View Two-Column Layout & Frosted Glass ---------------- */
+#view-new-order {
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+#view-new-order .new-order-layout-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.45fr) minmax(0, 0.78fr);
+  gap: 14px;
+  align-items: stretch;
+}
+
+#view-new-order .new-order-left-column {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+#view-new-order .new-order-right-column {
+  position: sticky;
+  top: 0;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+/* Customer Information Card (Compact 3-Column Inputs) */
+#view-new-order .new-order-customer-card {
+  background: rgba(255, 255, 255, 0.90);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(226, 232, 240, 0.85);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 4px 18px -2px rgba(13, 71, 161, 0.05), 0 2px 6px -1px rgba(0, 0, 0, 0.02);
+  padding: 12px 18px;
+  margin-bottom: 0;
+}
+
+#view-new-order .new-order-customer-card .panel-header {
+  margin-bottom: 2px;
+  padding-bottom: 0;
+}
+
+#view-new-order .new-order-customer-card .panel-title {
+  font-size: 15px;
+  font-weight: 700;
+}
+
+#view-new-order .new-order-form-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px 12px;
+  margin-top: 6px;
+}
+
+#view-new-order .new-order-form-grid .form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+#view-new-order .new-order-form-grid .form-group.span-full,
+#view-new-order .new-order-form-grid .form-group.span-2 {
+  grid-column: 1 / -1;
+}
+
+#view-new-order .new-order-form-grid .form-label {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin-bottom: 0;
+}
+
+#view-new-order .new-order-form-grid .form-control {
+  height: 33px;
+  font-size: 12.5px;
+  padding: 5px 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-light);
+  background: #ffffff;
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+#view-new-order .new-order-form-grid textarea.form-control {
+  height: 33px;
+  min-height: 33px;
+  line-height: 1.35;
+  resize: vertical;
+  padding: 5px 10px;
+}
+
+#view-new-order .new-order-form-grid .form-control:focus {
+  border-color: var(--primary-blue);
+  box-shadow: 0 0 0 3px rgba(13, 71, 161, 0.12);
+  outline: none;
+}
+
+/* Bottle Selection Panel in Left Column (4 Flavour Boxes in 1 Row) */
+#view-new-order .new-order-flavours-panel {
+  background: rgba(255, 255, 255, 0.90);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(226, 232, 240, 0.85);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 4px 18px -2px rgba(13, 71, 161, 0.05), 0 2px 6px -1px rgba(0, 0, 0, 0.02);
+  padding: 12px 18px;
+  margin-bottom: 0;
+}
+
+#view-new-order .new-order-flavours-panel .panel-header {
+  margin-bottom: 6px;
+  padding-bottom: 0;
+}
+
+#view-new-order .new-order-flavours-panel .panel-title {
+  font-size: 15px;
+  font-weight: 700;
+}
+
+#view-new-order .new-order-flavours-panel .price-pill {
+  font-size: 11.5px;
+  padding: 3px 8px;
+}
+
+#view-new-order .combo-offers-container {
+  margin-bottom: 8px;
+  padding: 6px 10px;
+  background: linear-gradient(90deg, #FEF3C7 0%, #FFFBEB 100%);
+  border: 1px solid #FCD34D;
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+#view-new-order .combo-offers-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11.5px;
+}
+
+#view-new-order .combo-offers-badge {
+  background: #D97706;
+  color: white;
+  font-weight: 800;
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 3px;
+  letter-spacing: 0.5px;
+}
+
+#view-new-order .combo-offers-text {
+  font-size: 11.5px;
+  color: #78350F;
+}
+
+#view-new-order .btn-combo {
+  padding: 4px 10px;
+  font-size: 11.5px;
+  font-weight: 700;
+  border-radius: var(--radius-sm);
+}
+
+/* 4 Flavour Boxes in 1 Single Horizontal Row */
+#view-new-order .flavours-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+  margin-top: 6px;
+}
+
+#view-new-order .flavour-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 5px;
+  padding: 8px 6px;
+  position: relative;
+  background: #ffffff;
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-md);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.02);
+  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+}
+
+#view-new-order .flavour-card:hover {
+  transform: translateY(-2px);
+  border-color: var(--primary-blue);
+  box-shadow: 0 6px 14px -2px rgba(13, 71, 161, 0.10);
+}
+
+#view-new-order .flavour-card-media {
+  width: 48px;
+  height: 52px;
+  min-width: 48px;
+  min-height: 52px;
+  border-radius: var(--radius-sm);
+  background: #fbfbfa;
+  border: 1px solid var(--border-subtle);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  padding: 2px;
+  flex-shrink: 0;
+}
+
+#view-new-order .flavour-bottle-img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  transition: transform var(--transition-fast);
+}
+
+#view-new-order .flavour-card:hover .flavour-bottle-img {
+  transform: scale(1.08);
+}
+
+#view-new-order .flavour-card-content {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+#view-new-order .flavour-header {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  position: relative;
+}
+
+#view-new-order .flavour-name {
+  font-weight: 700;
+  font-size: 12.5px;
+  color: var(--primary-blue);
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  width: 100%;
+}
+
+#view-new-order .flavour-stock-tag {
+  position: absolute;
+  top: 4px;
+  right: 6px;
+  font-size: 9.5px;
+  font-weight: 700;
+  padding: 1px 4px;
+  background: rgba(13, 71, 161, 0.08);
+  color: var(--primary-blue);
+  border-radius: 3px;
+  line-height: 1.2;
+}
+
+#view-new-order .flavour-qty-control {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  width: 100%;
+}
+
+#view-new-order .flavour-qty-control .btn-qty {
+  width: 26px;
+  height: 26px;
+  min-width: 26px;
+  min-height: 26px;
+  flex: 0 0 26px;
+  border-radius: var(--radius-xs);
+  font-size: 15px;
+  font-weight: bold;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f1f5f9;
+  border: 1px solid #cbd5e1;
+  color: var(--text-primary);
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
+}
+
+#view-new-order .flavour-qty-control .btn-qty:hover {
+  background: var(--primary-blue);
+  color: #ffffff;
+  border-color: var(--primary-blue);
+}
+
+#view-new-order .flavour-qty-control .qty-input {
+  width: 38px;
+  height: 26px;
+  min-width: 38px;
+  text-align: center;
+  font-weight: 700;
+  font-size: 12.5px;
+  border-radius: var(--radius-xs);
+  border: 1px solid var(--border-light);
+  padding: 0;
+  background: #ffffff;
+}
+
+/* Right Column: Order Summary Card */
+#view-new-order .new-order-summary-card {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.96) 0%, rgba(240, 247, 255, 0.90) 100%);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(191, 219, 254, 0.85);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 4px 20px -2px rgba(13, 71, 161, 0.08), 0 2px 8px -1px rgba(0, 0, 0, 0.03);
+  padding: 14px 18px;
+  margin-bottom: 0;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+#view-new-order .new-order-summary-card .panel-header {
+  margin-bottom: 6px;
+  padding-bottom: 0;
+}
+
+#view-new-order .new-order-summary-card .panel-title {
+  font-size: 15px;
+  font-weight: 700;
+}
+
+#view-new-order .pricing-summary-card-inner {
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid rgba(219, 234, 254, 0.95);
+  border-radius: var(--radius-md);
+  padding: 8px 14px;
+  margin-top: 6px;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+#view-new-order .pricing-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 5px 0;
+  font-size: 12.5px;
+  color: var(--text-secondary);
+  border-bottom: 1px dashed rgba(13, 71, 161, 0.12);
+}
+
+#view-new-order .pricing-row strong {
+  font-size: 12.5px;
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+#view-new-order .pricing-row.delivery-row {
+  padding: 5px 0;
+}
+
+#view-new-order .pricing-row.total-row {
+  border-bottom: none;
+  border-top: 2px solid var(--primary-blue);
+  margin-top: auto;
+  padding-top: 8px;
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--primary-blue);
+}
+
+#view-new-order .pricing-row.total-row strong {
+  font-size: 19px;
+  font-weight: 800;
+  color: var(--primary-blue);
+}
+
+#view-new-order .delivery-fee-field {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+#view-new-order .delivery-fee-input-wrap {
+  display: inline-flex;
+  align-items: center;
+  background: #ffffff;
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-sm);
+  padding: 0 6px;
+}
+
+#view-new-order .delivery-fee-input-wrap span {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+#view-new-order .delivery-input {
+  width: 60px;
+  height: 26px;
+  border: none;
+  background: transparent;
+  padding: 2px 4px;
+  font-weight: 700;
+  font-size: 12.5px;
+  text-align: right;
+}
+
+#view-new-order .delivery-input:focus {
+  outline: none;
+}
+
+#view-new-order .delivery-calc-note {
+  font-size: 10.5px;
+  color: #1E40AF;
+  margin-top: 1px;
+  line-height: 1.25;
+}
+
+#view-new-order .order-summary-actions {
+  margin-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+#view-new-order .new-order-summary-card #btn-submit-new-order {
+  width: 100%;
+  min-width: 0;
+  padding: 10px 16px;
+  font-size: 13.5px;
+  font-weight: 700;
+  border-radius: var(--radius-md);
+  justify-content: center;
+}
+
+/* Responsive Breakpoints */
+@media (max-width: 1024px) {
+  #view-new-order .new-order-layout-grid {
+    grid-template-columns: 1fr;
+  }
+  #view-new-order .new-order-right-column {
+    position: static;
+  }
+  #view-new-order .new-order-form-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  #view-new-order .flavours-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 640px) {
+  #view-new-order .new-order-form-grid {
+    grid-template-columns: 1fr;
+  }
+  #view-new-order .new-order-form-grid .form-group.span-full,
+  #view-new-order .new-order-form-grid .form-group.span-2 {
+    grid-column: span 1;
+  }
+  #view-new-order .flavours-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 /* Alternate Phone Styles & Copy Buttons */
 .btn-link-action {
   transition: opacity 0.18s ease, transform 0.18s ease;

@@ -8,7 +8,7 @@
   <meta http-equiv="Expires" content="0">
   <title>POPCONE Orders & Sales CRM</title>
   <meta name="description" content="Production-ready Order Management, Inventory Tracking, and Sales Analytics CRM for POPCONE.">
-  <link rel="stylesheet" href="/static/css/styles.css?v=20261122_02">
+  <link rel="stylesheet" href="/static/css/styles.css?v=20261122_07">
   <link rel="icon" href="/logo.jpg" type="image/jpeg">
   <link rel="shortcut icon" href="/logo.jpg" type="image/jpeg">
   <link rel="apple-touch-icon" href="/logo.jpg">
@@ -262,218 +262,225 @@
         <!-- ==================== 2. NEW ORDER VIEW ==================== -->
         <section id="view-new-order" class="view-page" style="display: none;">
           <form id="form-new-order">
-            <div class="panel">
-              <div class="panel-header">
-                <h3 class="panel-title">Customer Information</h3>
-                <span style="font-size: 13px; color: var(--text-muted);"><span class="required" style="color:var(--danger-red)">*</span> Required Fields</span>
-              </div>
-              <div class="form-grid">
-                <div class="form-group">
-                  <label class="form-label" for="new-order-customer">Customer Name <span class="required">*</span></label>
-                  <input type="text" id="new-order-customer" class="form-control" placeholder="Full Name" required>
-                </div>
-                <div class="form-group">
-                  <label class="form-label" for="new-order-phone">Phone Number <span class="required">*</span></label>
-                  <input type="tel" id="new-order-phone" class="form-control" placeholder="10-digit Mobile Number" required pattern="[0-9]{10,12}">
-                  <span id="new-order-phone-error" class="error-feedback"></span>
-                  <div id="new-order-phone-alert" class="phone-repeat-alert" style="display: none; margin-top: 6px; padding: 6px 10px; background: #eff6ff; border: 1px solid #bfdbfe; border-radius: var(--radius-sm); font-size: 12px; color: #1e40af; line-height: 1.4;">
-                    <span id="new-order-phone-alert-text"></span>
+            <div class="new-order-layout-grid">
+              <!-- LEFT COLUMN: Customer Information on top, Bottle Selection directly below -->
+              <div class="new-order-left-column">
+                
+                <!-- TOP CARD: Customer Information ("Order Details") -->
+                <div class="panel new-order-customer-card">
+                  <div class="panel-header">
+                    <h3 class="panel-title">Customer Information</h3>
+                    <span style="font-size: 13px; color: var(--text-muted);"><span class="required" style="color:var(--danger-red)">*</span> Required Fields</span>
                   </div>
-                  <div id="new-order-alt-phone-trigger-wrap" style="margin-top: 6px;">
-                    <button type="button" id="btn-add-alt-phone" class="btn-link-action" style="background:none; border:none; color:var(--primary-blue); font-size:12px; font-weight:600; cursor:pointer; padding:2px 0; display:inline-flex; align-items:center; gap:4px;">
-                      <span>+ Add another phone number</span>
+                  <div class="new-order-form-grid">
+                    <div class="form-group">
+                      <label class="form-label" for="new-order-customer">Customer Name <span class="required">*</span></label>
+                      <input type="text" id="new-order-customer" class="form-control" placeholder="Full Name" required autocomplete="name">
+                    </div>
+                    <div class="form-group">
+                      <label class="form-label" for="new-order-phone">Phone Number <span class="required">*</span></label>
+                      <input type="tel" id="new-order-phone" class="form-control" placeholder="10-digit Mobile Number" required pattern="[0-9]{10,12}" maxlength="12" autocomplete="tel">
+                      <span id="new-order-phone-error" class="error-feedback"></span>
+                      <div id="new-order-phone-alert" class="phone-repeat-alert" style="display: none; margin-top: 6px; padding: 6px 10px; background: #eff6ff; border: 1px solid #bfdbfe; border-radius: var(--radius-sm); font-size: 12px; color: #1e40af; line-height: 1.4;">
+                        <span id="new-order-phone-alert-text"></span>
+                      </div>
+                    </div>
+                    <div class="form-group">
+                      <label class="form-label" for="new-order-pincode">
+                        PIN Code <span class="required">*</span>
+                        <span id="pincode-spinner" class="pincode-spinner" style="display:none; font-size:11px; color:var(--primary-blue); font-weight:normal;">(Looking up...)</span>
+                      </label>
+                      <input type="text" id="new-order-pincode" class="form-control" placeholder="6-digit PIN (Auto-fills)" required pattern="[0-9]{6}" maxlength="6" autocomplete="postal-code">
+                      <span id="pincode-feedback" class="pincode-feedback" style="display:none; font-size:11px; margin-top:2px;"></span>
+                    </div>
+                    <div class="form-group">
+                      <label class="form-label" for="new-order-district">District <span class="required">*</span></label>
+                      <select id="new-order-district" class="form-control" required></select>
+                    </div>
+                    <div class="form-group">
+                      <label class="form-label" for="new-order-state">State <span class="required">*</span></label>
+                      <select id="new-order-state" class="form-control" required></select>
+                    </div>
+                    <div class="form-group">
+                      <label class="form-label" for="new-order-payment">Payment Method <span class="required">*</span></label>
+                      <select id="new-order-payment" class="form-control" required>
+                        <option value="Paid">Prepaid (Paid)</option>
+                        <option value="COD">Cash on Delivery (COD)</option>
+                      </select>
+                    </div>
+                    <div class="form-group span-full">
+                      <label class="form-label" for="new-order-address">Delivery Address <span class="required">*</span></label>
+                      <textarea id="new-order-address" class="form-control" placeholder="House/Flat No, Building, Street, Landmark" required rows="1" style="resize: vertical; min-height: 34px; height: 34px; font-family: inherit; font-size: 13px; line-height: 1.4; padding: 6px 10px;"></textarea>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- BOTTOM CARD: Bottle Selection & Flavours ("Bottle Details") -->
+                <div class="panel new-order-flavours-panel">
+                  <div class="panel-header">
+                    <h3 class="panel-title">Select Bottles &amp; Flavours</h3>
+                    <span class="price-pill">Original: <span class="current-bottle-price-display">₹160</span> / bottle (100g) &bull; Effective: <span class="effective-price-display">₹149</span></span>
+                  </div>
+
+                  <!-- Optional Combo Offers -->
+                  <div id="combo-offers-container" class="combo-offers-container" style="display: none; margin-bottom: 16px;">
+                    <div class="combo-offers-header">
+                      <span class="combo-offers-badge">SPECIAL OFFER</span>
+                      <span class="combo-offers-text">An optional combo offer is available for this quantity!</span>
+                    </div>
+                    <div class="combo-buttons-wrap">
+                      <button type="button" id="btn-combo-2" class="btn btn-combo" onclick="toggleNewOrderCombo('2_BOTTLE')" style="display: none;">
+                        Apply 2-Bottle Combo — ₹289
+                      </button>
+                      <button type="button" id="btn-combo-4" class="btn btn-combo" onclick="toggleNewOrderCombo('4_BOTTLE')" style="display: none;">
+                        Apply 4-Bottle Combo — ₹559
+                      </button>
+                    </div>
+                  </div>
+
+                  <div class="flavours-grid">
+                    <!-- Tomato -->
+                    <div class="flavour-card">
+                      <div class="flavour-card-media">
+                        <img src="/static/assets/flavours/spanish_tomato.png" alt="Tomato Bottle" class="flavour-bottle-img" loading="lazy">
+                      </div>
+                      <div class="flavour-card-content">
+                        <div class="flavour-header">
+                          <span class="flavour-name">Tomato</span>
+                          <span class="flavour-stock-tag">100g</span>
+                        </div>
+                        <div class="flavour-qty-control">
+                          <button type="button" class="btn-qty" onclick="adjustFlavourQty('Tomato', -1)" aria-label="Decrease Tomato" title="Decrease">−</button>
+                          <input type="number" id="qty-tomato" class="form-control qty-input" value="0" min="0" max="999">
+                          <button type="button" class="btn-qty" onclick="adjustFlavourQty('Tomato', 1)" aria-label="Increase Tomato" title="Increase">+</button>
+                        </div>
+                      </div>
+                    </div>
+
+                    <!-- Cheese -->
+                    <div class="flavour-card">
+                      <div class="flavour-card-media">
+                        <img src="/static/assets/flavours/cheddar_cheese.png" alt="Cheese Bottle" class="flavour-bottle-img" loading="lazy">
+                      </div>
+                      <div class="flavour-card-content">
+                        <div class="flavour-header">
+                          <span class="flavour-name">Cheese</span>
+                          <span class="flavour-stock-tag">100g</span>
+                        </div>
+                        <div class="flavour-qty-control">
+                          <button type="button" class="btn-qty" onclick="adjustFlavourQty('Cheese', -1)" aria-label="Decrease Cheese" title="Decrease">−</button>
+                          <input type="number" id="qty-cheese" class="form-control qty-input" value="0" min="0" max="999">
+                          <button type="button" class="btn-qty" onclick="adjustFlavourQty('Cheese', 1)" aria-label="Increase Cheese" title="Increase">+</button>
+                        </div>
+                      </div>
+                    </div>
+
+                    <!-- Sour Cream -->
+                    <div class="flavour-card">
+                      <div class="flavour-card-media">
+                        <img src="/static/assets/flavours/sour_cream.png" alt="Sour Cream Bottle" class="flavour-bottle-img" loading="lazy">
+                      </div>
+                      <div class="flavour-card-content">
+                        <div class="flavour-header">
+                          <span class="flavour-name">Sour Cream</span>
+                          <span class="flavour-stock-tag">100g</span>
+                        </div>
+                        <div class="flavour-qty-control">
+                          <button type="button" class="btn-qty" onclick="adjustFlavourQty('Sour Cream', -1)" aria-label="Decrease Sour Cream" title="Decrease">−</button>
+                          <input type="number" id="qty-sour-cream" class="form-control qty-input" value="0" min="0" max="999">
+                          <button type="button" class="btn-qty" onclick="adjustFlavourQty('Sour Cream', 1)" aria-label="Increase Sour Cream" title="Increase">+</button>
+                        </div>
+                      </div>
+                    </div>
+
+                    <!-- Peri Peri -->
+                    <div class="flavour-card">
+                      <div class="flavour-card-media">
+                        <img src="/static/assets/flavours/peri_peri.png" alt="Peri Peri Bottle" class="flavour-bottle-img" loading="lazy">
+                      </div>
+                      <div class="flavour-card-content">
+                        <div class="flavour-header">
+                          <span class="flavour-name">Peri Peri</span>
+                          <span class="flavour-stock-tag">100g</span>
+                        </div>
+                        <div class="flavour-qty-control">
+                          <button type="button" class="btn-qty" onclick="adjustFlavourQty('Peri Peri', -1)" aria-label="Decrease Peri Peri" title="Decrease">−</button>
+                          <input type="number" id="qty-peri-peri" class="form-control qty-input" value="0" min="0" max="999">
+                          <button type="button" class="btn-qty" onclick="adjustFlavourQty('Peri Peri', 1)" aria-label="Increase Peri Peri" title="Increase">+</button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+              </div>
+
+              <!-- RIGHT COLUMN: ORDER SUMMARY (Right to both Order Details and Bottle Details) -->
+              <div class="new-order-right-column">
+                <div class="panel new-order-summary-card">
+                  <div class="panel-header">
+                    <h3 class="panel-title">Order Summary</h3>
+                    <span class="badge" id="new-order-summary-badge" style="background: rgba(13, 71, 161, 0.08); color: var(--primary-blue); font-weight: 700; font-size: 11px; padding: 4px 8px; border-radius: var(--radius-sm);"><span id="new-order-bottles-badge-count">0</span> Bottles</span>
+                  </div>
+                  <div class="pricing-summary-card-inner">
+                    <div class="pricing-row">
+                      <span>Total Bottles:</span>
+                      <strong id="new-order-bottles-count">0</strong>
+                    </div>
+                    <div class="pricing-row">
+                      <span>Consignment Weight:</span>
+                      <strong id="new-order-weight-display">0g</strong>
+                    </div>
+                    <div class="pricing-row">
+                      <span>Subtotal (<span class="current-bottle-price-display">₹160</span>/btl):</span>
+                      <strong id="new-order-original-amount">₹0</strong>
+                    </div>
+                    <div class="pricing-row">
+                      <span>Discount per Bottle:</span>
+                      <strong id="new-order-discount-per-bottle" style="color: #059669;">-₹11</strong>
+                    </div>
+                    <div class="pricing-row">
+                      <span>Total Discount:</span>
+                      <strong id="new-order-total-discount" style="color: #059669;">-₹0</strong>
+                    </div>
+                    <div class="pricing-row">
+                      <span>Discounted Amount:</span>
+                      <strong id="new-order-discounted-product-amount">₹0</strong>
+                    </div>
+                    <div class="pricing-row" id="row-selected-combo" style="display: none;">
+                      <span>Selected Combo Offer:</span>
+                      <strong id="new-order-selected-combo-display" style="color: #D97706;">None</strong>
+                    </div>
+                    <div class="pricing-row delivery-row">
+                      <div style="flex: 1; padding-right: 8px;">
+                        <span>Delivery Fee:</span>
+                        <div id="new-order-delivery-note" class="delivery-calc-note">Select state &amp; district</div>
+                      </div>
+                      <div class="delivery-fee-field">
+                        <span id="delivery-fee-free-badge" class="badge badge-free-delivery" style="display: none; background: #10B981; color: white; padding: 3px 8px; border-radius: 4px; font-weight: 700; font-size: 11px;">FREE</span>
+                        <span id="new-order-free-delivery-badge" class="badge badge-free-delivery" style="display: none; background: #10B981; color: white; padding: 3px 8px; border-radius: 4px; font-weight: 700; font-size: 11px;">FREE</span>
+                        <div class="delivery-fee-input-wrap" id="delivery-fee-input-wrap">
+                          <span>₹</span>
+                          <input type="number" id="new-order-delivery-fee" class="form-control delivery-input" value="0" min="0" step="1" placeholder="0">
+                        </div>
+                      </div>
+                    </div>
+                    <div class="pricing-row total-row">
+                      <span>Final Payable Amount:</span>
+                      <strong id="new-order-final-amount">₹0</strong>
+                    </div>
+                  </div>
+
+                  <div class="order-summary-actions" style="margin-top: 16px; display: flex; flex-direction: column; gap: 8px;">
+                    <button type="submit" id="btn-submit-new-order" class="btn btn-primary btn-lg" style="width: 100%; justify-content: center;">
+                      <svg class="icon-svg" viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                      <span>Confirm &amp; Create Order</span>
                     </button>
-                  </div>
-                  <div id="new-order-alt-phone-group" style="display: none; margin-top: 8px;">
-                    <label class="form-label" for="new-order-alt-phone" style="font-size: 12px; display: flex; justify-content: space-between; align-items: center;">
-                      <span>Alternate Phone Number <span style="font-weight: normal; color: var(--text-secondary);">(Optional)</span></span>
-                      <button type="button" id="btn-remove-alt-phone" style="background: none; border: none; color: var(--danger-red); font-size: 11px; cursor: pointer; padding: 0;">Remove</button>
-                    </label>
-                    <input type="tel" id="new-order-alt-phone" class="form-control" maxlength="10" placeholder="10-digit Alternate Mobile Number">
-                    <span id="new-order-alt-phone-error" class="error-feedback"></span>
-                  </div>
-                </div>
-                <div class="form-group span-2">
-                  <label class="form-label" for="new-order-address">Delivery Address <span class="required">*</span></label>
-                  <input type="text" id="new-order-address" class="form-control" placeholder="House/Flat No, Street, Landmark" required>
-                </div>
-                <div class="form-group">
-                  <label class="form-label" for="new-order-state">State <span class="required">*</span></label>
-                  <select id="new-order-state" class="form-control" required></select>
-                </div>
-                <div class="form-group">
-                  <label class="form-label" for="new-order-district">District <span class="required">*</span></label>
-                  <select id="new-order-district" class="form-control" required></select>
-                </div>
-                <div class="form-group">
-                  <label class="form-label" for="new-order-pincode">
-                    PIN Code <span class="required">*</span>
-                    <span id="pincode-spinner" class="pincode-spinner" style="display:none; font-size:11px; color:var(--primary-blue); font-weight:normal;">(Looking up location...)</span>
-                  </label>
-                  <input type="text" id="new-order-pincode" class="form-control" placeholder="6-digit PIN (Auto-fills State & District)" required pattern="[0-9]{6}" maxlength="6">
-                  <span id="pincode-feedback" class="pincode-feedback" style="display:none; font-size:11px; margin-top:2px;"></span>
-                </div>
-                <div class="form-group">
-                  <label class="form-label" for="new-order-payment">Payment Method <span class="required">*</span></label>
-                  <select id="new-order-payment" class="form-control" required>
-                    <option value="Paid">Prepaid (Paid)</option>
-                    <option value="COD">Cash on Delivery (COD)</option>
-                  </select>
-                </div>
-              </div>
-            </div>
-
-            <!-- Flavour Selection -->
-            <div class="panel">
-              <div class="panel-header">
-                <h3 class="panel-title">Select Bottles &amp; Flavours</h3>
-                <span class="price-pill">Original: <span class="current-bottle-price-display">₹160</span> / bottle (100g) &bull; Effective: <span class="effective-price-display">₹149</span></span>
-              </div>
-              <div class="flavours-grid">
-                <!-- Tomato -->
-                <div class="flavour-card">
-                  <div class="flavour-card-media">
-                    <img src="/static/assets/flavours/spanish_tomato.png" alt="Tomato Bottle" class="flavour-bottle-img" loading="lazy">
-                  </div>
-                  <div class="flavour-card-content">
-                    <div class="flavour-header">
-                      <span class="flavour-name">Tomato</span>
-                      <span class="flavour-stock-tag">100g</span>
-                    </div>
-                    <div class="flavour-qty-control">
-                      <button type="button" class="btn-qty" onclick="adjustFlavourQty('Tomato', -1)" aria-label="Decrease Tomato" title="Decrease">−</button>
-                      <input type="number" id="qty-tomato" class="form-control qty-input" value="0" min="0" max="999">
-                      <button type="button" class="btn-qty" onclick="adjustFlavourQty('Tomato', 1)" aria-label="Increase Tomato" title="Increase">+</button>
+                    <div style="display: flex; justify-content: center;">
+                      <button type="reset" class="btn-link-action" style="background: none; border: none; color: var(--text-muted); font-size: 12px; font-weight: 500; cursor: pointer; padding: 4px;" onclick="setTimeout(recalcNewOrderPricing, 50)">Reset Form</button>
                     </div>
                   </div>
                 </div>
-
-                <!-- Cheese -->
-                <div class="flavour-card">
-                  <div class="flavour-card-media">
-                    <img src="/static/assets/flavours/cheddar_cheese.png" alt="Cheese Bottle" class="flavour-bottle-img" loading="lazy">
-                  </div>
-                  <div class="flavour-card-content">
-                    <div class="flavour-header">
-                      <span class="flavour-name">Cheese</span>
-                      <span class="flavour-stock-tag">100g</span>
-                    </div>
-                    <div class="flavour-qty-control">
-                      <button type="button" class="btn-qty" onclick="adjustFlavourQty('Cheese', -1)" aria-label="Decrease Cheese" title="Decrease">−</button>
-                      <input type="number" id="qty-cheese" class="form-control qty-input" value="0" min="0" max="999">
-                      <button type="button" class="btn-qty" onclick="adjustFlavourQty('Cheese', 1)" aria-label="Increase Cheese" title="Increase">+</button>
-                    </div>
-                  </div>
-                </div>
-
-                <!-- Sour Cream -->
-                <div class="flavour-card">
-                  <div class="flavour-card-media">
-                    <img src="/static/assets/flavours/sour_cream.png" alt="Sour Cream Bottle" class="flavour-bottle-img" loading="lazy">
-                  </div>
-                  <div class="flavour-card-content">
-                    <div class="flavour-header">
-                      <span class="flavour-name">Sour Cream</span>
-                      <span class="flavour-stock-tag">100g</span>
-                    </div>
-                    <div class="flavour-qty-control">
-                      <button type="button" class="btn-qty" onclick="adjustFlavourQty('Sour Cream', -1)" aria-label="Decrease Sour Cream" title="Decrease">−</button>
-                      <input type="number" id="qty-sour-cream" class="form-control qty-input" value="0" min="0" max="999">
-                      <button type="button" class="btn-qty" onclick="adjustFlavourQty('Sour Cream', 1)" aria-label="Increase Sour Cream" title="Increase">+</button>
-                    </div>
-                  </div>
-                </div>
-
-                <!-- Peri Peri -->
-                <div class="flavour-card">
-                  <div class="flavour-card-media">
-                    <img src="/static/assets/flavours/peri_peri.png" alt="Peri Peri Bottle" class="flavour-bottle-img" loading="lazy">
-                  </div>
-                  <div class="flavour-card-content">
-                    <div class="flavour-header">
-                      <span class="flavour-name">Peri Peri</span>
-                      <span class="flavour-stock-tag">100g</span>
-                    </div>
-                    <div class="flavour-qty-control">
-                      <button type="button" class="btn-qty" onclick="adjustFlavourQty('Peri Peri', -1)" aria-label="Decrease Peri Peri" title="Decrease">−</button>
-                      <input type="number" id="qty-peri-peri" class="form-control qty-input" value="0" min="0" max="999">
-                      <button type="button" class="btn-qty" onclick="adjustFlavourQty('Peri Peri', 1)" aria-label="Increase Peri Peri" title="Increase">+</button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <!-- Optional Combo Offers (Requirement 4: Display below order details and above blue summary card) -->
-              <div id="combo-offers-container" class="combo-offers-container" style="display: none;">
-                <div class="combo-offers-header">
-                  <span class="combo-offers-badge">SPECIAL OFFER</span>
-                  <span class="combo-offers-text">An optional combo offer is available for this quantity!</span>
-                </div>
-                <div class="combo-buttons-wrap">
-                  <button type="button" id="btn-combo-2" class="btn btn-combo" onclick="toggleNewOrderCombo('2_BOTTLE')" style="display: none;">
-                    Apply 2-Bottle Combo — ₹289
-                  </button>
-                  <button type="button" id="btn-combo-4" class="btn btn-combo" onclick="toggleNewOrderCombo('4_BOTTLE')" style="display: none;">
-                    Apply 4-Bottle Combo — ₹559
-                  </button>
-                </div>
-              </div>
-
-              <!-- Blue Bill Summary Card (Requirement 7 & 8) -->
-              <div class="pricing-summary-card">
-                <div class="pricing-row">
-                  <span>Total Number of Bottles:</span>
-                  <strong id="new-order-bottles-count">0</strong>
-                </div>
-                <div class="pricing-row">
-                  <span>Total Consignment Weight:</span>
-                  <strong id="new-order-weight-display">0g</strong>
-                </div>
-                <div class="pricing-row">
-                  <span>Original Product Amount (₹160/bottle):</span>
-                  <strong id="new-order-original-amount">₹0</strong>
-                </div>
-                <div class="pricing-row">
-                  <span>Discount per Bottle:</span>
-                  <strong id="new-order-discount-per-bottle">-₹11</strong>
-                </div>
-                <div class="pricing-row">
-                  <span>Total Discount Amount:</span>
-                  <strong id="new-order-total-discount" style="color: var(--accent-yellow);">-₹0</strong>
-                </div>
-                <div class="pricing-row">
-                  <span>Discounted Product Amount:</span>
-                  <strong id="new-order-discounted-product-amount">₹0</strong>
-                </div>
-                <div class="pricing-row" id="row-selected-combo" style="display: none;">
-                  <span>Selected Combo Offer:</span>
-                  <strong id="new-order-selected-combo-display" style="color: var(--accent-yellow);">None</strong>
-                </div>
-                <div class="pricing-row">
-                  <div>
-                    <span>Delivery / Shipping Fee (₹):</span>
-                    <div id="new-order-delivery-note" class="delivery-calc-note">Select state and district to calculate</div>
-                  </div>
-                  <div class="delivery-fee-field">
-                    <span id="delivery-fee-free-badge" class="badge badge-free-delivery" style="display: none; background: #10B981; color: white; padding: 4px 10px; border-radius: 4px; font-weight: 700; font-size: 11px;">FREE DELIVERY</span>
-                    <div class="delivery-fee-input-wrap" id="delivery-fee-input-wrap">
-                      <span>₹</span>
-                      <input type="number" id="new-order-delivery-fee" class="form-control delivery-input" value="0" min="0" step="1" placeholder="0">
-                    </div>
-                  </div>
-                </div>
-                <div class="pricing-row total-row">
-                  <span>Final Payable Amount:</span>
-                  <strong id="new-order-final-amount">₹0</strong>
-                </div>
-              </div>
-
-              <div style="margin-top: 24px; display: flex; justify-content: flex-end; gap: 12px;">
-                <button type="reset" class="btn btn-outline" onclick="setTimeout(recalcNewOrderPricing, 50)">Reset Form</button>
-                <button type="submit" id="btn-submit-new-order" class="btn btn-primary btn-lg">
-                  <svg class="icon-svg" viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
-                  <span>Confirm &amp; Create Order</span>
-                </button>
               </div>
             </div>
           </form>
@@ -1718,6 +1725,6 @@
 
   <!-- Scripts (Cache-busted) -->
   <script src="/static/js/api.js?v=20261116_01"></script>
-  <script src="/static/js/app.js?v=20261121_09"></script>
+  <script src="/static/js/app.js?v=20261122_07"></script>
 </body>
 </html>

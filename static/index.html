@@ -8,7 +8,7 @@
   <meta http-equiv="Expires" content="0">
   <title>POPCONE Orders & Sales CRM</title>
   <meta name="description" content="Production-ready Order Management, Inventory Tracking, and Sales Analytics CRM for POPCONE.">
-  <link rel="stylesheet" href="/static/css/styles.css?v=20261123_01">
+  <link rel="stylesheet" href="/static/css/styles.css?v=20261123_04">
   <link rel="icon" href="/logo.jpg" type="image/jpeg">
   <link rel="shortcut icon" href="/logo.jpg" type="image/jpeg">
   <link rel="apple-touch-icon" href="/logo.jpg">
@@ -490,15 +490,29 @@
         <section id="view-orders" class="view-page" style="display: none;">
           <div class="panel">
             <!-- Filter Toolbar -->
-            <div class="table-toolbar">
-              <div class="search-input-wrapper">
+            <div class="table-toolbar orders-table-toolbar">
+              <div class="orders-search-action-row">
+                <div class="search-input-wrapper">
                 <span class="search-icon">
                   <svg class="icon-svg" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
                 </span>
                 <input type="text" id="search-orders-input" class="form-control" placeholder="Search customer, phone, order ID">
               </div>
 
-              <div class="filter-group">
+              <div class="orders-export-actions">
+                <button id="btn-export-orders-csv" class="btn btn-brand-export" title="Export orders directly to Google Sheets / Excel">
+                  <svg class="icon-svg" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
+                  <span>Export orders</span>
+                </button>
+
+                <button id="btn-export-shipping-manifest" class="btn btn-brand-export" title="Export courier shipping manifest to Excel (.xlsx)">
+                  <svg class="icon-svg" viewBox="0 0 24 24"><rect x="1" y="3" width="15" height="13"></rect><polygon points="16 8 20 8 23 11 23 16 16 16 8"></polygon><circle cx="5.5" cy="18.5" r="2.5"></circle><circle cx="18.5" cy="18.5" r="2.5"></circle></svg>
+                  <span>Export shipping</span>
+                </button>
+              </div>
+            </div>
+
+            <div class="filter-group orders-filter-group">
                 <select id="filter-order-payment" class="filter-select">
                   <option value="All">All Payments</option>
                   <option value="Paid">Prepaid (Paid)</option>
@@ -539,16 +553,6 @@
                   <option value="Customer Name">Customer Name (A-Z)</option>
                   <option value="District">District (A-Z)</option>
                 </select>
-
-                <button id="btn-export-orders-csv" class="btn btn-accent btn-sm" title="Export orders directly to Google Sheets / Excel">
-                  <svg class="icon-svg" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
-                  <span>Export Google Sheets</span>
-                </button>
-
-                <button id="btn-export-shipping-manifest" class="btn btn-accent btn-sm" title="Export courier shipping manifest to Excel (.xlsx)">
-                  <svg class="icon-svg" viewBox="0 0 24 24"><rect x="1" y="3" width="15" height="13"></rect><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"></polygon><circle cx="5.5" cy="18.5" r="2.5"></circle><circle cx="18.5" cy="18.5" r="2.5"></circle></svg>
-                  <span>Export Shipping Manifest</span>
-                </button>
               </div>
             </div>
 
@@ -1101,7 +1105,7 @@
             <img src="/logo.jpg" alt="POPCONE" class="order-detail-logo">
             <div>
               <div id="detail-order-id" class="order-detail-id">ORD0000</div>
-              <div id="detail-order-date" style="font-size: 13px; opacity: 0.85;">2026-00-00</div>
+              <div id="detail-order-date" class="order-detail-date">2026-00-00</div>
             </div>
           </div>
           <div>

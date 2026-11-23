@@ -1771,10 +1771,11 @@ body.auth-required #app-container {
 
 /* ---------------- Order Details View (Second Reference Styled) ---------------- */
 .order-detail-header-card {
-  background: linear-gradient(135deg, var(--bg-sidebar), var(--primary-blue));
-  color: #FFFFFF;
+  background: linear-gradient(135deg, rgba(13, 71, 161, 0.05) 0%, rgba(21, 101, 192, 0.09) 100%);
+  color: var(--text-main);
+  border: 1px solid rgba(13, 71, 161, 0.14);
   border-radius: var(--radius-md);
-  padding: 20px;
+  padding: 16px 20px;
   margin-bottom: 20px;
   display: flex;
   align-items: center;
@@ -1792,7 +1793,16 @@ body.auth-required #app-container {
 .order-detail-id {
   font-size: 22px;
   font-weight: 800;
-  color: var(--accent-yellow);
+  color: var(--primary-blue);
+  letter-spacing: 0.5px;
+}
+
+.order-detail-date,
+#detail-order-date {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  margin-top: 2px;
 }
 
 .detail-section-title {
@@ -3427,6 +3437,7 @@ body.auth-required #app-container {
   background: linear-gradient(135deg, rgba(13, 71, 161, 0.04) 0%, rgba(21, 101, 192, 0.08) 100%);
   border: 1px solid rgba(13, 71, 161, 0.12);
   border-radius: var(--radius-md);
+  color: var(--text-main);
   transition: box-shadow 0.2s ease;
 }
 
@@ -4218,24 +4229,151 @@ body.auth-required #app-container {
   transform: scale(0.94);
 }
 
-/* Export Buttons Sheen & Lift */
-#btn-export-orders-csv,
-#btn-export-shipping-manifest {
+/* ---------------- 12b. Orders Table Toolbar & Brand Export Buttons ---------------- */
+.orders-table-toolbar {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+}
+
+.orders-search-action-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  width: 100%;
+}
+
+.orders-search-action-row .search-input-wrapper {
+  flex: 1;
+  max-width: 380px;
+  min-width: 240px;
+}
+
+.orders-search-action-row .search-input-wrapper input {
+  height: 40px;
+  font-size: 13.5px;
+}
+
+.orders-export-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  margin-left: auto;
+}
+
+.orders-filter-group {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+}
+
+/* Thicker, Shorter Brand Export Buttons with Matte Yellow & Slanted Yellow-to-Blue Hover Animation */
+.btn-brand-export {
   position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  height: 38px;
+  padding: 0 15px;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.15px;
+  white-space: nowrap;
+  border-radius: var(--radius-md);
+  border: 1px solid #D6A420;
+  cursor: pointer;
+  user-select: none;
   overflow: hidden;
-  transition: transform 0.18s cubic-bezier(0.16, 1, 0.3, 1),
-              box-shadow 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+  text-decoration: none;
+  
+  /* Initial state: POPCONE Matte Warm Yellow (non-glossy, soft natural finish) */
+  color: #0D47A1;
+  background: linear-gradient(118deg, #F2C744 0%, #E5B632 45%, #185ABC 55%, #0D47A1 100%);
+  background-size: 260% 100%;
+  background-position: 0% 0%;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08), 0 2px 6px rgba(0, 0, 0, 0.04);
+  transition: 
+    background-position 0.42s cubic-bezier(0.22, 1, 0.36, 1),
+    color 0.30s ease,
+    border-color 0.30s ease,
+    box-shadow 0.30s ease,
+    transform 0.18s ease;
 }
 
-#btn-export-orders-csv:hover,
-#btn-export-shipping-manifest:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 18px rgba(245, 158, 11, 0.35);
+.btn-brand-export .icon-svg {
+  width: 15px;
+  height: 15px;
+  stroke: #0D47A1;
+  stroke-width: 2.2;
+  flex-shrink: 0;
+  transition: stroke 0.30s ease, transform 0.20s ease;
 }
 
-#btn-export-orders-csv:active,
-#btn-export-shipping-manifest:active {
-  transform: scale(0.97);
+/* Slanted Left-to-Right Color Sweep into POPCONE Royal Navy Blue on Hover */
+.btn-brand-export:hover {
+  background-position: 100% 0%;
+  color: #FFFFFF;
+  border-color: #0D47A1;
+  transform: translateY(-1.5px);
+  box-shadow: 0 3px 10px rgba(13, 71, 161, 0.25);
+}
+
+.btn-brand-export:hover .icon-svg {
+  stroke: #FFFFFF;
+  transform: scale(1.08);
+}
+
+.btn-brand-export:active {
+  transform: translateY(0);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+}
+
+.btn-brand-export:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+  transform: scale(1.10);
+}
+
+.btn-brand-export:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 6px rgba(13, 71, 161, 0.30);
+}
+
+.btn-brand-export:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+/* Responsive adjustment for Orders search bar & action buttons */
+@media (max-width: 640px) {
+  .orders-search-action-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+  .orders-search-action-row .search-input-wrapper {
+    max-width: 100%;
+  }
+  .orders-export-actions {
+    margin-left: 0;
+    width: 100%;
+    justify-content: stretch;
+  }
+  .orders-export-actions .btn-brand-export {
+    flex: 1;
+    font-size: 12px;
+    padding: 0 10px;
+  }
 }
 
 /* ---------------- 13. Inventory Stock Cards & Ambient Glow ---------------- */

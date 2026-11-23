@@ -8,7 +8,7 @@
   <meta http-equiv="Expires" content="0">
   <title>POPCONE Orders & Sales CRM</title>
   <meta name="description" content="Production-ready Order Management, Inventory Tracking, and Sales Analytics CRM for POPCONE.">
-  <link rel="stylesheet" href="/static/css/styles.css?v=20261123_06">
+  <link rel="stylesheet" href="/static/css/styles.css?v=20261123_07">
   <link rel="icon" href="/logo.jpg" type="image/jpeg">
   <link rel="shortcut icon" href="/logo.jpg" type="image/jpeg">
   <link rel="apple-touch-icon" href="/logo.jpg">
@@ -1148,6 +1148,10 @@
             <span class="detail-info-label">Location</span>
             <span id="detail-customer-location" class="detail-info-value">-</span>
           </div>
+          <div class="detail-info-item span-full" id="detail-notes-container" style="grid-column: span 2; display: none;">
+            <span class="detail-info-label">Order Notes / Instructions</span>
+            <span id="detail-customer-notes" class="detail-info-value" style="color: var(--primary-blue); font-weight: 500; background: rgba(13, 71, 161, 0.05); border: 1px solid rgba(13, 71, 161, 0.15); border-left: 3px solid var(--primary-blue); padding: 8px 12px; border-radius: var(--radius-sm); display: block; margin-top: 4px; line-height: 1.4; word-break: break-word;">-</span>
+          </div>
         </div>
 
         <div class="detail-section-title">Ordered Products</div>
@@ -1272,6 +1276,10 @@
               <div class="form-group span-2">
                 <label class="form-label" for="edit-address">Full Address <span class="req-star">*</span></label>
                 <input type="text" id="edit-address" class="form-control" placeholder="Street address, building, landmark" required>
+              </div>
+              <div class="form-group span-2">
+                <label class="form-label" for="edit-order-notes">Order Notes / Instructions <span style="font-weight: normal; color: var(--text-secondary);">(Optional)</span></label>
+                <textarea id="edit-order-notes" class="form-control" rows="2" placeholder="Special delivery instructions, landmark details, packaging requests..." style="height: 52px; min-height: 48px; resize: vertical;"></textarea>
               </div>
               <div class="form-group">
                 <label class="form-label" for="edit-pincode">
@@ -1733,6 +1741,6 @@
 
   <!-- Scripts (Cache-busted) -->
   <script src="/static/js/api.js?v=20261116_01"></script>
-  <script src="/static/js/app.js?v=20261123_06"></script>
+  <script src="/static/js/app.js?v=20261123_07"></script>
 </body>
 </html>

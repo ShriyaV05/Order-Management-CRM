@@ -277,6 +277,7 @@ def _init_db_unlocked():
     # Additive schema migration: ensure actual_delivery_fee and alternate_phone exist in orders table
     _add_column_if_missing(cursor, "orders", "actual_delivery_fee", "actual_delivery_fee REAL DEFAULT NULL")
     _add_column_if_missing(cursor, "orders", "alternate_phone", "alternate_phone TEXT DEFAULT NULL")
+    _add_column_if_missing(cursor, "orders", "notes", "notes TEXT DEFAULT ''")
     try:
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_orders_alt_phone ON orders(alternate_phone);")
     except Exception:
@@ -365,7 +366,8 @@ def _init_db_unlocked():
         created_by TEXT NOT NULL,
         created_at TEXT NOT NULL,
         edited_by TEXT NOT NULL,
-        edited_at TEXT NOT NULL
+        edited_at TEXT NOT NULL,
+        notes TEXT DEFAULT ''
     );
     """)
 
@@ -402,6 +404,7 @@ def _init_db_unlocked():
     _add_column_if_missing(cursor, "orders", "combo_price", "combo_price REAL NOT NULL DEFAULT 0.0")
     _add_column_if_missing(cursor, "orders", "actual_delivery_fee", "actual_delivery_fee REAL DEFAULT NULL")
     _add_column_if_missing(cursor, "orders", "alternate_phone", "alternate_phone TEXT DEFAULT NULL")
+    _add_column_if_missing(cursor, "orders", "notes", "notes TEXT DEFAULT ''")
     try:
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_orders_alt_phone ON orders(alternate_phone);")
     except Exception:

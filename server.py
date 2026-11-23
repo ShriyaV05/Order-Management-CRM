@@ -1178,8 +1178,8 @@ def create_order(req: CreateOrderRequest, current_user: Dict[str, Any] = Depends
             delivery_fee, actual_delivery_fee, final_amount, payment, dispatch_state,
             created_by, created_at, edited_by, edited_at,
             discount_per_bottle, total_discount, normal_product_amount,
-            is_combo, combo_type, combo_price
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+            is_combo, combo_type, combo_price, notes
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
         """, (
             new_order_id, req.customer_name.strip(), cleaned_phone, cleaned_alt_phone, req.address.strip(),
             req.pin_code.strip(), req.state.strip(), req.district.strip(),
@@ -1187,7 +1187,7 @@ def create_order(req: CreateOrderRequest, current_user: Dict[str, Any] = Depends
             delivery_fee, actual_delivery_fee, final_amount, req.payment, "PLACED",
             current_user["display_name"], now_str, current_user["display_name"], now_str,
             discount_per_bottle, total_discount, normal_product_amount,
-            is_combo, combo_type, combo_price
+            is_combo, combo_type, combo_price, (req.notes or "").strip()
         ))
 
         for it in valid_items:
@@ -1317,6 +1317,7 @@ def get_order_details(order_id: str, current_user: Dict[str, Any] = Depends(get_
             "created_at": order["created_at"],
             "edited_by": order["edited_by"],
             "edited_at": order["edited_at"],
+            "notes": (order["notes"] if "notes" in order.keys() and order["notes"] is not None else ""),
             "items": items,
             "audit_history": audit_history
         }
@@ -1421,7 +1422,7 @@ def edit_order(order_id: str, req: EditOrderRequest, current_user: Dict[str, Any
             total_bottles = ?, total_weight_grams = ?, product_amount = ?, delivery_fee = ?,
             actual_delivery_fee = ?, final_amount = ?, payment = ?, edited_by = ?, edited_at = ?,
             discount_per_bottle = ?, total_discount = ?, normal_product_amount = ?,
-            is_combo = ?, combo_type = ?, combo_price = ?
+            is_combo = ?, combo_type = ?, combo_price = ?, notes = ?
         WHERE order_id = ?;
         """, (
             req.customer_name.strip(), cleaned_phone, cleaned_alt_phone, req.address.strip(), req.pin_code.strip(),
@@ -1429,7 +1430,7 @@ def edit_order(order_id: str, req: EditOrderRequest, current_user: Dict[str, Any
             applicable_product_amount, delivery_fee, actual_delivery_fee, final_amount, req.payment,
             current_user["display_name"], now_str,
             historical_discount, total_discount, normal_product_amount,
-            is_combo, combo_type, combo_price,
+            is_combo, combo_type, combo_price, (req.notes or "").strip(),
             order_id
         ))
 

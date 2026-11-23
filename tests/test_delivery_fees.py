@@ -87,7 +87,8 @@ class DeliveryFeesTestCase(unittest.TestCase):
             normal_product_amount REAL NOT NULL DEFAULT 0.0,
             is_combo INTEGER NOT NULL DEFAULT 0,
             combo_type TEXT NOT NULL DEFAULT '',
-            combo_price REAL NOT NULL DEFAULT 0.0
+            combo_price REAL NOT NULL DEFAULT 0.0,
+            notes TEXT DEFAULT ''
         );
 
         CREATE TABLE IF NOT EXISTS order_items (

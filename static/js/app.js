@@ -2176,6 +2176,19 @@ document.addEventListener('DOMContentLoaded', async () => {
       document.getElementById('detail-customer-address').textContent = o.address;
       document.getElementById('detail-customer-location').textContent = `${o.district}, ${o.state} - ${o.pin_code}`;
 
+      // Requirement: Show notes in order details ONLY if notes were entered (non-empty)
+      const notesContainer = document.getElementById('detail-notes-container');
+      const notesEl = document.getElementById('detail-customer-notes');
+      if (notesContainer && notesEl) {
+        if (o.notes && o.notes.trim()) {
+          notesEl.textContent = o.notes.trim();
+          notesContainer.style.display = 'block';
+        } else {
+          notesEl.textContent = '';
+          notesContainer.style.display = 'none';
+        }
+      }
+
       document.getElementById('detail-total-bottles').textContent = o.total_bottles;
       document.getElementById('detail-total-weight').textContent = o.total_weight;
 
@@ -2348,6 +2361,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (editAltTrigger) editAltTrigger.style.display = 'block';
       }
       document.getElementById('edit-address').value = o.address;
+      const editNotesEl = document.getElementById('edit-order-notes');
+      if (editNotesEl) editNotesEl.value = o.notes || '';
       document.getElementById('edit-pincode').value = o.pin_code;
       
       const savedFee = (o.delivery_fee !== undefined && o.delivery_fee !== null) ? Number(o.delivery_fee) : 0;
@@ -2750,11 +2765,15 @@ document.addEventListener('DOMContentLoaded', async () => {
       editAltPhone = rawAlt;
     }
 
+    const editNotesEl = document.getElementById('edit-order-notes');
+    const editNotesVal = editNotesEl ? editNotesEl.value.trim() : '';
+
     const payload = {
       customer_name: document.getElementById('edit-customer-name').value.trim(),
       phone: document.getElementById('edit-phone').value.trim(),
       alternate_phone: editAltPhone,
       address: document.getElementById('edit-address').value.trim(),
+      notes: editNotesVal,
       pin_code: document.getElementById('edit-pincode').value.trim(),
       state: document.getElementById('edit-state').value.trim(),
       district: document.getElementById('edit-district').value.trim(),

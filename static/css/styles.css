@@ -3719,12 +3719,17 @@ body.auth-required #app-container {
 }
 
 #view-new-order .new-order-form-grid textarea.form-control {
-  height: 56px;
-  min-height: 52px;
+  height: 50px;
+  min-height: 46px;
   line-height: 1.4;
   resize: vertical;
   padding: 8px 12px;
   font-size: 13.5px;
+}
+
+#view-new-order .new-order-form-grid textarea.new-order-notes-textarea {
+  height: 46px;
+  min-height: 42px;
 }
 
 /* Bottle Selection Panel (Translucent Frosted Glass) */

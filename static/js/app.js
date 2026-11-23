@@ -1443,6 +1443,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     const customerName = document.getElementById('new-order-customer').value.trim();
     const phone = document.getElementById('new-order-phone').value.trim();
     const address = document.getElementById('new-order-address').value.trim();
+    const notesEl = document.getElementById('new-order-notes');
+    const notesVal = notesEl ? notesEl.value.trim() : '';
     const pinCode = document.getElementById('new-order-pincode').value.trim();
     const stateVal = document.getElementById('new-order-state').value.trim();
     const distVal = document.getElementById('new-order-district').value.trim();
@@ -1499,7 +1501,8 @@ document.addEventListener('DOMContentLoaded', async () => {
       delivery_fee: deliveryFee,
       apply_combo: !!state.newOrderState.comboSelected,
       combo_type: state.newOrderState.comboSelected || '',
-      items
+      items,
+      notes: notesVal || null
     };
 
     const submitBtn = document.getElementById('btn-submit-new-order') || document.querySelector('#form-new-order button[type="submit"]');
@@ -1600,6 +1603,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     const resetAltTrigger = document.getElementById('new-order-alt-phone-trigger-wrap');
     const resetAltError = document.getElementById('new-order-alt-phone-error');
     if (resetAltInput) resetAltInput.value = '';
+    const resetNotes = document.getElementById('new-order-notes');
+    if (resetNotes) resetNotes.value = '';
     if (resetAltGroup) resetAltGroup.style.display = 'none';
     if (resetAltTrigger) resetAltTrigger.style.display = 'block';
     if (resetAltError) {

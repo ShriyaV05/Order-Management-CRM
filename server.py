@@ -78,6 +78,7 @@ class CreateOrderRequest(BaseModel):
     apply_combo: Optional[bool] = False
     combo_type: Optional[str] = ""
     items: List[OrderItemInput]
+    notes: Optional[str] = None
 
 class EditOrderRequest(BaseModel):
     customer_name: str
@@ -92,6 +93,7 @@ class EditOrderRequest(BaseModel):
     apply_combo: Optional[bool] = False
     combo_type: Optional[str] = ""
     items: List[OrderItemInput]
+    notes: Optional[str] = None
 
 class StockMovementRequest(BaseModel):
     flavour: str

@@ -3597,42 +3597,36 @@ body.auth-required #app-container {
 /* Container ambient brand yellow & blue background (strictly scoped to New Order view) */
 .content-scrollable:has(#view-new-order:not([style*="display: none"])) {
   background: 
-    radial-gradient(ellipse 65% 55% at 5% 10%, rgba(255, 213, 79, 0.16) 0%, transparent 65%),
-    radial-gradient(ellipse 60% 50% at 95% 12%, rgba(13, 71, 161, 0.13) 0%, transparent 65%),
-    radial-gradient(ellipse 55% 45% at 90% 88%, rgba(255, 206, 71, 0.11) 0%, transparent 60%),
-    radial-gradient(ellipse 60% 50% at 10% 90%, rgba(21, 101, 192, 0.09) 0%, transparent 65%),
+    radial-gradient(ellipse 70% 60% at 8% 10%, rgba(255, 213, 79, 0.18) 0%, transparent 65%),
+    radial-gradient(ellipse 65% 55% at 92% 12%, rgba(13, 71, 161, 0.15) 0%, transparent 65%),
+    radial-gradient(ellipse 60% 50% at 90% 90%, rgba(255, 206, 71, 0.14) 0%, transparent 60%),
+    radial-gradient(ellipse 65% 55% at 10% 90%, rgba(21, 101, 192, 0.12) 0%, transparent 65%),
     #F4F6FA;
+  padding: 20px 24px;
 }
 
 #view-new-order {
-  max-width: 1400px;
+  width: 100%;
+  max-width: 1540px;
   margin: 0 auto;
   position: relative;
-  border-radius: 20px;
-  padding: 16px 20px;
-  background: 
-    radial-gradient(ellipse 70% 60% at 8% 12%, rgba(255, 213, 79, 0.20) 0%, transparent 65%),
-    radial-gradient(ellipse 65% 55% at 92% 15%, rgba(13, 71, 161, 0.15) 0%, transparent 65%),
-    radial-gradient(ellipse 55% 45% at 88% 85%, rgba(255, 206, 71, 0.14) 0%, transparent 60%),
-    radial-gradient(ellipse 60% 50% at 15% 88%, rgba(21, 101, 192, 0.12) 0%, transparent 65%),
-    linear-gradient(135deg, rgba(255, 255, 255, 0.72) 0%, rgba(248, 250, 252, 0.80) 50%, rgba(239, 246, 255, 0.85) 100%);
-  box-shadow: 
-    inset 0 1px 1px 0 rgba(255, 255, 255, 0.95),
-    0 12px 36px -6px rgba(13, 71, 161, 0.07);
-  border: 1px solid rgba(255, 255, 255, 0.85);
+  padding: 0;
+  background: transparent;
+  border: none;
+  box-shadow: none;
 }
 
 #view-new-order .new-order-layout-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1.45fr) minmax(0, 0.78fr);
-  gap: 14px;
+  grid-template-columns: minmax(0, 1.48fr) minmax(330px, 0.82fr);
+  gap: 16px;
   align-items: stretch;
 }
 
 #view-new-order .new-order-left-column {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 14px;
 }
 
 #view-new-order .new-order-right-column {
@@ -3645,40 +3639,40 @@ body.auth-required #app-container {
 
 /* Customer Information Card (Translucent Frosted Glass) */
 #view-new-order .new-order-customer-card {
-  background: rgba(255, 255, 255, 0.65);
+  background: rgba(255, 255, 255, 0.68);
   backdrop-filter: blur(20px) saturate(180%);
   -webkit-backdrop-filter: blur(20px) saturate(180%);
-  border: 1px solid rgba(255, 255, 255, 0.90);
+  border: 1px solid rgba(255, 255, 255, 0.92);
   border-radius: var(--radius-lg);
   box-shadow: 
     inset 0 1px 1px 0 rgba(255, 255, 255, 0.95),
-    0 8px 30px -4px rgba(13, 71, 161, 0.06),
+    0 8px 32px -4px rgba(13, 71, 161, 0.07),
     0 2px 6px rgba(0, 0, 0, 0.02);
-  padding: 12px 18px;
+  padding: 16px 20px;
   margin-bottom: 0;
 }
 
 #view-new-order .new-order-customer-card .panel-header {
-  margin-bottom: 2px;
+  margin-bottom: 6px;
   padding-bottom: 0;
 }
 
 #view-new-order .new-order-customer-card .panel-title {
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 700;
 }
 
 #view-new-order .new-order-form-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 8px 12px;
-  margin-top: 6px;
+  gap: 10px 14px;
+  margin-top: 8px;
 }
 
 #view-new-order .new-order-form-grid .form-group {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 4px;
 }
 
 #view-new-order .new-order-form-grid .form-group.span-full,
@@ -3687,51 +3681,52 @@ body.auth-required #app-container {
 }
 
 #view-new-order .new-order-form-grid .form-label {
-  font-size: 11.5px;
+  font-size: 13px;
   font-weight: 600;
   color: var(--text-secondary);
-  margin-bottom: 0;
+  margin-bottom: 2px;
 }
 
 #view-new-order .new-order-form-grid .form-control {
-  height: 33px;
-  font-size: 12.5px;
-  padding: 5px 10px;
-  border-radius: var(--radius-sm);
-  border: 1px solid rgba(203, 213, 225, 0.75);
-  background: rgba(255, 255, 255, 0.75);
+  height: 40px;
+  font-size: 13.5px;
+  padding: 8px 12px;
+  border-radius: var(--radius-md);
+  border: 1px solid rgba(203, 213, 225, 0.82);
+  background: rgba(255, 255, 255, 0.82);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
   transition: border-color var(--transition-fast), box-shadow var(--transition-fast), background var(--transition-fast);
 }
 
 #view-new-order .new-order-form-grid .form-control:focus {
-  background: rgba(255, 255, 255, 0.95);
+  background: rgba(255, 255, 255, 0.96);
   border-color: var(--primary-blue);
   box-shadow: 0 0 0 3px rgba(13, 71, 161, 0.12);
   outline: none;
 }
 
 #view-new-order .new-order-form-grid textarea.form-control {
-  height: 33px;
-  min-height: 33px;
-  line-height: 1.35;
+  height: 56px;
+  min-height: 52px;
+  line-height: 1.4;
   resize: vertical;
-  padding: 5px 10px;
+  padding: 8px 12px;
+  font-size: 13.5px;
 }
 
 /* Bottle Selection Panel (Translucent Frosted Glass) */
 #view-new-order .new-order-flavours-panel {
-  background: rgba(255, 255, 255, 0.65);
+  background: rgba(255, 255, 255, 0.68);
   backdrop-filter: blur(20px) saturate(180%);
   -webkit-backdrop-filter: blur(20px) saturate(180%);
-  border: 1px solid rgba(255, 255, 255, 0.90);
+  border: 1px solid rgba(255, 255, 255, 0.92);
   border-radius: var(--radius-lg);
   box-shadow: 
     inset 0 1px 1px 0 rgba(255, 255, 255, 0.95),
-    0 8px 30px -4px rgba(13, 71, 161, 0.06),
+    0 8px 32px -4px rgba(13, 71, 161, 0.07),
     0 2px 6px rgba(0, 0, 0, 0.02);
-  padding: 12px 18px;
+  padding: 14px 20px;
   margin-bottom: 0;
 }
 
@@ -3741,23 +3736,24 @@ body.auth-required #app-container {
 }
 
 #view-new-order .new-order-flavours-panel .panel-title {
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 700;
 }
 
 #view-new-order .new-order-flavours-panel .price-pill {
-  font-size: 11.5px;
-  padding: 3px 8px;
+  font-size: 12px;
+  padding: 4px 10px;
+  border-radius: var(--radius-sm);
 }
 
 /* Translucent Glass Combo Offer Banner */
 #view-new-order .combo-offers-container {
   margin-bottom: 8px;
-  padding: 6px 10px;
-  background: linear-gradient(135deg, rgba(254, 243, 199, 0.82) 0%, rgba(255, 251, 235, 0.72) 100%);
+  padding: 6px 12px;
+  background: linear-gradient(135deg, rgba(254, 243, 199, 0.85) 0%, rgba(255, 251, 235, 0.75) 100%);
   backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
-  border: 1px solid rgba(252, 211, 77, 0.70);
+  border: 1px solid rgba(252, 211, 77, 0.75);
   border-radius: var(--radius-sm);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9), 0 4px 14px rgba(217, 119, 6, 0.08);
   display: flex;
@@ -3770,7 +3766,7 @@ body.auth-required #app-container {
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 11.5px;
+  font-size: 12px;
 }
 
 #view-new-order .combo-offers-badge {
@@ -3784,13 +3780,13 @@ body.auth-required #app-container {
 }
 
 #view-new-order .combo-offers-text {
-  font-size: 11.5px;
+  font-size: 12px;
   color: #78350F;
 }
 
 #view-new-order .btn-combo {
-  padding: 4px 10px;
-  font-size: 11.5px;
+  padding: 5px 12px;
+  font-size: 12px;
   font-weight: 700;
   border-radius: var(--radius-sm);
 }
@@ -3799,8 +3795,8 @@ body.auth-required #app-container {
 #view-new-order .flavours-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 10px;
-  margin-top: 6px;
+  gap: 12px;
+  margin-top: 8px;
 }
 
 #view-new-order .flavour-card {
@@ -3808,10 +3804,10 @@ body.auth-required #app-container {
   flex-direction: column;
   align-items: center;
   text-align: center;
-  gap: 5px;
-  padding: 8px 6px;
+  gap: 6px;
+  padding: 10px 8px;
   position: relative;
-  background: rgba(255, 255, 255, 0.72);
+  background: rgba(255, 255, 255, 0.74);
   backdrop-filter: blur(14px) saturate(160%);
   -webkit-backdrop-filter: blur(14px) saturate(160%);
   border: 1px solid rgba(255, 255, 255, 0.92);
@@ -3824,7 +3820,7 @@ body.auth-required #app-container {
 
 #view-new-order .flavour-card:hover {
   transform: translateY(-2px);
-  background: rgba(255, 255, 255, 0.90);
+  background: rgba(255, 255, 255, 0.92);
   border-color: rgba(13, 71, 161, 0.40);
   box-shadow: 
     inset 0 1px 1px 0 #ffffff,
@@ -3832,12 +3828,12 @@ body.auth-required #app-container {
 }
 
 #view-new-order .flavour-card-media {
-  width: 48px;
-  height: 52px;
-  min-width: 48px;
-  min-height: 52px;
+  width: 52px;
+  height: 56px;
+  min-width: 52px;
+  min-height: 56px;
   border-radius: var(--radius-sm);
-  background: rgba(248, 247, 242, 0.65);
+  background: rgba(248, 247, 242, 0.70);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
   border: 1px solid rgba(255, 255, 255, 0.85);
@@ -3879,7 +3875,7 @@ body.auth-required #app-container {
 
 #view-new-order .flavour-name {
   font-weight: 700;
-  font-size: 12.5px;
+  font-size: 13px;
   color: var(--primary-blue);
   text-align: center;
   white-space: nowrap;
@@ -3890,8 +3886,8 @@ body.auth-required #app-container {
 
 #view-new-order .flavour-stock-tag {
   position: absolute;
-  top: 4px;
-  right: 6px;
+  top: 2px;
+  right: 4px;
   font-size: 9.5px;
   font-weight: 700;
   padding: 1px 4px;
@@ -3905,24 +3901,24 @@ body.auth-required #app-container {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 3px;
+  gap: 4px;
   width: 100%;
 }
 
 #view-new-order .flavour-qty-control .btn-qty {
-  width: 26px;
-  height: 26px;
-  min-width: 26px;
-  min-height: 26px;
-  flex: 0 0 26px;
+  width: 30px;
+  height: 30px;
+  min-width: 30px;
+  min-height: 30px;
+  flex: 0 0 30px;
   border-radius: var(--radius-xs);
-  font-size: 15px;
+  font-size: 16px;
   font-weight: bold;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(241, 245, 249, 0.82);
-  border: 1px solid rgba(203, 213, 225, 0.8);
+  background: rgba(241, 245, 249, 0.85);
+  border: 1px solid rgba(203, 213, 225, 0.85);
   color: var(--text-primary);
   cursor: pointer;
   padding: 0;
@@ -3936,30 +3932,30 @@ body.auth-required #app-container {
 }
 
 #view-new-order .flavour-qty-control .qty-input {
-  width: 38px;
-  height: 26px;
-  min-width: 38px;
+  width: 42px;
+  height: 30px;
+  min-width: 42px;
   text-align: center;
   font-weight: 700;
-  font-size: 12.5px;
+  font-size: 13.5px;
   border-radius: var(--radius-xs);
-  border: 1px solid rgba(203, 213, 225, 0.8);
+  border: 1px solid rgba(203, 213, 225, 0.85);
   padding: 0;
-  background: rgba(255, 255, 255, 0.82);
+  background: rgba(255, 255, 255, 0.85);
 }
 
 /* Right Column: Order Summary Card (Translucent Blue Frosted Glass) */
 #view-new-order .new-order-summary-card {
-  background: linear-gradient(160deg, rgba(255, 255, 255, 0.78) 0%, rgba(240, 247, 255, 0.70) 50%, rgba(224, 242, 254, 0.64) 100%);
+  background: linear-gradient(160deg, rgba(255, 255, 255, 0.82) 0%, rgba(240, 247, 255, 0.74) 50%, rgba(224, 242, 254, 0.68) 100%);
   backdrop-filter: blur(22px) saturate(180%);
   -webkit-backdrop-filter: blur(22px) saturate(180%);
-  border: 1px solid rgba(255, 255, 255, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.94);
   border-radius: var(--radius-lg);
   box-shadow: 
     inset 0 1px 1px 0 rgba(255, 255, 255, 0.95),
     0 10px 36px -4px rgba(13, 71, 161, 0.10),
     0 3px 10px -1px rgba(0, 0, 0, 0.03);
-  padding: 14px 18px;
+  padding: 16px 20px;
   margin-bottom: 0;
   height: 100%;
   display: flex;
@@ -3972,19 +3968,19 @@ body.auth-required #app-container {
 }
 
 #view-new-order .new-order-summary-card .panel-title {
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 700;
 }
 
 #view-new-order .pricing-summary-card-inner {
-  background: rgba(255, 255, 255, 0.52);
+  background: rgba(255, 255, 255, 0.58);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(219, 234, 254, 0.88);
+  border: 1px solid rgba(219, 234, 254, 0.90);
   border-radius: var(--radius-md);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.95), 0 2px 8px rgba(13, 71, 161, 0.04);
-  padding: 8px 14px;
-  margin-top: 6px;
+  padding: 10px 16px;
+  margin-top: 8px;
   flex: 1;
   display: flex;
   flex-direction: column;
@@ -3995,34 +3991,34 @@ body.auth-required #app-container {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 5px 0;
-  font-size: 12.5px;
+  padding: 6px 0;
+  font-size: 13.5px;
   color: var(--text-secondary);
   border-bottom: 1px dashed rgba(13, 71, 161, 0.12);
 }
 
 #view-new-order .pricing-row strong {
-  font-size: 12.5px;
+  font-size: 13.5px;
   color: var(--text-primary);
   font-weight: 600;
 }
 
 #view-new-order .pricing-row.delivery-row {
-  padding: 5px 0;
+  padding: 6px 0;
 }
 
 #view-new-order .pricing-row.total-row {
   border-bottom: none;
   border-top: 2px solid var(--primary-blue);
   margin-top: auto;
-  padding-top: 8px;
-  font-size: 13.5px;
+  padding-top: 10px;
+  font-size: 14.5px;
   font-weight: 700;
   color: var(--primary-blue);
 }
 
 #view-new-order .pricing-row.total-row strong {
-  font-size: 19px;
+  font-size: 21px;
   font-weight: 800;
   color: var(--primary-blue);
 }
@@ -4036,26 +4032,26 @@ body.auth-required #app-container {
 #view-new-order .delivery-fee-input-wrap {
   display: inline-flex;
   align-items: center;
-  background: rgba(255, 255, 255, 0.85);
-  border: 1px solid rgba(203, 213, 225, 0.80);
+  background: rgba(255, 255, 255, 0.90);
+  border: 1px solid rgba(203, 213, 225, 0.85);
   border-radius: var(--radius-sm);
-  padding: 0 6px;
+  padding: 0 8px;
 }
 
 #view-new-order .delivery-fee-input-wrap span {
-  font-size: 12px;
+  font-size: 13px;
   color: var(--text-muted);
   font-weight: 600;
 }
 
 #view-new-order .delivery-input {
-  width: 60px;
-  height: 26px;
+  width: 64px;
+  height: 28px;
   border: none;
   background: transparent;
   padding: 2px 4px;
   font-weight: 700;
-  font-size: 12.5px;
+  font-size: 13.5px;
   text-align: right;
 }
 
@@ -4064,14 +4060,14 @@ body.auth-required #app-container {
 }
 
 #view-new-order .delivery-calc-note {
-  font-size: 10.5px;
+  font-size: 11px;
   color: #1E40AF;
-  margin-top: 1px;
+  margin-top: 2px;
   line-height: 1.25;
 }
 
 #view-new-order .order-summary-actions {
-  margin-top: 10px;
+  margin-top: 12px;
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -4080,17 +4076,18 @@ body.auth-required #app-container {
 #view-new-order .new-order-summary-card #btn-submit-new-order {
   width: 100%;
   min-width: 0;
-  padding: 10px 16px;
-  font-size: 13.5px;
+  padding: 12px 18px;
+  font-size: 14.5px;
   font-weight: 700;
   border-radius: var(--radius-md);
   justify-content: center;
 }
 
 /* Responsive Breakpoints */
-@media (max-width: 1024px) {
+@media (max-width: 1080px) {
   #view-new-order .new-order-layout-grid {
     grid-template-columns: 1fr;
+    gap: 14px;
   }
   #view-new-order .new-order-right-column {
     position: static;
@@ -4104,6 +4101,14 @@ body.auth-required #app-container {
 }
 
 @media (max-width: 640px) {
+  .content-scrollable:has(#view-new-order:not([style*="display: none"])) {
+    padding: 12px;
+  }
+  #view-new-order .new-order-customer-card,
+  #view-new-order .new-order-flavours-panel,
+  #view-new-order .new-order-summary-card {
+    padding: 14px 16px;
+  }
   #view-new-order .new-order-form-grid {
     grid-template-columns: 1fr;
   }

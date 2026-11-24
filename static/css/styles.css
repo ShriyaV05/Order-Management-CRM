@@ -3687,6 +3687,33 @@ body.auth-required #app-container {
   gap: 4px;
 }
 
+#view-new-order .form-group-inline-pair {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 8px;
+  min-width: 0;
+  width: 100%;
+}
+
+#view-new-order .form-group-inline-pair .form-group {
+  margin: 0;
+  min-width: 0;
+  width: 100%;
+}
+
+#view-new-order .form-group-inline-pair .form-label {
+  font-size: 11.5px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+#view-new-order .form-group-inline-pair .form-control {
+  min-width: 0;
+  width: 100%;
+  font-size: 11.5px;
+  padding: 6px 4px 6px 8px;
+}
+
 #view-new-order .new-order-form-grid .form-group.span-full,
 #view-new-order .new-order-form-grid .form-group.span-2 {
   grid-column: 1 / -1;

@@ -1489,6 +1489,9 @@ document.addEventListener('DOMContentLoaded', async () => {
       altPhone = rawAlt;
     }
 
+    const orderSourceEl = document.getElementById('new-order-source');
+    const orderSourceVal = (orderSourceEl && orderSourceEl.value) ? orderSourceEl.value : 'Assisted';
+
     const payload = {
       customer_name: customerName,
       phone,
@@ -1502,7 +1505,8 @@ document.addEventListener('DOMContentLoaded', async () => {
       apply_combo: !!state.newOrderState.comboSelected,
       combo_type: state.newOrderState.comboSelected || '',
       items,
-      notes: notesVal || null
+      notes: notesVal || null,
+      order_source: orderSourceVal
     };
 
     const submitBtn = document.getElementById('btn-submit-new-order') || document.querySelector('#form-new-order button[type="submit"]');
@@ -1605,6 +1609,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (resetAltInput) resetAltInput.value = '';
     const resetNotes = document.getElementById('new-order-notes');
     if (resetNotes) resetNotes.value = '';
+    const resetOrderSource = document.getElementById('new-order-source');
+    if (resetOrderSource) resetOrderSource.value = 'Assisted';
     if (resetAltGroup) resetAltGroup.style.display = 'none';
     if (resetAltTrigger) resetAltTrigger.style.display = 'block';
     if (resetAltError) {
@@ -2176,6 +2182,18 @@ document.addEventListener('DOMContentLoaded', async () => {
       document.getElementById('detail-customer-address').textContent = o.address;
       document.getElementById('detail-customer-location').textContent = `${o.district}, ${o.state} - ${o.pin_code}`;
 
+      // Requirement 2: Display saved Order Source from actual saved data (never infer Assisted for historical NULL)
+      const orderSourceEl = document.getElementById('detail-order-source');
+      if (orderSourceEl) {
+        if (o.order_source === 'Website') {
+          orderSourceEl.innerHTML = '<span class="badge" style="background:#E0F2FE; color:#0369A1; font-weight:700; padding:2px 8px; border-radius:4px; font-size:12px; display:inline-block;">Website</span>';
+        } else if (o.order_source === 'Assisted') {
+          orderSourceEl.innerHTML = '<span class="badge" style="background:#FEF3C7; color:#B45309; font-weight:700; padding:2px 8px; border-radius:4px; font-size:12px; display:inline-block;">Assisted</span>';
+        } else {
+          orderSourceEl.innerHTML = '<span style="color:var(--text-muted); font-style:italic;">Not Specified</span>';
+        }
+      }
+
       // Requirement: Show notes in order details ONLY if notes were entered (non-empty)
       const notesContainer = document.getElementById('detail-notes-container');
       const notesEl = document.getElementById('detail-customer-notes');
@@ -2363,6 +2381,18 @@ document.addEventListener('DOMContentLoaded', async () => {
       document.getElementById('edit-address').value = o.address;
       const editNotesEl = document.getElementById('edit-order-notes');
       if (editNotesEl) editNotesEl.value = o.notes || '';
+
+      // Requirement 3: Pre-populate Order Source in Edit Order modal
+      const editOrderSourceEl = document.getElementById('edit-order-source');
+      if (editOrderSourceEl) {
+        if (o.order_source === 'Website') {
+          editOrderSourceEl.value = 'Website';
+        } else if (o.order_source === 'Assisted') {
+          editOrderSourceEl.value = 'Assisted';
+        } else {
+          editOrderSourceEl.value = 'Assisted';
+        }
+      }
       document.getElementById('edit-pincode').value = o.pin_code;
       
       const savedFee = (o.delivery_fee !== undefined && o.delivery_fee !== null) ? Number(o.delivery_fee) : 0;
@@ -2768,6 +2798,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     const editNotesEl = document.getElementById('edit-order-notes');
     const editNotesVal = editNotesEl ? editNotesEl.value.trim() : '';
 
+    const editOrderSourceEl = document.getElementById('edit-order-source');
+    const editOrderSourceVal = editOrderSourceEl ? editOrderSourceEl.value : undefined;
+
     const payload = {
       customer_name: document.getElementById('edit-customer-name').value.trim(),
       phone: document.getElementById('edit-phone').value.trim(),
@@ -2781,7 +2814,8 @@ document.addEventListener('DOMContentLoaded', async () => {
       delivery_fee: parseFloat(document.getElementById('edit-delivery-fee').value) || 0,
       apply_combo: !!editOrderState.comboSelected,
       combo_type: editOrderState.comboSelected || '',
-      items
+      items,
+      order_source: editOrderSourceVal
     };
 
     try {

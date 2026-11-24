@@ -8,7 +8,7 @@
   <meta http-equiv="Expires" content="0">
   <title>POPCONE Orders & Sales CRM</title>
   <meta name="description" content="Production-ready Order Management, Inventory Tracking, and Sales Analytics CRM for POPCONE.">
-  <link rel="stylesheet" href="/static/css/styles.css?v=20261123_07">
+  <link rel="stylesheet" href="/static/css/styles.css?v=20261124_04">
   <link rel="icon" href="/logo.jpg" type="image/jpeg">
   <link rel="shortcut icon" href="/logo.jpg" type="image/jpeg">
   <link rel="apple-touch-icon" href="/logo.jpg">
@@ -301,12 +301,21 @@
                       <label class="form-label" for="new-order-state">State <span class="required">*</span></label>
                       <select id="new-order-state" class="form-control" required></select>
                     </div>
-                    <div class="form-group">
-                      <label class="form-label" for="new-order-payment">Payment Method <span class="required">*</span></label>
-                      <select id="new-order-payment" class="form-control" required>
-                        <option value="Paid">Prepaid (Paid)</option>
-                        <option value="COD">Cash on Delivery (COD)</option>
-                      </select>
+                    <div class="form-group-inline-pair">
+                      <div class="form-group">
+                        <label class="form-label" for="new-order-payment">Payment <span class="required">*</span></label>
+                        <select id="new-order-payment" class="form-control" required>
+                          <option value="Paid">Prepaid</option>
+                          <option value="COD">COD</option>
+                        </select>
+                      </div>
+                      <div class="form-group">
+                        <label class="form-label" for="new-order-source">Order Source <span class="required">*</span></label>
+                        <select id="new-order-source" class="form-control" required>
+                          <option value="Assisted" selected>Assisted</option>
+                          <option value="Website">Website</option>
+                        </select>
+                      </div>
                     </div>
                     <div class="form-group span-full">
                       <label class="form-label" for="new-order-address">Delivery Address <span class="required">*</span></label>
@@ -1144,9 +1153,13 @@
             <span class="detail-info-label">Address</span>
             <span id="detail-customer-address" class="detail-info-value">-</span>
           </div>
-          <div class="detail-info-item" style="grid-column: span 2;">
+          <div class="detail-info-item">
             <span class="detail-info-label">Location</span>
             <span id="detail-customer-location" class="detail-info-value">-</span>
+          </div>
+          <div class="detail-info-item">
+            <span class="detail-info-label">Order Source</span>
+            <span id="detail-order-source" class="detail-info-value">-</span>
           </div>
           <div class="detail-info-item span-full" id="detail-notes-container" style="grid-column: span 2; display: none;">
             <span class="detail-info-label">Order Notes / Instructions</span>
@@ -1296,6 +1309,13 @@
               <div class="form-group">
                 <label class="form-label" for="edit-state">State <span class="req-star">*</span></label>
                 <select id="edit-state" class="form-control" required></select>
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="edit-order-source">Order Source <span class="req-star">*</span></label>
+                <select id="edit-order-source" class="form-control" required>
+                  <option value="Assisted">Assisted</option>
+                  <option value="Website">Website</option>
+                </select>
               </div>
             </div>
           </div>
@@ -1741,6 +1761,6 @@
 
   <!-- Scripts (Cache-busted) -->
   <script src="/static/js/api.js?v=20261116_01"></script>
-  <script src="/static/js/app.js?v=20261123_07"></script>
+  <script src="/static/js/app.js?v=20261124_04"></script>
 </body>
 </html>

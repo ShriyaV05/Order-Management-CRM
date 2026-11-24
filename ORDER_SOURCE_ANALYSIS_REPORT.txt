@@ -1,0 +1,242 @@
+================================================================================
+POPCONE CRM – ORDER SOURCE FEATURE ARCHITECTURAL ANALYSIS REPORT
+Phase 1: Analysis & Technical Implementation Blueprint (Zero Code Changes)
+Date: 2026-11-23
+Status: PENDING USER APPROVAL ("proceed")
+================================================================================
+
+1. EXECUTIVE SUMMARY
+--------------------------------------------------------------------------------
+This report provides a comprehensive architectural assessment and implementation
+plan for introducing an "Order Source" field across the POPCONE Orders & Sales CRM.
+In accordance with strict Phase 1 guidelines, NO source code, database tables,
+existing orders, customer records, or financial logic have been altered.
+
+The Order Source feature will enable tracking whether an order originated from
+the "Website" or was created via "Assisted" sales, with "Assisted" serving as
+the default selection for all new orders.
+
+
+2. EXACT FILES, COMPONENTS, FUNCTIONS, AND FIELDS INVOLVED
+--------------------------------------------------------------------------------
+A. Database Layer:
+   - File: database.py
+   - Component: Schema migration manager (_init_db_unlocked)
+   - Function: _add_column_if_missing(cursor, "orders", "order_source", "order_source TEXT DEFAULT NULL")
+   - Table Affected: orders
+   - Column: order_source (Data type: TEXT, Nullable: TRUE, Default: NULL)
+
+B. Backend API Layer:
+   - File: server.py
+   - Data Models:
+     * CreateOrderRequest(BaseModel): Add field `order_source: Optional[str] = "Assisted"`
+     * EditOrderRequest(BaseModel): Add field `order_source: Optional[str] = None`
+   - API Endpoints:
+     * POST /api/orders (create_order): Extract and validate order_source ('Website' | 'Assisted'); insert into orders table.
+     * GET /api/orders (get_orders): Include order_source in order row dictionary.
+     * GET /api/orders/{order_id} (get_order_details): Return `order_source` in formatted order response.
+     * PUT /api/orders/{order_id} (edit_order): Update `order_source = ?` in SQL UPDATE statement without altering financial or item data.
+
+C. Frontend User Interface Layer:
+   - File: static/index.html
+     * Component 1: New Order Page (#view-new-order -> .new-order-customer-card .new-order-form-grid)
+       Add field: `<select id="new-order-source" class="form-control" required>` with options:
+         - `<option value="Assisted" selected>Assisted</option>`
+         - `<option value="Website">Website</option>`
+     * Component 2: Order Details Modal (#modal-order-details -> .detail-info-grid)
+       Add display element: `<span id="detail-order-source" class="detail-info-value">-</span>`
+     * Component 3: Edit Order Modal (#modal-edit-order -> Section A: Customer Information)
+       Add field: `<select id="edit-order-source" class="form-control" required>` with options:
+         - `<option value="Assisted">Assisted</option>`
+         - `<option value="Website">Website</option>`
+     * Version Tags: Bump asset cache-busting query strings to v=20261123_08.
+
+   - File: static/js/app.js
+     * Form Submission (#form-new-order 'submit'): Extract value from #new-order-source, attach to payload.
+     * Form Reset (#form-new-order 'reset'): Reset #new-order-source to 'Assisted'.
+     * Order Details Renderer (openOrderDetails): Read `o.order_source`. If present, render with styled badge; if NULL or unset (historical orders), render as "Not Specified".
+     * Edit Order Opener (openEditOrderModal): Populate #edit-order-source with existing `o.order_source || 'Assisted'`.
+     * Edit Order Submission (#form-edit-order 'submit'): Include updated `order_source` in PUT payload.
+
+   - File: static/css/styles.css
+     * Form control styling for #new-order-source and #edit-order-source matching frosted glass aesthetic.
+     * Badge styles for Order Source in Order Details modal.
+
+D. Automated Test Infrastructure:
+   - Files:
+     * tests/test_delivery_fees.py
+     * tests/test_order_customer_flow.py
+     * tests/test_shipping_manifest.py
+     * tests/test_order_notes.py
+     * tests/test_order_source.py (New dedicated test suite)
+
+
+3. CAPTURING ORDER SOURCE ON NEW ORDER PAGE
+--------------------------------------------------------------------------------
+1. Form Structure:
+   Inside `#view-new-order .new-order-customer-card .new-order-form-grid`, a dedicated
+   form group will be added directly within the Customer Information section:
+   ```html
+   <div class="form-group">
+     <label class="form-label" for="new-order-source">Order Source <span class="required">*</span></label>
+     <select id="new-order-source" class="form-control" required>
+       <option value="Assisted" selected>Assisted</option>
+       <option value="Website">Website</option>
+     </select>
+   </div>
+   ```
+2. Layout Alignment & Balance:
+   - The grid currently uses `repeat(3, 1fr)`.
+   - Adding Order Source creates an even, highly balanced 2x3 input grid before the Address row:
+     Row 1: Customer Name (col 1), Phone Number (col 2), PIN Code (col 3)
+     Row 2: District (col 1), State (col 2), Order Source (col 3)
+     Row 3: Payment Method (col 1), Delivery Address (span cols 2 & 3 or span full)
+     Row 4: Order Notes (span full)
+   - Height and padding remain strictly consistent (40px input height, 13.5px font size),
+     guaranteeing zero vertical overflow on 1366x768 laptop screens and desktop screens.
+3. Default State:
+   - Defaults to "Assisted" on initial load.
+   - Reverts to "Assisted" whenever the "Reset Form" button or submission reset runs.
+4. Submission Payload:
+   - JavaScript extracts:
+     `const orderSource = document.getElementById('new-order-source')?.value || 'Assisted';`
+   - Validated against whitelist {'Website', 'Assisted'}.
+   - Sent in POST /api/orders request payload.
+
+
+4. DISPLAYING ORDER SOURCE IN ORDER DETAILS
+--------------------------------------------------------------------------------
+1. Presentation Location:
+   In `#modal-order-details`, the Order Source will be rendered cleanly in the
+   "Customer & Delivery Address" or "Payment & Logistics" info grid.
+   ```html
+   <div class="detail-info-item">
+     <span class="detail-info-label">Order Source</span>
+     <span id="detail-order-source" class="detail-info-value">-</span>
+   </div>
+   ```
+2. Rendering Logic (app.js -> openOrderDetails):
+   - If `order.order_source === 'Website'`:
+     Renders as a crisp, distinct badge: `<span class="badge" style="background:#E0F2FE; color:#0369A1; font-weight:700;">Website</span>`
+   - If `order.order_source === 'Assisted'`:
+     Renders as a crisp, distinct badge: `<span class="badge" style="background:#FEF3C7; color:#B45309; font-weight:700;">Assisted</span>`
+   - If `order.order_source` is NULL, empty, or undefined (Historical Orders):
+     Renders as: `<span style="color:#94A3B8; font-weight:500;">Not Specified</span>`
+3. Zero-Inference Guarantee:
+   - The value is derived strictly from `order.order_source`.
+   - Historical records are NEVER auto-inferred or displayed as "Assisted".
+
+
+5. EDITING AND SAVING ORDER SOURCE IN EDIT ORDER
+--------------------------------------------------------------------------------
+1. Modal Field Structure:
+   Inside `#modal-edit-order`, Section A (Customer Information), an editable field
+   will be added:
+   ```html
+   <div class="form-group">
+     <label class="form-label" for="edit-order-source">Order Source <span class="req-star">*</span></label>
+     <select id="edit-order-source" class="form-control" required>
+       <option value="Assisted">Assisted</option>
+       <option value="Website">Website</option>
+     </select>
+   </div>
+   ```
+2. Pre-population (app.js -> openEditOrderModal):
+   - Reads `order.order_source`.
+   - If 'Website', selects 'Website'.
+   - If 'Assisted', selects 'Assisted'.
+   - If NULL / unset (historical order), presents an explicit selector or defaults to 'Assisted' upon editing.
+3. Save Operation:
+   - The PUT payload contains: `order_source: document.getElementById('edit-order-source').value`.
+   - Server updates `order_source = ?` in the database.
+   - Crucial Isolation: Only `order_source` and user-edited fields are updated.
+     Bottle quantities, inventory deductions, combo offers, discounts, delivery fees,
+     and final totals remain 100% untouched.
+   - Reopening Order Details immediately displays the newly updated source.
+
+
+6. HANDLING EXISTING ORDERS WITHOUT ORDER SOURCE (HISTORICAL DATA SAFETY)
+--------------------------------------------------------------------------------
+- All 14 existing historical orders currently in the Turso production database
+  will retain `order_source = NULL`.
+- Strict Non-Negotiable Commitments:
+  1. NO UPDATE queries will be executed against historical rows.
+  2. NO backfill script will run.
+  3. Historical rows will NOT be assumed to be 'Assisted' or 'Website'.
+  4. In the UI, historical orders display transparently as "Not Specified" (or "—").
+  5. If an administrator later chooses to open Edit Order for a historical record,
+     they may select and assign a source explicitly at that time.
+
+
+7. DATABASE SUITABILITY & SCHEMA MIGRATION ASSESSMENT
+--------------------------------------------------------------------------------
+1. Existing Column Check:
+   - The `orders` table currently contains 29 columns:
+     id, order_id, customer_name, phone, alternate_phone, address, pin_code, state,
+     district, total_bottles, total_weight_grams, unit_price, product_amount,
+     delivery_fee, actual_delivery_fee, final_amount, payment, dispatch_state,
+     created_by, created_at, edited_by, edited_at, discount_per_bottle, total_discount,
+     normal_product_amount, is_combo, combo_type, combo_price, notes.
+   - None of these columns represent the order channel or acquisition source.
+   - Existing fields (payment, dispatch_state, created_by, notes) serve dedicated
+     functions and cannot be overloaded without corrupting operational integrity.
+2. Is a Schema Change Required?
+   - Yes. A new column `order_source` must be added to store this data permanently.
+3. Proposed Safe Migration Approach:
+   - SQLite / Turso metadata-only non-blocking DDL:
+     `ALTER TABLE orders ADD COLUMN order_source TEXT DEFAULT NULL;`
+   - Implemented via the application's existing helper in database.py:
+     `_add_column_if_missing(cursor, "orders", "order_source", "order_source TEXT DEFAULT NULL")`
+   - Why this is 100% safe:
+     * O(1) instant operation.
+     * Does not rewrite the table or lock concurrent reads.
+     * Existing rows are not modified; they automatically evaluate to NULL.
+     * Idempotent (checks column existence before altering).
+
+
+8. PRESERVATION OF BACKWARD COMPATIBILITY & SYSTEM INTEGRITY
+--------------------------------------------------------------------------------
+1. API Compatibility:
+   - Pydantic's `CreateOrderRequest` accepts `order_source: Optional[str] = "Assisted"`.
+     Calls omitting this field will automatically default to "Assisted" without 422 errors.
+   - `EditOrderRequest` accepts `order_source: Optional[str] = None`.
+   - Existing test fixtures and scripts continue to function without changes.
+2. Business Logic Isolation:
+   - Pricing formulas, delivery calculations, inventory stock tracking, and combo offer
+     validations are completely independent of `order_source`.
+3. Event Handler Cleanliness:
+   - No duplicate event listeners; uses existing submit and reset handlers.
+
+
+9. COMPREHENSIVE TESTING PLAN
+--------------------------------------------------------------------------------
+A. Automated Backend Test Suite (pytest):
+   1. Create Order with Default Source: Verify POST /api/orders without explicit source saves as 'Assisted'.
+   2. Create Order with Website Source: Verify POST /api/orders with 'Website' saves as 'Website'.
+   3. Create Order Input Validation: Verify invalid sources (e.g., 'Retail') return 400 Bad Request.
+   4. Historical Order Retrieval: Verify GET /api/orders/{order_id} on historical order returns `order_source: null` without errors.
+   5. Edit Order Source: Verify PUT /api/orders/{order_id} transitions source between 'Assisted' and 'Website' while verifying product amount, delivery fee, and bottle quantities are strictly identical before and after edit.
+   6. Full Regression: Verify all 84 existing automated test cases pass with 0 failures.
+
+B. Local Visual & UI Flow Verification (Headless Edge CDP & Manual):
+   1. New Order Page:
+      - Confirm dropdown appears in Customer Information.
+      - Confirm default selection is 'Assisted'.
+      - Change to 'Website', create order, verify order saved with 'Website'.
+      - Click 'Reset Form', verify dropdown resets to 'Assisted'.
+      - Check responsiveness on 1366x768 (100% zoom) and 1440x900 (Desktop) ensuring 0px overflow.
+   2. Order Details Page:
+      - Open historical order (e.g. ORD0001–ORD0014): Confirm Order Source displays 'Not Specified' (not assumed Assisted).
+      - Open order with 'Website': Confirm displays 'Website' badge.
+      - Open order with 'Assisted': Confirm displays 'Assisted' badge.
+   3. Edit Order Page:
+      - Open Edit Order modal for an order: Confirm dropdown reflects currently saved source.
+      - Change source, save changes, and verify Order Details updates immediately.
+      - Confirm no other customer or order attributes were altered.
+
+
+================================================================================
+END OF PHASE 1 ANALYSIS REPORT.
+STATUS: READY FOR REVIEW.
+Awaiting explicit approval command: "proceed" before Phase 2 implementation.
+================================================================================

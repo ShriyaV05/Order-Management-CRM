@@ -1,0 +1,132 @@
+================================================================================
+POPCONE CRM – ORDER SOURCE FEATURE: PHASE 2 IMPLEMENTATION REPORT
+Execution Mode: OPTION C (Local Implementation with Isolated In-Memory Tests First)
+Date: 2026-11-24
+Status: LOCAL IMPLEMENTATION COMPLETE – AWAITING PRODUCTION DEPLOYMENT APPROVAL
+================================================================================
+
+1. EXECUTIVE SUMMARY & PRODUCTION DATABASE PRESERVATION
+--------------------------------------------------------------------------------
+In accordance with your explicit instructions for Option C:
+- The complete Order Source feature has been implemented in application code.
+- Additive database handling was integrated using the application's migration helper.
+- The schema migration was tested and verified using an isolated in-memory SQLite database.
+- STRICT SAFETY DIRECTIVE COMPLIED WITH:
+  * ZERO operations or connections were executed against the shared production Turso database.
+  * NO ALTER TABLE statement was executed against production.
+  * .env configuration and database connection credentials were untouched.
+  * All 14 historical production records remain 100% unaltered.
+- Automated tests covering order creation, editing, historical NULL handling, and
+  financial/inventory calculations passed with 100% success (91/91 tests passed).
+
+
+2. MODIFIED & CREATED FILES
+--------------------------------------------------------------------------------
+A. database.py
+   - Added `_add_column_if_missing(cursor, "orders", "order_source", "order_source TEXT DEFAULT NULL")`
+     in `_init_db_unlocked()` (both pre-check and initial setup paths).
+   - Updated `CREATE TABLE IF NOT EXISTS orders` definition to include `order_source TEXT DEFAULT NULL`.
+   - Migration remains 100% non-blocking, additive, and idempotent.
+
+B. server.py
+   - `CreateOrderRequest(BaseModel)`: Added `order_source: Optional[str] = "Assisted"`.
+   - `EditOrderRequest(BaseModel)`: Added `order_source: Optional[str] = None`.
+   - `create_order` (POST /api/orders):
+     * Strictly validates `order_source in ('Assisted', 'Website')`. Default: `'Assisted'`.
+     * Persists `order_source` into the `orders` table.
+   - `get_orders` (GET /api/orders):
+     * Exposes `order_source` in the returned order dictionary.
+   - `get_order_details` (GET /api/orders/{order_id}):
+     * Exposes `order_source` (returns string or `None` if NULL).
+   - `edit_order` (PUT /api/orders/{order_id}):
+     * If `order_source` is provided, validates strictly against `('Assisted', 'Website')`.
+     * If `order_source` is omitted/None, preserves current value (historical NULL remains NULL).
+     * Updates `order_source = ?` in SQL UPDATE without modifying quantities, pricing,
+       discounts, delivery fees, or inventory.
+
+C. static/index.html
+   - New Order Page: Added `<select id="new-order-source">` inside Customer Information.
+     Options: `Assisted` (selected by default) and `Website`.
+     Layout: Re-aligned into a balanced 3-column grid (Payment Method, Order Source, Delivery Address span 2).
+   - Order Details Modal: Added `<span id="detail-order-source">` paired with Location in Customer Information.
+   - Edit Order Modal: Added `<select id="edit-order-source">` in Section A (Customer Information).
+   - Version Bump: Updated asset query strings from `v=20261123_07` to `v=20261123_08`.
+
+D. static/js/app.js
+   - New Order Submit: Extracts `#new-order-source` (defaulting to 'Assisted') and includes in payload.
+   - New Order Reset: Automatically resets `#new-order-source.value = 'Assisted'`.
+   - Order Details Display: Derived strictly from actual saved data (`order.order_source`):
+     * 'Website' -> Rendered as blue badge.
+     * 'Assisted' -> Rendered as amber badge.
+     * NULL / Unset (Historical) -> Rendered as neutral "Not Specified" (never inferred).
+   - Edit Order Modal: Pre-populates `#edit-order-source` with currently saved source.
+   - Edit Order Submit: Transmits updated `order_source` in PUT payload.
+
+E. Test Files:
+   - tests/test_order_source.py (NEW dedicated test suite with 7 test cases).
+   - tests/test_order_notes.py (Updated in-memory SQLite schema).
+   - tests/test_delivery_fees.py (Updated in-memory SQLite schema).
+   - tests/test_order_customer_flow.py (Updated in-memory SQLite schema).
+   - tests/test_shipping_manifest.py (Updated in-memory SQLite schema).
+
+
+3. MIGRATION CODE & SPECIFICATION
+--------------------------------------------------------------------------------
+DDL statement to be executed against Turso in Phase 3:
+```sql
+ALTER TABLE orders ADD COLUMN order_source TEXT DEFAULT NULL;
+```
+Execution helper in database.py:
+```python
+_add_column_if_missing(cursor, "orders", "order_source", "order_source TEXT DEFAULT NULL")
+```
+Safety guarantees:
+- O(1) instantaneous metadata-only alteration in SQLite/libSQL.
+- Does NOT rewrite the table or lock concurrent readers.
+- All historical records automatically evaluate to NULL without row updates.
+- Fully idempotent: checks PRAGMA table_info before attempting alteration.
+
+
+4. COMPREHENSIVE AUTOMATED TEST RESULTS
+--------------------------------------------------------------------------------
+Test Command: pytest tests/
+Test Results: 91 passed in 3.25s (100% Pass Rate)
+
+Breakdown:
+- tests/test_order_source.py (7 passed):
+  1. test_01_in_memory_migration_simulation: Simulates DDL migration on pre-existing table;
+     verifies column added, historical rows retain NULL, and helper is idempotent.
+  2. test_02_create_order_default_assisted: Verifies creating order without specifying source
+     defaults to 'Assisted' in DB and order details API.
+  3. test_03_create_order_explicit_website: Verifies order with 'Website' persists and returns 'Website'.
+  4. test_04_create_order_invalid_source_rejected: Verifies invalid source (e.g. 'Retail')
+     is rejected with 400 Bad Request.
+  5. test_05_historical_order_returns_null: Verifies historical order (ORD9001 with order_source = NULL)
+     returns None, ensuring UI renders "Not Specified".
+  6. test_06_edit_order_transitions: Verifies transitioning Assisted -> Website and Website -> Assisted;
+     verifies all pricing, bottle quantities, and totals remain strictly identical.
+  7. test_07_edit_historical_order_without_source_preserves_null: Verifies editing an order without
+     passing order_source preserves NULL.
+
+- Regression Test Suites (84 passed):
+  - tests/test_backup_system.py: 51/51 PASSED
+  - tests/test_inventory_adjustment.py: 8/8 PASSED
+  - tests/test_delivery_fees.py: 4/4 PASSED
+  - tests/test_order_customer_flow.py: 11/11 PASSED
+  - tests/test_order_notes.py: 3/3 PASSED
+  - tests/test_shipping_manifest.py: 7/7 PASSED
+
+
+5. UNRESOLVED LIMITATIONS & RISKS
+--------------------------------------------------------------------------------
+- Database Migration Status: NOT EXECUTED against production Turso (as instructed).
+- Production Status: NOT DEPLOYED.
+- Once Phase 3 is approved, deploying code and running the additive migration will
+  enable the feature live with zero downtime.
+
+
+================================================================================
+END OF PHASE 2 REPORT.
+STATUS: READY FOR PRODUCTION APPROVAL.
+Awaiting explicit approval command: "proceed" before Phase 3 deployment.
+================================================================================

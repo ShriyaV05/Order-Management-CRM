@@ -79,6 +79,7 @@ class CreateOrderRequest(BaseModel):
     combo_type: Optional[str] = ""
     items: List[OrderItemInput]
     notes: Optional[str] = None
+    order_source: Optional[str] = "Assisted"
 
 class EditOrderRequest(BaseModel):
     customer_name: str
@@ -94,6 +95,7 @@ class EditOrderRequest(BaseModel):
     combo_type: Optional[str] = ""
     items: List[OrderItemInput]
     notes: Optional[str] = None
+    order_source: Optional[str] = None
 
 class StockMovementRequest(BaseModel):
     flavour: str
@@ -996,6 +998,7 @@ def get_orders(
             "created_at": r["created_at"],
             "edited_by": r["edited_by"],
             "edited_at": r["edited_at"],
+            "order_source": (r["order_source"] if "order_source" in r.keys() and r["order_source"] is not None else None),
             "flavours_display": flavours_display,
             "items": items
         })
@@ -1081,6 +1084,11 @@ def create_order(req: CreateOrderRequest, current_user: Dict[str, Any] = Depends
             raise HTTPException(status_code=400, detail="Alternate phone number must be a valid 10-digit Indian phone number if provided")
         if cleaned_alt_phone == cleaned_phone:
             raise HTTPException(status_code=400, detail="Alternate phone number cannot be the same as the primary phone number")
+
+    # Order Source validation: strictly 'Assisted' or 'Website', default 'Assisted'
+    order_source = (req.order_source or "Assisted").strip()
+    if order_source not in ("Assisted", "Website"):
+        raise HTTPException(status_code=400, detail="Order Source must be either 'Assisted' or 'Website'")
 
     conn = get_db()
     cursor = conn.cursor()
@@ -1178,8 +1186,8 @@ def create_order(req: CreateOrderRequest, current_user: Dict[str, Any] = Depends
             delivery_fee, actual_delivery_fee, final_amount, payment, dispatch_state,
             created_by, created_at, edited_by, edited_at,
             discount_per_bottle, total_discount, normal_product_amount,
-            is_combo, combo_type, combo_price, notes
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+            is_combo, combo_type, combo_price, notes, order_source
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
         """, (
             new_order_id, req.customer_name.strip(), cleaned_phone, cleaned_alt_phone, req.address.strip(),
             req.pin_code.strip(), req.state.strip(), req.district.strip(),
@@ -1187,7 +1195,7 @@ def create_order(req: CreateOrderRequest, current_user: Dict[str, Any] = Depends
             delivery_fee, actual_delivery_fee, final_amount, req.payment, "PLACED",
             current_user["display_name"], now_str, current_user["display_name"], now_str,
             discount_per_bottle, total_discount, normal_product_amount,
-            is_combo, combo_type, combo_price, (req.notes or "").strip()
+            is_combo, combo_type, combo_price, (req.notes or "").strip(), order_source
         ))
 
         for it in valid_items:
@@ -1318,6 +1326,7 @@ def get_order_details(order_id: str, current_user: Dict[str, Any] = Depends(get_
             "edited_by": order["edited_by"],
             "edited_at": order["edited_at"],
             "notes": (order["notes"] if "notes" in order.keys() and order["notes"] is not None else ""),
+            "order_source": (order["order_source"] if "order_source" in order.keys() and order["order_source"] is not None else None),
             "items": items,
             "audit_history": audit_history
         }
@@ -1337,6 +1346,13 @@ def edit_order(order_id: str, req: EditOrderRequest, current_user: Dict[str, Any
         if cleaned_alt_phone == cleaned_phone:
             raise HTTPException(status_code=400, detail="Alternate phone number cannot be the same as the primary phone number")
 
+    # Order Source handling in edit_order:
+    # If provided, validate strictly ('Assisted' | 'Website').
+    if req.order_source is not None:
+        src = str(req.order_source).strip()
+        if src not in ("Assisted", "Website"):
+            raise HTTPException(status_code=400, detail="Order Source must be either 'Assisted' or 'Website'")
+
     conn = get_db()
     cursor = conn.cursor()
 
@@ -1346,6 +1362,8 @@ def edit_order(order_id: str, req: EditOrderRequest, current_user: Dict[str, Any
     if not existing_order:
         conn.close()
         raise HTTPException(status_code=404, detail="Order not found")
+
+    new_order_source = str(req.order_source).strip() if req.order_source is not None else (existing_order["order_source"] if "order_source" in existing_order.keys() else None)
 
     # Valid items
     new_items_dict = {it.flavour: it.quantity for it in req.items if it.quantity > 0}
@@ -1422,7 +1440,7 @@ def edit_order(order_id: str, req: EditOrderRequest, current_user: Dict[str, Any
             total_bottles = ?, total_weight_grams = ?, product_amount = ?, delivery_fee = ?,
             actual_delivery_fee = ?, final_amount = ?, payment = ?, edited_by = ?, edited_at = ?,
             discount_per_bottle = ?, total_discount = ?, normal_product_amount = ?,
-            is_combo = ?, combo_type = ?, combo_price = ?, notes = ?
+            is_combo = ?, combo_type = ?, combo_price = ?, notes = ?, order_source = ?
         WHERE order_id = ?;
         """, (
             req.customer_name.strip(), cleaned_phone, cleaned_alt_phone, req.address.strip(), req.pin_code.strip(),
@@ -1430,7 +1448,7 @@ def edit_order(order_id: str, req: EditOrderRequest, current_user: Dict[str, Any
             applicable_product_amount, delivery_fee, actual_delivery_fee, final_amount, req.payment,
             current_user["display_name"], now_str,
             historical_discount, total_discount, normal_product_amount,
-            is_combo, combo_type, combo_price, (req.notes or "").strip(),
+            is_combo, combo_type, combo_price, (req.notes or "").strip(), new_order_source,
             order_id
         ))
 

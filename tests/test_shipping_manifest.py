@@ -70,7 +70,8 @@ class ShippingManifestTestCase(unittest.TestCase):
             is_combo INTEGER DEFAULT 0,
             combo_type TEXT DEFAULT '',
             combo_price REAL DEFAULT 0.0,
-            notes TEXT DEFAULT ''
+            notes TEXT DEFAULT '',
+            order_source TEXT DEFAULT NULL
         );
 
         -- Insert historical order (actual_delivery_fee is NULL)

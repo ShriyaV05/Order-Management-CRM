@@ -86,7 +86,8 @@ class OrderNotesTestCase(unittest.TestCase):
             is_combo INTEGER NOT NULL DEFAULT 0,
             combo_type TEXT NOT NULL DEFAULT '',
             combo_price REAL NOT NULL DEFAULT 0.0,
-            notes TEXT DEFAULT ''
+            notes TEXT DEFAULT '',
+            order_source TEXT DEFAULT NULL
         );
 
         CREATE TABLE IF NOT EXISTS order_items (

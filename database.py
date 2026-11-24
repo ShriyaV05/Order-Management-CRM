@@ -278,6 +278,7 @@ def _init_db_unlocked():
     _add_column_if_missing(cursor, "orders", "actual_delivery_fee", "actual_delivery_fee REAL DEFAULT NULL")
     _add_column_if_missing(cursor, "orders", "alternate_phone", "alternate_phone TEXT DEFAULT NULL")
     _add_column_if_missing(cursor, "orders", "notes", "notes TEXT DEFAULT ''")
+    _add_column_if_missing(cursor, "orders", "order_source", "order_source TEXT DEFAULT NULL")
     try:
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_orders_alt_phone ON orders(alternate_phone);")
     except Exception:
@@ -367,7 +368,8 @@ def _init_db_unlocked():
         created_at TEXT NOT NULL,
         edited_by TEXT NOT NULL,
         edited_at TEXT NOT NULL,
-        notes TEXT DEFAULT ''
+        notes TEXT DEFAULT '',
+        order_source TEXT DEFAULT NULL
     );
     """)
 
@@ -405,6 +407,7 @@ def _init_db_unlocked():
     _add_column_if_missing(cursor, "orders", "actual_delivery_fee", "actual_delivery_fee REAL DEFAULT NULL")
     _add_column_if_missing(cursor, "orders", "alternate_phone", "alternate_phone TEXT DEFAULT NULL")
     _add_column_if_missing(cursor, "orders", "notes", "notes TEXT DEFAULT ''")
+    _add_column_if_missing(cursor, "orders", "order_source", "order_source TEXT DEFAULT NULL")
     try:
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_orders_alt_phone ON orders(alternate_phone);")
     except Exception:

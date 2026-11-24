@@ -1,0 +1,80 @@
+================================================================================
+POPCONE CRM - ORDER SOURCE FEATURE: PHASE 3 DEPLOYMENT & VERIFICATION REPORT
+================================================================================
+Date: 2026-11-24
+Status: PRODUCTION DEPLOYMENT COMPLETE & VERIFIED
+Target Database Host: popcone-db-shriyav05.aws-ap-south-1.turso.io
+Production Application URL: https://popcone-orders.vercel.app
+Git Commit: 25ea8ba ("feat: Add Order Source field to New Order, Order Details, and Edit Order pages")
+Frontend Cache-Buster Version: v=20261124_04
+
+--------------------------------------------------------------------------------
+1. DATABASE MIGRATION EXECUTION & INTEGRITY VERIFICATION
+--------------------------------------------------------------------------------
+Migration Statement:
+    ALTER TABLE orders ADD COLUMN order_source TEXT DEFAULT NULL;
+Executed Via:
+    database._add_column_if_missing(cursor, "orders", "order_source", "order_source TEXT DEFAULT NULL")
+
+Before Migration:
+  - Host: popcone-db-shriyav05.aws-ap-south-1.turso.io
+  - Existing Columns: 29
+  - order_source Present: False
+  - Total Existing Orders: 14 (ORD0001 - ORD0014)
+
+After Migration:
+  - Columns in 'orders': 30 (order_source successfully added)
+  - Total Existing Orders: 14 (100% matched, 0 records added/dropped/altered)
+  - Historical Orders with order_source == NULL: 14 / 14 (100%)
+  - Non-NULL Historical Orders: 0 (Zero historical records were backfilled or modified)
+  - Verified Field Integrity for all 14 orders: customer names, phones, bottle counts,
+    amounts, payments, dispatch states, and notes completely unchanged.
+
+--------------------------------------------------------------------------------
+2. LIVE PRODUCTION APPLICATION VERIFICATION
+--------------------------------------------------------------------------------
+A. New Order Page:
+  - Location: Customer Information section, Row 2, Column 3 (directly beneath PIN Code).
+  - Arrangement: Side-by-side with Payment Method in `.form-group-inline-pair`.
+  - Zero separate line: Row 2 consists of District, State, and [Payment | Order Source].
+  - Default Selection: "Assisted"
+  - Permitted Values: "Assisted", "Website"
+  - Verified on Live Production: Confirmed via headless browser at https://popcone-orders.vercel.app
+
+B. Order Details Page:
+  - Location: Customer & Delivery Address card under Location.
+  - Historical Orders (ORD0001 - ORD0014 with NULL):
+      Displays: "Not Specified" (subtle muted italic styling; never inferred or backfilled).
+  - Newly Saved Orders:
+      Displays: "Assisted" (blue badge) or "Website" (green badge).
+  - Verified on Live Production: ORD0001 verified live showing "Not Specified".
+
+C. Edit Order Modal:
+  - Added "Order Source" dropdown with options: "Assisted", "Website".
+  - Loads currently saved source (or defaults to Assisted for historical orders upon editing).
+  - Updates only order_source; preserves bottle quantities, prices, discounts, delivery fees, and inventory.
+  - Verified on Live Production: Form control and option elements verified live.
+
+D. Backend & API Validation:
+  - POST /api/orders: accepts order_source ("Assisted" default, "Website"), persists to DB.
+  - GET /api/orders: returns order_source for all orders.
+  - GET /api/orders/{order_id}: returns order_source for individual order.
+  - PUT /api/orders/{order_id}: accepts updated order_source with whitelist validation.
+  - Safe Handling: Historical NULLs returned as null, backwards-compatible with all API consumers.
+
+--------------------------------------------------------------------------------
+3. AUTOMATED TEST SUITE RESULTS
+--------------------------------------------------------------------------------
+Test Command: pytest tests/
+Test Results: 91 passed in 2.42s (100% pass rate)
+  - tests/test_order_source.py: 7 passed
+  - tests/test_order_notes.py: 3 passed
+  - tests/test_order_customer_flow.py: 11 passed
+  - tests/test_inventory_adjustment.py: 8 passed
+  - tests/test_delivery_fees.py: 4 passed
+  - tests/test_backup_system.py: 51 passed
+  - tests/test_shipping_manifest.py: 7 passed
+
+================================================================================
+DEPLOYMENT SIGN-OFF: ALL PRODUCTION VERIFICATIONS SUCCESSFUL
+================================================================================

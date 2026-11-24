@@ -2885,49 +2885,85 @@ body.auth-required #app-container {
   background-color: rgba(241, 245, 249, 0.85);
 }
 
-/* ---------------- 6. Analytics Page Glassmorphism Redesign ---------------- */
+/* ---------------- 6. Analytics Page Glassmorphism Redesign & Micro-Interactions ---------------- */
+#view-analytics {
+  width: 100%;
+  max-width: 1540px;
+  margin: 0 auto;
+  position: relative;
+  animation: viewFadeIn 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
 #view-analytics .panel {
-  background: rgba(255, 255, 255, 0.78);
-  backdrop-filter: blur(14px) saturate(160%);
-  -webkit-backdrop-filter: blur(14px) saturate(160%);
-  border: 1px solid rgba(255, 255, 255, 0.9);
-  box-shadow: 0 10px 30px -4px rgba(13, 71, 161, 0.06), 0 2px 8px -1px rgba(0, 0, 0, 0.03);
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.95);
+  box-shadow: 0 10px 32px -4px rgba(13, 71, 161, 0.07), 0 2px 8px rgba(0, 0, 0, 0.03);
   border-radius: var(--radius-lg);
+  overflow: hidden;
+  transition: box-shadow 0.24s ease, border-color 0.24s ease;
+}
+
+#view-analytics .panel:hover {
+  box-shadow: 0 14px 40px -4px rgba(13, 71, 161, 0.10), 0 4px 12px rgba(0, 0, 0, 0.04);
 }
 
 #view-analytics .kpi-card {
-  background: rgba(255, 255, 255, 0.75);
-  backdrop-filter: blur(14px) saturate(160%);
-  -webkit-backdrop-filter: blur(14px) saturate(160%);
-  border: 1px solid rgba(255, 255, 255, 0.9);
+  position: relative;
+  background: rgba(255, 255, 255, 0.86);
+  backdrop-filter: blur(18px) saturate(180%);
+  -webkit-backdrop-filter: blur(18px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.95);
   border-radius: var(--radius-md);
-  box-shadow: 0 8px 24px -3px rgba(13, 71, 161, 0.07), 0 2px 6px -1px rgba(0, 0, 0, 0.03);
-  transition: transform 0.22s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.22s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.2s ease;
+  box-shadow: 0 8px 24px -4px rgba(13, 71, 161, 0.07), 0 2px 6px rgba(0, 0, 0, 0.02);
+  transition: transform 0.24s cubic-bezier(0.16, 1, 0.3, 1),
+              box-shadow 0.24s cubic-bezier(0.16, 1, 0.3, 1),
+              border-color 0.2s ease,
+              background 0.2s ease;
 }
 
 #view-analytics .kpi-card:hover {
   transform: translateY(-4px);
-  box-shadow: 0 14px 28px -3px rgba(13, 71, 161, 0.15), 0 4px 12px -2px rgba(255, 206, 71, 0.25);
+  box-shadow: 0 14px 28px -3px rgba(13, 71, 161, 0.12), 0 4px 14px rgba(255, 206, 71, 0.15);
   border-color: rgba(255, 206, 71, 0.7);
 }
 
-#view-analytics .kpi-card.accent-yellow::after {
-  background: linear-gradient(180deg, #FFD54F 0%, #FFCE47 100%);
-  width: 5px;
-  box-shadow: 0 0 10px rgba(255, 213, 79, 0.5);
+#view-analytics .kpi-card.accent-yellow {
+  background: linear-gradient(160deg, rgba(255, 255, 255, 0.94) 0%, rgba(255, 253, 242, 0.88) 100%);
+  border-color: rgba(254, 240, 138, 0.75);
+}
+
+#view-analytics .kpi-card.accent-yellow:hover {
+  border-color: rgba(253, 230, 138, 0.9);
+  box-shadow: 0 14px 28px -3px rgba(245, 158, 11, 0.18), 0 4px 14px rgba(255, 206, 71, 0.25);
 }
 
 #view-analytics .kpi-card::after {
-  background: linear-gradient(180deg, #1565C0 0%, #0D47A1 100%);
+  content: "";
+  position: absolute;
+  top: 16px;
+  bottom: 16px;
+  left: 0;
   width: 5px;
-  box-shadow: 0 0 10px rgba(13, 71, 161, 0.35);
+  border-radius: 0 4px 4px 0;
+  background: linear-gradient(180deg, #1565C0 0%, #0D47A1 100%);
+  box-shadow: 0 0 12px rgba(13, 71, 161, 0.35);
 }
 
+#view-analytics .kpi-card.accent-yellow::after {
+  background: linear-gradient(180deg, #FFD54F 0%, #F59E0B 100%);
+  box-shadow: 0 0 14px rgba(245, 158, 11, 0.55);
+}
+
+/* Analytics Period Switch Pill */
 #view-analytics .btn-group {
-  background: rgba(241, 245, 249, 0.75);
-  padding: 3px;
+  background: rgba(241, 245, 249, 0.85);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  padding: 4px;
   border-radius: var(--radius-full);
-  border: 1px solid rgba(226, 232, 240, 0.85);
+  border: 1px solid rgba(226, 232, 240, 0.9);
   display: inline-flex;
   gap: 2px;
 }
@@ -2935,18 +2971,19 @@ body.auth-required #app-container {
 #view-analytics .analytics-mode-btn {
   border-radius: var(--radius-full);
   border: none;
-  padding: 6px 14px;
-  font-size: 12px;
+  padding: 6px 16px;
+  font-size: 12.5px;
   font-weight: 700;
   color: var(--text-secondary);
   background: transparent;
-  transition: all 0.18s ease;
+  transition: all 0.24s cubic-bezier(0.16, 1, 0.3, 1);
+  cursor: pointer;
 }
 
 #view-analytics .analytics-mode-btn.active {
-  background: var(--primary-blue);
+  background: linear-gradient(135deg, #1565C0 0%, #0D47A1 100%);
   color: #FFFFFF;
-  box-shadow: 0 2px 8px rgba(13, 71, 161, 0.35);
+  box-shadow: 0 2px 10px rgba(13, 71, 161, 0.35);
 }
 
 #view-analytics .analytics-mode-btn:not(.active):hover {
@@ -2954,11 +2991,55 @@ body.auth-required #app-container {
   color: var(--primary-blue);
 }
 
+/* Analytics Month & Year Dropdowns */
+#analytics-month-select,
+#analytics-year-select {
+  background: rgba(255, 255, 255, 0.88);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(203, 213, 225, 0.85);
+  border-radius: var(--radius-sm);
+  padding: 6px 12px;
+  transition: all 0.2s ease;
+}
+
+#analytics-month-select:hover,
+#analytics-year-select:hover {
+  border-color: #94A3B8;
+}
+
+#analytics-month-select:focus,
+#analytics-year-select:focus {
+  border-color: var(--primary-blue);
+  box-shadow: 0 0 0 3px rgba(13, 71, 161, 0.12);
+  outline: none;
+}
+
+/* Analytics Tables Frosted Headers & Rows */
 #view-analytics .crm-table thead th {
   background: rgba(248, 250, 252, 0.88);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   border-bottom: 2px solid rgba(226, 232, 240, 0.85);
+  color: #475569;
+}
+
+#view-analytics .crm-table tbody tr {
+  transition: background-color 0.18s ease;
+}
+
+#view-analytics .crm-table tbody tr:hover {
+  background-color: rgba(241, 245, 249, 0.85);
+}
+
+#view-analytics #analytics-monthly-tbody tr,
+#view-analytics #analytics-weekly-tbody tr {
+  cursor: pointer;
+}
+
+#view-analytics #analytics-monthly-tbody tr:hover,
+#view-analytics #analytics-weekly-tbody tr:hover {
+  background-color: rgba(241, 245, 249, 0.90);
 }
 
 /* ---------------- 7. Dashboard Premium Glassmorphism & Visual Enhancement ---------------- */
@@ -3011,14 +3092,17 @@ body.auth-required #app-container {
 }
 
 @media (min-width: 1150px) {
-  #view-dashboard .kpi-grid {
+  #view-dashboard .kpi-grid,
+  #view-analytics .analytics-kpi-grid {
     grid-template-columns: repeat(5, minmax(0, 1fr));
     gap: 14px;
   }
-  #view-dashboard .kpi-card {
+  #view-dashboard .kpi-card,
+  #view-analytics .kpi-card {
     padding: 20px 18px;
   }
-  #view-dashboard .kpi-value {
+  #view-dashboard .kpi-value,
+  #view-analytics .kpi-value {
     font-size: 28px;
   }
 }
@@ -3605,9 +3689,11 @@ body.auth-required #app-container {
 
 /* ---------------- 11b. New Order View Two-Column Layout & Frosted Glassmorphism ---------------- */
 
-/* Container ambient brand yellow & blue background (strictly scoped to New Order & Orders views) */
+/* Container ambient brand yellow & blue background (scoped to New Order, Orders, Inventory & Analytics views) */
 .content-scrollable:has(#view-new-order:not([style*="display: none"])),
-.content-scrollable:has(#view-orders:not([style*="display: none"])) {
+.content-scrollable:has(#view-orders:not([style*="display: none"])),
+.content-scrollable:has(#view-inventory:not([style*="display: none"])),
+.content-scrollable:has(#view-analytics:not([style*="display: none"])) {
   background: 
     radial-gradient(ellipse 70% 60% at 8% 10%, rgba(255, 213, 79, 0.18) 0%, transparent 65%),
     radial-gradient(ellipse 65% 55% at 92% 12%, rgba(13, 71, 161, 0.15) 0%, transparent 65%),
@@ -4146,7 +4232,9 @@ body.auth-required #app-container {
 
 @media (max-width: 640px) {
   .content-scrollable:has(#view-new-order:not([style*="display: none"])),
-  .content-scrollable:has(#view-orders:not([style*="display: none"])) {
+  .content-scrollable:has(#view-orders:not([style*="display: none"])),
+  .content-scrollable:has(#view-inventory:not([style*="display: none"])),
+  .content-scrollable:has(#view-analytics:not([style*="display: none"])) {
     padding: 12px;
   }
   #view-new-order .new-order-customer-card,
@@ -4455,20 +4543,6 @@ body.auth-required #app-container {
   transform: none;
   box-shadow: none;
 }
-  transform: scale(1.10);
-}
-
-.btn-brand-export:active {
-  transform: translateY(0);
-  box-shadow: 0 2px 6px rgba(13, 71, 161, 0.30);
-}
-
-.btn-brand-export:disabled {
-  opacity: 0.65;
-  cursor: not-allowed;
-  transform: none;
-  box-shadow: none;
-}
 
 /* Responsive adjustment for Orders search bar & action buttons */
 @media (max-width: 640px) {
@@ -4492,45 +4566,167 @@ body.auth-required #app-container {
   }
 }
 
-/* ---------------- 13. Inventory Stock Cards & Ambient Glow ---------------- */
+/* ---------------- 13. Inventory View Frosted Glassmorphism & Micro-Interactions ---------------- */
+#view-inventory {
+  width: 100%;
+  max-width: 1540px;
+  margin: 0 auto;
+  position: relative;
+  animation: viewFadeIn 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+#view-inventory .inventory-stock-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 18px;
+  margin-bottom: 28px;
+}
+
+@media (min-width: 1050px) {
+  #view-inventory .inventory-stock-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 16px;
+  }
+}
+
+/* Frosted Glassmorphism Stock Cards with Brand Glow */
 .stock-card {
-  transition: transform 0.22s cubic-bezier(0.16, 1, 0.3, 1),
-              box-shadow 0.22s cubic-bezier(0.16, 1, 0.3, 1),
-              border-color 0.2s ease;
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--radius-lg);
+  padding: 24px 22px;
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  
+  /* Translucent frosted glass */
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.88) 0%, rgba(248, 250, 252, 0.78) 100%);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.95);
+  box-shadow: 0 8px 26px -4px rgba(13, 71, 161, 0.07), 0 2px 6px rgba(0, 0, 0, 0.02);
+  
+  transition: transform 0.28s cubic-bezier(0.16, 1, 0.3, 1),
+              box-shadow 0.28s cubic-bezier(0.16, 1, 0.3, 1),
+              border-color 0.24s ease,
+              background 0.24s ease;
+  animation: cardEntrance 0.32s cubic-bezier(0.16, 1, 0.3, 1) backwards;
 }
 
-.stock-card:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 12px 28px -4px rgba(13, 71, 161, 0.1), 0 2px 8px rgba(0, 0, 0, 0.04);
-  border-color: #CBD5E1;
+#inventory-stock-grid .stock-card:nth-child(1) { animation-delay: 0.03s; }
+#inventory-stock-grid .stock-card:nth-child(2) { animation-delay: 0.07s; }
+#inventory-stock-grid .stock-card:nth-child(3) { animation-delay: 0.11s; }
+#inventory-stock-grid .stock-card:nth-child(4) { animation-delay: 0.15s; }
+
+/* In-Stock Cards: Soft Mint / Emerald Glass with Ambient Glow */
+.stock-card:not(.low-stock) {
+  background: linear-gradient(145deg, rgba(240, 253, 244, 0.88) 0%, rgba(255, 255, 255, 0.82) 100%);
+  border: 1.5px solid rgba(16, 185, 129, 0.40);
+  box-shadow: 0 8px 24px -4px rgba(16, 185, 129, 0.12), 0 2px 6px rgba(0, 0, 0, 0.02);
 }
 
-.stock-card:hover .stock-card-bottle-img {
-  transform: translateY(-4px) scale(1.08) rotate(2deg);
-  filter: drop-shadow(0 8px 14px rgba(0, 0, 0, 0.14));
+.stock-card:not(.low-stock):hover {
+  transform: translateY(-5px);
+  box-shadow: 0 16px 36px -4px rgba(16, 185, 129, 0.22), 0 4px 14px rgba(13, 71, 161, 0.12);
+  border-color: rgba(16, 185, 129, 0.75);
 }
 
+/* Low-Stock Cards: Ambient Warning Pulse with Frosted Coral Glass */
 .stock-card.low-stock {
-  border: 2px solid var(--danger-red);
-  background: #FFFDFD;
-  animation: ambientWarningGlow 3.2s infinite ease-in-out;
+  background: linear-gradient(145deg, rgba(255, 245, 245, 0.92) 0%, rgba(255, 255, 255, 0.82) 100%);
+  border: 1.5px solid rgba(239, 68, 68, 0.60);
+  box-shadow: 0 8px 24px -4px rgba(239, 68, 68, 0.15), 0 0 16px rgba(239, 68, 68, 0.08);
+  animation: cardEntrance 0.32s cubic-bezier(0.16, 1, 0.3, 1) backwards, ambientWarningGlow 3.5s infinite ease-in-out;
+}
+
+.stock-card.low-stock:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 16px 36px -4px rgba(239, 68, 68, 0.25), 0 0 22px rgba(239, 68, 68, 0.18);
+  border-color: rgba(239, 68, 68, 0.95);
 }
 
 @keyframes ambientWarningGlow {
   0%, 100% {
-    box-shadow: 0 0 0 1px rgba(239, 68, 68, 0.25), 0 4px 12px rgba(239, 68, 68, 0.08);
+    box-shadow: 0 0 0 1px rgba(239, 68, 68, 0.25), 0 6px 16px rgba(239, 68, 68, 0.08);
   }
   50% {
-    box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.45), 0 8px 24px rgba(239, 68, 68, 0.18);
+    box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.45), 0 10px 28px rgba(239, 68, 68, 0.20);
   }
+}
+
+/* Bottle Image 3D Pop on Hover */
+.stock-card-bottle-img {
+  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), filter 0.25s ease;
+}
+
+.stock-card:hover .stock-card-bottle-img {
+  transform: translateY(-4px) scale(1.10) rotate(2deg);
+  filter: drop-shadow(0 10px 18px rgba(0, 0, 0, 0.18));
 }
 
 .stock-card-status {
-  transition: transform 0.15s ease;
+  transition: transform 0.18s ease;
 }
 
 .stock-card:hover .stock-card-status {
-  transform: translateX(2px);
+  transform: translateX(3px);
+}
+
+/* Stock Movement History Panel Frosted Glass */
+#view-inventory .panel {
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.95);
+  box-shadow: 0 10px 32px -4px rgba(13, 71, 161, 0.07), 0 2px 8px rgba(0, 0, 0, 0.03);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  transition: box-shadow 0.24s ease, border-color 0.24s ease;
+}
+
+#view-inventory .panel:hover {
+  box-shadow: 0 14px 40px -4px rgba(13, 71, 161, 0.10), 0 4px 12px rgba(0, 0, 0, 0.04);
+}
+
+#view-inventory .panel-header {
+  border-bottom: 1px solid rgba(226, 232, 240, 0.7);
+  padding: 18px 24px;
+}
+
+#view-inventory .crm-table thead th {
+  background: rgba(248, 250, 252, 0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 2px solid rgba(226, 232, 240, 0.85);
+  color: #475569;
+}
+
+#view-inventory .crm-table tbody tr {
+  transition: background-color 0.18s ease;
+}
+
+#view-inventory .crm-table tbody tr:hover {
+  background-color: rgba(241, 245, 249, 0.75);
+}
+
+/* Top Inventory Buttons Micro-Interactions */
+#btn-open-stock-movement,
+#btn-open-reset-stock {
+  transition: transform 0.18s cubic-bezier(0.16, 1, 0.3, 1),
+              box-shadow 0.18s ease,
+              background-color 0.18s ease;
+}
+
+#btn-open-stock-movement:hover,
+#btn-open-reset-stock:hover {
+  transform: translateY(-1.5px);
+}
+
+#btn-open-stock-movement:active,
+#btn-open-reset-stock:active {
+  transform: scale(0.97);
 }
 
 /* ---------------- 14. Refined Toast Notification Animation ---------------- */

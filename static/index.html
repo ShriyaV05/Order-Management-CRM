@@ -8,7 +8,7 @@
   <meta http-equiv="Expires" content="0">
   <title>POPCONE Orders & Sales CRM</title>
   <meta name="description" content="Production-ready Order Management, Inventory Tracking, and Sales Analytics CRM for POPCONE.">
-  <link rel="stylesheet" href="/static/css/styles.css?v=20261124_05">
+  <link rel="stylesheet" href="/static/css/styles.css?v=20261125_02">
   <link rel="icon" href="/logo.jpg" type="image/jpeg">
   <link rel="shortcut icon" href="/logo.jpg" type="image/jpeg">
   <link rel="apple-touch-icon" href="/logo.jpg">
@@ -256,6 +256,8 @@
                 </tbody>
               </table>
             </div>
+            <!-- Mobile Recent Orders Card List -->
+            <div id="dashboard-recent-orders-mobile-list" class="orders-mobile-card-list"></div>
           </div>
         </section>
 
@@ -497,6 +499,18 @@
               </div>
             </div>
           </form>
+
+          <!-- Mobile Sticky Summary Action Dock (Mobile Only) -->
+          <div id="new-order-mobile-dock" class="new-order-mobile-dock" style="display: none;">
+            <div class="mobile-dock-info" id="btn-mobile-dock-expand" title="Tap to scroll to breakdown">
+              <div class="mobile-dock-bottles"><span id="mobile-dock-bottles-count">0</span> bottles</div>
+              <div class="mobile-dock-amount">Total: <strong id="mobile-dock-total-amount">₹0</strong></div>
+            </div>
+            <button type="button" id="btn-mobile-dock-submit" class="btn btn-primary btn-mobile-dock-create">
+              <svg class="icon-svg" viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+              <span>Create Order</span>
+            </button>
+          </div>
         </section>
 
         <!-- ==================== 3. ORDERS VIEW ==================== -->
@@ -595,6 +609,8 @@
                 </tbody>
               </table>
             </div>
+            <!-- Mobile Orders Card List -->
+            <div id="orders-mobile-card-list" class="orders-mobile-card-list"></div>
           </div>
         </section>
 
@@ -1759,8 +1775,42 @@
     </div>
   </div>
 
+  <!-- Frosted Mobile Bottom Navigation Bar (Mobile Only) -->
+  <nav class="mobile-bottom-nav" id="mobile-bottom-nav">
+    <a href="#dashboard" class="bottom-nav-item active" data-tab="dashboard" id="bottom-nav-dashboard">
+      <span class="bottom-nav-icon">
+        <svg class="icon-svg" viewBox="0 0 24 24"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></svg>
+      </span>
+      <span class="bottom-nav-label">Dashboard</span>
+    </a>
+    <a href="#orders" class="bottom-nav-item" data-tab="orders" id="bottom-nav-orders">
+      <span class="bottom-nav-icon">
+        <svg class="icon-svg" viewBox="0 0 24 24"><path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg>
+      </span>
+      <span class="bottom-nav-label">Orders</span>
+    </a>
+    <a href="#new-order" class="bottom-nav-item bottom-nav-action" data-tab="new-order" id="bottom-nav-new-order">
+      <span class="bottom-nav-action-circle">
+        <svg class="icon-svg" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M8 12h8"/><path d="M12 8v8"/></svg>
+      </span>
+      <span class="bottom-nav-label">New Order</span>
+    </a>
+    <a href="#inventory" class="bottom-nav-item" data-tab="inventory" id="bottom-nav-inventory">
+      <span class="bottom-nav-icon">
+        <svg class="icon-svg" viewBox="0 0 24 24"><path d="m12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83Z"/><path d="m22 17.65-9.17 4.16a2 2 0 0 1-1.66 0L2 17.65"/><path d="m22 12.65-9.17 4.16a2 2 0 0 1-1.66 0L2 12.65"/></svg>
+      </span>
+      <span class="bottom-nav-label">Inventory</span>
+    </a>
+    <a href="#analytics" class="bottom-nav-item" data-tab="analytics" id="bottom-nav-analytics">
+      <span class="bottom-nav-icon">
+        <svg class="icon-svg" viewBox="0 0 24 24"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
+      </span>
+      <span class="bottom-nav-label">Analytics</span>
+    </a>
+  </nav>
+
   <!-- Scripts (Cache-busted) -->
   <script src="/static/js/api.js?v=20261116_01"></script>
-  <script src="/static/js/app.js?v=20261124_05"></script>
+  <script src="/static/js/app.js?v=20261125_02"></script>
 </body>
 </html>

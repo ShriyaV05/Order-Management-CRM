@@ -451,6 +451,35 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   });
 
+  // Wire Mobile Bottom Navigation Bar Click Listeners
+  document.querySelectorAll('.bottom-nav-item').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.preventDefault();
+      const targetTab = btn.dataset.tab;
+      if (targetTab) {
+        window.location.hash = `#${targetTab}`;
+        switchTab(targetTab);
+      }
+    });
+  });
+
+  // Wire Mobile New Order Sticky Summary Dock
+  const mobileDockBtn = document.getElementById('btn-mobile-dock-submit');
+  if (mobileDockBtn) {
+    mobileDockBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      const mainSubmit = document.getElementById('btn-submit-new-order');
+      if (mainSubmit) mainSubmit.click();
+    });
+  }
+  const mobileDockExpand = document.getElementById('btn-mobile-dock-expand');
+  if (mobileDockExpand) {
+    mobileDockExpand.addEventListener('click', () => {
+      const summaryCard = document.querySelector('#view-new-order .new-order-summary-card');
+      if (summaryCard) summaryCard.scrollIntoView({ behavior: 'smooth' });
+    });
+  }
+
   function switchTab(tab) {
     if (tab === 'backups') {
       if (!isUserAdmin()) {
@@ -463,6 +492,20 @@ document.addEventListener('DOMContentLoaded', async () => {
     navItems.forEach(item => {
       item.classList.toggle('active', item.dataset.tab === tab);
     });
+
+    // Sync Mobile Bottom Navigation Bar (Mobile)
+    document.querySelectorAll('.bottom-nav-item').forEach(item => {
+      item.classList.toggle('active', item.dataset.tab === tab);
+    });
+
+    // Sync Mobile New Order Summary Dock
+    const mobileDock = document.getElementById('new-order-mobile-dock');
+    if (mobileDock) {
+      const isMobile = window.innerWidth < 768;
+      const shouldShow = tab === 'new-order' && isMobile;
+      mobileDock.classList.toggle('active', shouldShow);
+      mobileDock.style.display = shouldShow ? 'flex' : 'none';
+    }
 
     document.querySelectorAll('.view-page').forEach(page => {
       const isTarget = page.id === `view-${tab}`;
@@ -793,6 +836,37 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
       } else {
         recentTableBody.innerHTML = `<tr><td colspan="6" style="text-align:center; padding: 28px; color: var(--text-secondary);">No orders recorded yet</td></tr>`;
+      }
+    }
+
+    // Render Mobile Recent Orders Cards
+    const recentCardList = document.getElementById('dashboard-recent-orders-mobile-list');
+    if (recentCardList) {
+      if (data.recent_orders && data.recent_orders.length > 0) {
+        recentCardList.innerHTML = data.recent_orders.map(o => `
+          <div class="order-mobile-card" data-order-id="${o.order_id}">
+            <div class="order-card-header">
+              <span class="order-card-id">${escapeHtml(o.order_id)}</span>
+              <span class="badge ${o.dispatch_state === 'DISPATCHED' ? 'badge-dispatched' : 'badge-placed'}">${escapeHtml(o.dispatch_state)}</span>
+            </div>
+            <div class="order-card-body">
+              <div class="order-card-customer-row">
+                <div class="order-card-customer-name">${escapeHtml(o.customer)}</div>
+                <div class="order-card-amount">₹${(o.amount || 0).toLocaleString('en-IN')}</div>
+              </div>
+              <div class="order-card-location-row" style="margin-top: 6px; display: flex; justify-content: space-between; align-items: center;">
+                <span class="badge ${o.payment === 'Paid' ? 'badge-paid' : 'badge-cod'}">${escapeHtml(o.payment)}</span>
+                <span style="font-size: 11.5px; color: var(--text-secondary);">${escapeHtml(o.created_at)}</span>
+              </div>
+            </div>
+          </div>
+        `).join('');
+
+        recentCardList.querySelectorAll('.order-mobile-card').forEach(card => {
+          card.addEventListener('click', () => openOrderDetails(card.dataset.orderId));
+        });
+      } else {
+        recentCardList.innerHTML = `<div class="empty-orders-card" style="text-align:center; padding: 24px; color: var(--text-secondary); background: rgba(255,255,255,0.7); border-radius: 12px; border: 1px solid var(--border-light);">No orders recorded yet</div>`;
       }
     }
   }
@@ -1428,6 +1502,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     const deliveryFee = parseFloat(feeInput.value) || 0;
     const finalAmount = applicableProductAmount + deliveryFee;
     document.getElementById('new-order-final-amount').textContent = `₹${finalAmount.toLocaleString('en-IN')}`;
+
+    // Update Mobile Sticky Summary Action Dock
+    const mobileDockBottles = document.getElementById('mobile-dock-bottles-count');
+    if (mobileDockBottles) mobileDockBottles.textContent = totalBottles;
+    const mobileDockAmount = document.getElementById('mobile-dock-total-amount');
+    if (mobileDockAmount) mobileDockAmount.textContent = `₹${finalAmount.toLocaleString('en-IN')}`;
   }
 
   function updateFinalPricingDisplay() {
@@ -1742,6 +1822,82 @@ document.addEventListener('DOMContentLoaded', async () => {
         showOrderActionsMenu(btn, oid);
       });
     });
+
+    // Render Mobile Order Cards for viewports < 768px (eliminates 1326px horizontal table overflow)
+    const cardList = document.getElementById('orders-mobile-card-list');
+    if (cardList) {
+      if (!orders || orders.length === 0) {
+        cardList.innerHTML = `<div class="empty-orders-card" style="text-align:center; padding: 40px; color: var(--text-secondary); background: rgba(255,255,255,0.7); border-radius: 12px; border: 1px solid var(--border-light);">No orders match the selected filters.</div>`;
+      } else {
+        cardList.innerHTML = orders.map(o => {
+          const isDispatched = o.dispatch === 'DISPATCHED';
+          const isPaid = o.payment === 'Paid';
+          const sourceText = o.order_source || 'Not Specified';
+          const sourceBadgeClass = o.order_source === 'Website' ? 'badge-source-website' : (o.order_source === 'Assisted' ? 'badge-source-assisted' : 'badge-source-null');
+          return `
+            <div class="order-mobile-card" data-order-id="${o.order_id}">
+              <div class="order-card-header">
+                <div class="order-card-id-wrap">
+                  <span class="order-card-id">${escapeHtml(o.order_id)}</span>
+                  <span class="order-card-date">${escapeHtml(o.date.split(' ')[0])}</span>
+                </div>
+                <button class="btn-dispatch-toggle ${isDispatched ? 'is-dispatched' : 'is-placed'}" 
+                        data-toggle-id="${o.order_id}" 
+                        title="Click to toggle dispatch status">
+                  ${escapeHtml(o.dispatch)}
+                </button>
+              </div>
+              <div class="order-card-body">
+                <div class="order-card-customer-row">
+                  <div class="order-card-customer-name">${escapeHtml(o.customer)}</div>
+                  <a href="tel:${escapeHtml(o.phone)}" class="order-card-phone" onclick="event.stopPropagation();">
+                    <svg class="icon-svg" viewBox="0 0 24 24" width="13" height="13"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+                    <span>${escapeHtml(o.phone)}</span>
+                  </a>
+                </div>
+                <div class="order-card-location-row">
+                  <span>${escapeHtml(o.district)}, ${escapeHtml(o.state)}</span>
+                  <span class="order-source-pill ${sourceBadgeClass}">${escapeHtml(sourceText)}</span>
+                </div>
+              </div>
+              <div class="order-card-footer">
+                <div class="order-card-bottles">
+                  <strong>${o.bottles}</strong> ${o.bottles === 1 ? 'bottle' : 'bottles'} (${escapeHtml(o.weight)})
+                </div>
+                <div class="order-card-price-badge-wrap">
+                  <span class="badge ${isPaid ? 'badge-paid' : 'badge-cod'}">${escapeHtml(o.payment)}</span>
+                  <span class="order-card-amount">₹${o.final.toLocaleString('en-IN')}</span>
+                </div>
+              </div>
+            </div>
+          `;
+        }).join('');
+
+        // Wire mobile card click listeners
+        cardList.querySelectorAll('.order-mobile-card').forEach(card => {
+          card.addEventListener('click', (e) => {
+            if (e.target.closest('.btn-dispatch-toggle') || e.target.closest('a')) return;
+            openOrderDetails(card.dataset.orderId);
+          });
+        });
+
+        // Wire mobile dispatch toggles
+        cardList.querySelectorAll('.btn-dispatch-toggle').forEach(btn => {
+          btn.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            const oid = btn.dataset.toggleId;
+            try {
+              const res = await api.toggleDispatch(oid);
+              invalidateCache(['dashboard', 'orders']);
+              showToast(`Order ${oid} status: ${res.dispatch_state}`);
+              await loadOrders();
+            } catch (err) {
+              showToast(err.message || 'Failed to update dispatch', 'danger');
+            }
+          });
+        });
+      }
+    }
   }
 
   // Floating Order Actions Dropdown (renders outside order row/table to prevent scrollbar/clipping)

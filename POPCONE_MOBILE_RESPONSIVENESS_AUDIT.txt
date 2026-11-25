@@ -1,0 +1,752 @@
+================================================================================
+POPCONE CRM - COMPLETE MOBILE RESPONSIVENESS AUDIT & REDESIGN ARCHITECTURE
+================================================================================
+Document Type: Technical Audit & Architectural Blueprint (Phase 1 Report)
+Target System: POPCONE Orders & Sales CRM (https://popcone-orders.vercel.app)
+Audit Date: 2026-11-24
+Audited Viewports:
+  - Small Phone: 360 x 640 (e.g. Galaxy S8, standard compact Android)
+  - Standard Phone: 390 x 844 (e.g. iPhone 12/13/14/15/16)
+  - Large Phone: 430 x 932 (e.g. iPhone Pro Max / Plus)
+  - Tablet: 768 x 1024 (e.g. iPad Mini / Portrait Tablet)
+  - Laptop: 1366 x 768 (Standard laptop baseline)
+  - Desktop: 1920 x 1080 (Full HD monitor baseline)
+Phase Authorization: Phase 1 Only (Analysis & Architecture - Zero Code Modifications)
+================================================================================
+
+TABLE OF CONTENTS
+-----------------
+1. Executive Summary & Objective
+2. Application Architecture Overview
+3. Complete Inventory of Inspected Pages, Modals & Components
+4. Page-by-Page Usability & Layout Audit (With Measured Metrics)
+   4.1 Login Screen & Overlay
+   4.2 Navigation & App Shell (Sidebar vs. Mobile Bottom Nav)
+   4.3 Dashboard View (#view-dashboard)
+   4.4 New Order View (#view-new-order)
+   4.5 Orders Management View (#view-orders)
+   4.6 Order Details Modal (#modal-order-details)
+   4.7 Edit Order Modal (#modal-edit-order)
+   4.8 Inventory & Stock History View (#view-inventory)
+   4.9 Sales Analytics & Reports View (#view-analytics)
+   4.10 Settings Modal & Password Management (#modal-settings / #view-settings)
+   4.11 Secondary Modals (Stock Movement, Reset Stock, Delete Order, Confirm Backup)
+   4.12 Cloud Backups View (#view-backups)
+5. Comprehensive Technical Audit
+   5.1 Existing CSS Architecture & Media Queries Breakdown
+   5.2 Fixed Widths, Flexbox, Grids, and Overflow Hotspots
+   5.3 JavaScript Viewport Handling & DOM Manipulation
+   5.4 Touch Targets, Form Controls & Virtual Keyboard Behaviour
+6. Desktop Preservation Strategy (Zero-Regression Guarantee)
+7. Tablet Responsiveness Strategy (768px - 1024px)
+8. Proposed Mobile Architecture & Redesign Specifications
+   8.1 Mobile App Shell & Bottom Navigation Bar
+   8.2 Dashboard: Compact 2-Column KPI Matrix & Responsive Recent Orders
+   8.3 New Order: Streamlined Flow & Sticky Summary Action Dock
+   8.4 Orders: Responsive Card-Based Order List & Compact Filter Chips
+   8.5 Order Details & Edit Order: Full-View Mobile Bottom-Sheet Modals
+   8.6 Inventory & Analytics: 2-Column Responsive Stock & KPI Blocks
+9. Detailed File Modification Plan
+10. Data Safety & Database Non-Negotiables Verification
+11. Comprehensive Testing Matrix & Verification Checklist
+12. Limitations, Risks, and Open Architectural Decisions
+13. Phase 1 Sign-Off & Next Steps
+
+================================================================================
+1. EXECUTIVE SUMMARY & OBJECTIVE
+================================================================================
+The POPCONE Orders & Sales CRM is a single-page web application (SPA) serving as
+the operational backbone for order management, inventory control, and revenue
+analytics. Ashish, the primary stakeholder, operates the CRM predominantly from
+his mobile smartphone. 
+
+Currently, while desktop/laptop viewports (1366x768 and 1920x1080) deliver an
+optimal experience with multi-column glassmorphic cards and sticky summaries,
+the mobile smartphone experience (< 768px) suffers from severe architectural
+friction:
+  1. Critical information is pushed off-screen due to 1326px wide fixed tables.
+  2. Modals (especially Edit Order) exhibit severe horizontal clipping where
+     entire input columns (Phone, District, Order Source) are inaccessible.
+  3. Action buttons in modals (such as "Mark as DISPATCHED") spill outside the
+     viewport boundaries.
+  4. On the New Order page, the Order Summary and "Create Order" button are
+     pushed over 1900px down the page below 4 tall flavour cards and combo
+     banners, making order creation cumbersome.
+  5. Navigation requires reaching to the extreme top-left corner to open a
+     hamburger drawer, which on mobile displays icons without text labels due
+     to conflicting media query rules.
+  6. Dashboard and Analytics KPI cards stack in a single column with excessive
+     padding, forcing hundreds of pixels of unnecessary vertical scrolling.
+
+The objective of this project is to implement true responsive adaptation:
+  - ONE single unified codebase with responsive layouts for all viewports.
+  - Zero changes to the existing desktop/laptop design, styling, and interactions.
+  - Zero changes to backend business logic, Turso database schema, or stored records.
+  - High-efficiency mobile layouts prioritizing rapid thumb reachability, compact
+    information hierarchy, eliminated horizontal overflow, and tactile controls.
+
+================================================================================
+2. APPLICATION ARCHITECTURE OVERVIEW
+================================================================================
+The application is structured as a lightweight, high-performance vanilla SPA:
+  - Frontend:
+    * Entry HTML: static/index.html (274 unique DOM IDs, semantic sections)
+    * Styling: static/css/styles.css (4,779 lines, CSS custom properties,
+      BEM-inspired naming, frosted glassmorphism system)
+    * Application Logic: static/js/app.js (163 KB, modular IIFE/event-driven)
+    * API Client: static/js/api.js (REST client with JWT token management)
+  - Backend:
+    * FastAPI Server: server.py (uvicorn ASGI runner)
+    * Database Engine: database.py (Turso LibSQL cloud database with local SQLite)
+    * Authentication: auth.py (JWT Bearer tokens, bcrypt hashing)
+  - Deployment Architecture:
+    * Vercel Serverless Production (https://popcone-orders.vercel.app)
+    * Auto-deploy pipeline tracking GitHub 'main' branch
+
+Layout Structure:
+  <body class="auth-required">
+    #login-overlay.login-overlay
+    #app-container
+      #sidebar-backdrop.sidebar-backdrop
+      #main-sidebar.sidebar
+      .main-wrapper
+        .top-header
+          #btn-toggle-sidebar
+          #header-page-title
+          #header-sync-status
+          .header-actions (#btn-open-settings)
+        main.content-scrollable
+          #view-dashboard.view-page
+          #view-new-order.view-page
+          #view-orders.view-page
+          #view-inventory.view-page
+          #view-analytics.view-page
+          #view-settings.view-page
+          #view-backups.view-page
+      modals...
+      #toast-container
+
+================================================================================
+3. COMPLETE INVENTORY OF INSPECTED PAGES, MODALS & COMPONENTS
+================================================================================
+The audit covered 100% of DOM nodes and interactive views:
+
+[Pages / Views]
+  1. Login Screen: #login-overlay, .login-wrapper, .login-card
+  2. Dashboard View: #view-dashboard (5 KPI cards, Recent Orders table)
+  3. New Order View: #view-new-order (Customer info, Flavour grid, Order summary)
+  4. Orders Management View: #view-orders (Search, Export, Filters, 10-col Table)
+  5. Inventory View: #view-inventory (Stock grid, Movements table, Stock actions)
+  6. Analytics View: #view-analytics (Period tabs, KPI grid, Flavour sales table)
+  7. Settings View / Modal: #modal-settings & #view-settings (Discounts, Passwords)
+  8. Cloud Backups View: #view-backups (Storage cards, Google Drive manifest)
+
+[Modals & Popovers]
+  9. Order Details Modal: #modal-order-details (Header card, Info grid, Products table, Audit bar, Actions footer)
+ 10. Edit Order Modal: #modal-edit-order (Sections A/B/C, Combo box, Footer)
+ 11. Delete Order Modal: #modal-delete-order (Confirmation dialog)
+ 12. Stock Movement Modal: #modal-stock-movement (Inward/Adjustment form)
+ 13. Reset Stock Modal: #modal-reset-stock (Zero stock confirmation)
+ 14. Confirm Backup Modal: #modal-confirm-backup (Google Drive snapshot trigger)
+
+[Shell & Shared Components]
+ 15. Sidebar Navigation: #main-sidebar (Header logo, Nav links, User profile footer)
+ 16. Top Header: .top-header (Hamburger toggle, Page title, Settings button)
+ 17. Toast System: #toast-container, .toast
+ 18. Sync Indicator: #header-sync-status
+ 19. Form Controls: .form-control, .form-group, .form-label, .select-wrapper
+ 20. Brand Export Buttons: .btn-brand-export (.btn-export-orders, .btn-export-shipping, #btn-export-analytics-csv)
+
+================================================================================
+4. PAGE-BY-PAGE USABILITY & LAYOUT AUDIT (WITH MEASURED METRICS)
+================================================================================
+
+4.1 LOGIN SCREEN (#login-overlay)
+----------------------------------
+Current Status:
+  - On 390x844: Card width: 350px. Fits within viewport with good centering.
+Usability Hotspots:
+  - Keyboard Focus: When soft keyboard pops up on mobile (reducing available
+    height to ~380px-420px), `.login-overlay` uses `display: flex; align-items: center;`
+    without `overflow-y: auto`. On small screens (360x640), the top logo and
+    bottom "Sign In" button clip if zoomed or when the keyboard opens.
+  - Touch Target: "Sign In" button is 44px (compliant). Password toggle eye icon
+    touch area is only 28x28px, making it difficult to tap with a thumb.
+Selectors Involved:
+  - static/css/styles.css: L150-L240 (.login-overlay, .login-wrapper, .login-card,
+    .password-toggle-btn)
+
+4.2 NAVIGATION & APP SHELL (#main-sidebar, .top-header, .main-wrapper)
+-----------------------------------------------------------------------
+Current Status:
+  - Below 768px: `.sidebar` has `position: fixed; transform: translateX(-100%); width: 260px !important;`
+  - Toggle: Hamburger button in `.top-header` toggles `.sidebar.mobile-open`.
+Usability Hotspots:
+  - CRITICAL BUG - MISSING LABELS ON MOBILE:
+    In styles.css L2014 (@media max-width: 900px):
+      `.sidebar-brand-text, .nav-text, .user-info { display: none; }`
+    Because this rule applies to all viewports <= 900px (including <= 768px),
+    when a user taps the hamburger button to open the mobile drawer, the drawer
+    opens at 260px width containing ONLY 5 naked icons floating in empty blue
+    space with NO text labels! Users cannot identify what each icon leads to.
+  - Thumb Reach Ergonomics:
+    To switch between Dashboard, New Order, Orders, Inventory, or Analytics,
+    a mobile user holding their phone one-handed must stretch their thumb all
+    the way to the top-left corner (y: ~32px) to hit a 38x38px hamburger icon,
+    wait for the drawer animation, tap an unlabeled icon, and wait for the drawer
+    to close. This requires 2-3 taps per navigation event.
+  - Top Header Spacing:
+    `.top-header` has fixed `height: 64px; padding: 0 28px;`. On 360px phones,
+    the hamburger button (38px), page title ("Inventory & Stock History" = 220px),
+    and Settings button (100px) collide and wrap or truncate.
+Selectors Involved:
+  - static/css/styles.css: L569 (.sidebar), L2014 (@media max-width: 900px),
+    L2687 (@media max-width: 768px), L670 (.top-header), L700 (.btn-toggle-sidebar)
+
+4.3 DASHBOARD VIEW (#view-dashboard)
+-------------------------------------
+Current Status:
+  - KPI Grid: `.kpi-grid` has `grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));`
+  - Measured on 390x844: Total scroll height: 1370px.
+Usability Hotspots:
+  - Giant Stacked Cards:
+    Because available width is 350px (after 20px padding), `minmax(180px, 1fr)`
+    cannot fit 2 columns (180 * 2 + 16 = 376px > 350px). Consequently, the grid
+    drops to a single column! All 5 KPI cards stack vertically.
+    Each card has `padding: 24px 20px; min-height: 120px;`.
+    The 5 KPI cards alone consume ~750px of vertical height—nearly the entire
+    first screen—before the user can see any order information.
+  - Recent Orders Table Overflow:
+    The Recent Orders table has `scrollWidth: 696px` inside a 350px card.
+    The table overflows horizontally by 346px.
+    Columns like "DISPATCH STATUS" and "CREATED AT" are clipped on the right.
+Selectors Involved:
+  - static/css/styles.css: L915 (.kpi-grid), L922 (.kpi-card), L3287 (#view-dashboard .crm-table)
+
+4.4 NEW ORDER VIEW (#view-new-order)
+-------------------------------------
+Current Status:
+  - Layout Grid: `.new-order-layout-grid` has 2 columns on desktop, collapses to
+    1 column at max-width: 1080px (L4218).
+  - Measured on 390x844: Total scroll height: 1916px.
+Usability Hotspots:
+  - Disconnected Order Summary & Create Order Action:
+    On desktop, Order Summary sits in a sticky right sidebar always in view.
+    On mobile, Order Summary is stacked at the absolute bottom of the DOM (L4078).
+    A user entering an order on mobile must scroll down:
+      1. Customer Information card (~500px)
+      2. Select Bottles banner (~80px)
+      3. 4 Flavour selection cards (~700px)
+      4. Combo offers container (~250px)
+      5. Finally reach Order Summary (~400px) to see the total price and "Create Order".
+    If a user adjusts bottle counts, they have NO visual feedback of the total
+    payable amount or discount without scrolling 1900px down.
+  - Flavour Cards Vertical Waste:
+    On mobile, the 4 flavour cards (Cheese, Peri Peri, Sour Cream, Tomato) stack
+    in 2 columns or 1 column with large bottle images (120px) and large quantity
+    selectors, consuming over 600px of scrolling.
+  - Offer Banner Clipping:
+    The top "Original: ₹160 (100g) / bottle Effective: ₹149" badge wraps awkwardly
+    into 3 cramped lines inside the section header.
+Selectors Involved:
+  - static/css/styles.css: L3717 (.new-order-layout-grid), L3763 (.new-order-form-grid),
+    L3830 (.flavours-grid), L4078 (.new-order-summary-card), L4206 (#btn-submit-new-order)
+
+4.5 ORDERS MANAGEMENT VIEW (#view-orders)
+------------------------------------------
+Current Status:
+  - Measured on 390x844: Table scrollWidth: 1326px!
+Usability Hotspots:
+  - Extreme Horizontal Table Overflow:
+    The table contains 9 columns: Order ID, Date, Customer Name, Phone Number,
+    Bottles, Total Amount, Payment Status, Dispatch Status, Actions.
+    On a 390px mobile viewport, only the first 2.5 columns (Order ID, Date, and
+    half of Customer Name) are visible.
+    Over 900px of table width is completely hidden off-screen!
+    Ashish cannot see the order amount (₹), payment status (Paid/COD), or dispatch
+    status without swiping horizontally across a wide table, causing clumsy
+    two-axis panning (horizontal + vertical).
+  - Filter Bar Vertical Footprint:
+    The orders view has:
+      - 1 search input
+      - 2 export buttons (Export Orders, Export Shipping)
+      - 5 select dropdowns (Payment, Dispatch State, District, Date, Sort)
+    Currently, these stack as full-width elements or awkward wraps taking up
+    over 340px of vertical space before a single order is visible.
+Selectors Involved:
+  - static/css/styles.css: L4411 (#view-orders .table-responsive), L4449
+    (.orders-search-action-row), L4467 (.orders-filter-row), L4421 (.crm-table)
+
+4.6 ORDER DETAILS MODAL (#modal-order-details)
+-----------------------------------------------
+Current Status:
+  - Modal container width: 100%, max-width: 780px.
+Usability Hotspots:
+  - CRITICAL OVERFLOW IN ACTION FOOTER:
+    The modal footer (L1233 in index.html) contains 3 buttons:
+      1. #btn-detail-toggle-dispatch ("Toggle Dispatch Status" or "Mark as DISPATCHED")
+      2. #btn-detail-edit ("Edit Order")
+      3. #btn-detail-delete ("Delete Order")
+    In styles.css L1760:
+      `.modal-footer { display: flex; justify-content: flex-end; gap: 10px; }`
+    Because `flex-wrap` is NOT set (defaults to `nowrap`) and `justify-content` is
+    `flex-end`, the combined width of these 3 buttons (~430px) exceeds the 350px
+    available modal width on mobile.
+    As proven in `audit_mobile_modal_order_details_390.png`:
+    The first button ("Mark as DISPATCHED") is forced past the left boundary of
+    the modal dialog, visibly protruding outside the card!
+  - 2-Column Detail Grid Squeeze:
+    `.detail-info-grid` has `grid-template-columns: repeat(2, 1fr)`.
+    On 360px phones, Customer Name and Phone Numbers squeeze into 150px columns,
+    causing long addresses or phone numbers to wrap into 5-6 fragmented lines.
+Selectors Involved:
+  - static/css/styles.css: L1703 (.modal-container), L1760 (.modal-footer),
+    L1150 (.detail-info-grid), L1233 in index.html
+
+4.7 EDIT ORDER MODAL (#modal-edit-order)
+-----------------------------------------
+Current Status:
+  - Modal container: `.edit-order-modal-container` with max-width: 860px.
+Usability Hotspots:
+  - SEVERE HORIZONTAL FORM CLIPPING:
+    Section A (Customer Information) uses `.form-grid` (styles.css L1134):
+      `.form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 20px; }`
+    Combined with:
+      `.form-group.span-2 { grid-column: span 2; }` (styles.css L1146)
+    On mobile (< 480px), forcing `span 2` requires a minimum width of 240px * 2 + 20px = 500px!
+    The modal body is only ~340px wide.
+    As captured in `audit_mobile_modal_edit_order_390.png`:
+    The form spills 160px past the right edge of the screen!
+    The right-hand inputs—Phone Number, District, and the newly added Order Source
+    dropdown—are truncated or completely cut off! Ashish cannot comfortably tap
+    or change Order Source or District in Edit Order on his phone.
+  - Section B (Order Items & Combo):
+    The 4 flavour editors in `.edit-flavours-grid` squeeze into 130px columns with
+    tiny steppers, and the combo selection box has text wrapping.
+  - Sticky Footer Collision:
+    The modal footer with "Cancel" and "Save Changes" overlaps the bottom of the
+    form unless scrolled with precision.
+Selectors Involved:
+  - static/css/styles.css: L1134 (.form-grid), L1146 (.form-group.span-2),
+    L2282 (.edit-order-modal-container), L2361 (.edit-flavours-grid)
+
+4.8 INVENTORY & STOCK HISTORY VIEW (#view-inventory)
+-----------------------------------------------------
+Current Status:
+  - Desktop: 4 stock cards in single-row 4-column layout (L4586).
+  - Measured on 390x844: Total scroll height: 3190px!
+Usability Hotspots:
+  - Excessive Card Size on Mobile:
+    In styles.css L1875, `.inventory-stock-grid` drops to `repeat(auto-fit, minmax(210px, 1fr))`,
+    which becomes a single 1-column stack of 4 giant cards.
+    Each card is ~165px tall, requiring the user to scroll over 700px just to
+    inspect 4 bottle quantities!
+  - Awkward Header Action Wrap:
+    "Warehouse Stock Levels" heading, "+ Stock In / Adjustment", and "Reset All Stock to 0"
+    collide and wrap into an unbalanced 3-tier block.
+  - Stock Movement History Table:
+    `scrollWidth: 628px`. Clips on mobile, requiring horizontal scroll.
+Selectors Involved:
+  - static/css/styles.css: L1875 (.inventory-stock-grid), L1882 (.stock-card),
+    L4586 (@media min-width: 1050px), L4700 (.crm-table)
+
+4.9 SALES ANALYTICS & REPORTS VIEW (#view-analytics)
+-----------------------------------------------------
+Current Status:
+  - Desktop: 5 KPI cards on single-row 5-column layout (L3096).
+  - Measured on 390x844: Total scroll height: 2156px.
+Usability Hotspots:
+  - 5-Card Vertical Tower:
+    Similar to Dashboard, the 5 analytics KPI cards (Revenue, Shipping, Bottles,
+    Orders, Top Flavour) stack in 1 column. Total height of the 5 cards is ~700px.
+  - Analytics Filter Toolbar:
+    The Period switcher (`Weekly` | `Monthly` | `Annual`), Month dropdown, Year
+    dropdown, and Export button stack vertically with inconsistent alignment.
+  - Monthly Flavour Breakdown Table:
+    Table width: 413px. Clips slightly on 360px and 390px screens.
+Selectors Involved:
+  - static/css/styles.css: L2665 (.analytics-kpi-grid), L2620 (.analytics-toolbar),
+    L3019 (#view-analytics .crm-table)
+
+4.10 SETTINGS MODAL & PASSWORD MANAGEMENT (#modal-settings)
+-----------------------------------------------------------
+Current Status:
+  - Contains Member Discount setting and Admin User Password Management.
+Usability Hotspots:
+  - Modal container max-width: 580px.
+  - Fits mobile width, but vertical height exceeds small phone viewport (360x640),
+    causing the "Close" button to hide below the fold if body overflow is restricted.
+Selectors Involved:
+  - static/css/styles.css: L2221 (.settings-box), L2245 (.settings-columns-grid)
+
+4.11 SECONDARY MODALS (#modal-stock-movement, #modal-reset-stock, #modal-delete-order)
+----------------------------------------------------------------------------------------
+Current Status:
+  - Single-column dialogs.
+Usability Hotspots:
+  - Inputs fit well, but modal backdrop padding of 20px on 360px phones reduces
+    inner dialog width to 320px. Action buttons ("Cancel", "Save Movement",
+    "Confirm Delete") should stretch to 100% or use equal 1:1 columns.
+
+4.12 CLOUD BACKUPS VIEW (#view-backups)
+----------------------------------------
+Current Status:
+  - 4 status cards (Storage Provider, Production DB, Retention Policy, Encryption)
+    plus backup manifest table.
+Usability Hotspots:
+  - 4 cards stack vertically consuming 450px.
+  - Manifest table clips on small screens.
+Selectors Involved:
+  - static/css/styles.css: L4000+ (.backup-info-grid, #table-backups-manifest)
+
+================================================================================
+5. COMPREHENSIVE TECHNICAL AUDIT
+================================================================================
+
+5.1 CSS ARCHITECTURE & MEDIA QUERIES BREAKDOWN
+----------------------------------------------
+The file `static/css/styles.css` (4,779 lines) currently contains 11 media queries:
+  1. @media (max-width: 600px): Login overlay card sizing.
+  2. @media (max-width: 400px): Small screen login card adjustments.
+  3. @media (max-width: 900px): Collapses sidebar to 72px and hides nav labels.
+  4. @media (max-width: 680px): Edit combo options grid adjustments.
+  5. @media (max-width: 768px): Positions sidebar off-canvas with translateX(-100%).
+  6. @media (min-width: 1150px): 5-column single-row alignment for Dashboard & Analytics KPIs.
+  7. @media (max-width: 1080px): Collapses New Order layout to 1 column.
+  8. @media (max-width: 640px): Content scrollable padding (12px) & New Order form span overrides.
+  9. @media (max-width: 640px): Orders search row column stacking.
+ 10. @media (min-width: 1050px): 4-column single-row alignment for Inventory stock cards.
+ 11. @media (prefers-reduced-motion: reduce): Accessibility animation suppression.
+
+Key Finding:
+The existing media queries were added opportunistically at different breakpoints
+(900px, 768px, 680px, 640px, 600px, 400px) rather than following a unified,
+systematic mobile-first or desktop-isolated breakpoint scale.
+Crucially, the rule at 900px (`.nav-text { display: none; }`) bleeds directly into
+the 768px mobile drawer rule, causing the invisible label bug.
+
+5.2 FIXED WIDTHS, FLEXBOX, GRIDS & OVERFLOW HOTSPOTS
+----------------------------------------------------
+  - `#app-container`: `width: 100vw; height: 100vh; overflow: hidden; display: flex;`
+    Correctly prevents body overscroll on desktop, but on mobile requires proper
+    `height: 100dvh` (dynamic viewport height) to account for iOS Safari and
+    Android Chrome URL bars appearing/disappearing.
+  - `.content-scrollable`: `flex: 1; overflow-y: auto; overflow-x: hidden;`
+    Child elements with fixed `scrollWidth` (like tables at 1326px) cause either
+    unwanted horizontal drag or severe clipping.
+  - `.crm-table`: `white-space: nowrap; width: 100%;`
+    On desktop, `nowrap` prevents messy multi-line cell breaks. On mobile, it
+    forces the table to expand to 1326px, breaking narrow viewports.
+  - `.form-group.span-2`: Hardcoded to `grid-column: span 2;` inside `.form-grid`.
+    Forces 2-column widths inside modals even on 360px screens.
+
+5.3 JAVASCRIPT VIEWPORT HANDLING & DOM MANIPULATION
+---------------------------------------------------
+In `static/js/app.js`:
+  - L2015: `if (window.innerWidth <= 768 && sidebar) { sidebar.classList.remove('mobile-open'); }`
+    Automatically closes the sidebar on tab navigation.
+  - Sidebar collapsed state preference is stored in `localStorage.getItem('popcone_sidebar_collapsed')`.
+    Correctly guarded by `window.innerWidth > 768`.
+  - No JavaScript hardcoded pixel widths are injected into DOM styles.
+    All sizing is governed by CSS classes, making the application 100% cleanly
+    adaptable via isolated media queries without altering JS business logic.
+
+5.4 TOUCH TARGETS, FORM CONTROLS & VIRTUAL KEYBOARD BEHAVIOUR
+--------------------------------------------------------------
+  - Touch Target Guidelines: Apple iOS HIG and Google Material Design require
+    interactive elements to have a minimum touch target size of 44 x 44px (or 48 x 48px).
+  - Current Deficiencies:
+    * Modal close buttons (`.btn-close-modal`): 28 x 28px (too small for thumb).
+    * Quantity steppers (`.btn-qty`): 32 x 32px.
+    * Table row action buttons: 30 x 30px.
+    * Password toggle button: 28 x 28px.
+    * Date and select inputs: 38px height (should be 44px on mobile).
+  - Virtual Keyboard:
+    * iOS Safari zooms in automatically on `<input>` if `font-size < 16px`.
+    * Current `.form-control` has `font-size: 13.5px` or `14px`. On iPhone,
+      tapping any input triggers an unwanted page zoom!
+    * Fix: Ensure inputs have `font-size: 16px` on mobile screens to prevent
+      browser auto-zoom while maintaining crisp visual presentation.
+
+================================================================================
+6. DESKTOP PRESERVATION STRATEGY (ZERO-REGRESSION GUARANTEE)
+================================================================================
+A core mandate of this project is that the existing desktop and laptop experience
+must remain 100% UNTOUCHED and PRESERVED.
+
+Isolation Architecture:
+  1. ZERO Unscoped CSS Edits:
+     No global changes to existing desktop classes (`.sidebar`, `.top-header`,
+     `.kpi-grid`, `.inventory-stock-grid`, `.new-order-layout-grid`, `.modal-container`,
+     `.crm-table`) will be made outside of media queries.
+  2. Mobile Scope Isolation:
+     All mobile-specific overrides will be strictly wrapped inside:
+       `@media (max-width: 767px) { ... }`
+     And small phone edge cases inside:
+       `@media (max-width: 480px) { ... }`
+  3. Tablet Scope Isolation:
+     Tablet adjustments will be strictly wrapped inside:
+       `@media (min-width: 768px) and (max-width: 1024px) { ... }`
+  4. Desktop Base Preservation:
+     Any rule targeting screens `>= 1025px` will remain entirely as written today.
+     The single-row 4-column stock grid (`@media (min-width: 1050px)`) and single-row
+     5-column KPI grid (`@media (min-width: 1150px)`) will remain active on desktop.
+  5. Feature Parity & Single Codebase:
+     No duplicate HTML pages or separate endpoints. The exact same DOM nodes will
+     adapt responsively via CSS Grid and Flexbox reflows.
+
+================================================================================
+7. TABLET RESPONSIVENESS STRATEGY (768px - 1024px)
+================================================================================
+Tablet viewports (such as iPad in portrait at 768x1024 or landscape at 1024x768):
+  - Sidebar: Compact 72px icon sidebar with tooltip hovers, leaving ~700px-950px
+    for main content.
+  - Dashboard & Analytics KPIs: Clean 3-column / 2-column or 4-column auto-fit
+    grid (`repeat(auto-fit, minmax(220px, 1fr))`) without awkward orphans.
+  - Inventory Stock Grid: 2-column x 2-row grid (`repeat(2, 1fr)`).
+  - New Order: 2-column layout preserved where tablet width >= 900px, or 1-column
+    with sticky summary where < 900px.
+  - Tables: Horizontal scrolling container with subtle fade indicators on the
+    edges to signal scrollable content.
+
+================================================================================
+8. PROPOSED MOBILE ARCHITECTURE & REDESIGN SPECIFICATIONS (Phase 2 Roadmap)
+================================================================================
+
+8.1 MOBILE APP SHELL & BOTTOM NAVIGATION BAR
+--------------------------------------------
+Currently, navigation requires tapping a top-left hamburger to open a drawer.
+Proposed Redesign for Mobile (< 768px):
+  - Retain the top header in simplified form:
+    * Left: POPCONE brand icon & active page title.
+    * Right: Sync indicator & Settings button (gear icon).
+  - Introduce an elegant Frosted Mobile Bottom Navigation Bar:
+    * Fixed to the bottom of the viewport: `position: fixed; bottom: 0; left: 0; right: 0; z-index: 500;`
+    * Height: 60px + `env(safe-area-inset-bottom)`.
+    * Styling: Frosted glass (`background: rgba(255, 255, 255, 0.92); backdrop-filter: blur(16px); border-top: 1px solid rgba(226, 232, 240, 0.85);`).
+    * 5 Thumb-Friendly Navigation Tabs:
+      1. Dashboard (Grid icon)
+      2. Orders (Package icon)
+      3. New Order (+ icon, elevated POPCONE Yellow circular button)
+      4. Inventory (Layers icon)
+      5. Analytics (Trending chart icon)
+    * Each tab has a 44x44px touch target, active indicator bar/glow, and compact 10px label.
+    * When New Order is tapped, Ashish is instantly on the order creation screen.
+    * `.main-wrapper` receives `padding-bottom: 72px` to prevent any content overlap.
+    * Desktop sidebar remains 100% hidden on mobile (`display: none;` at < 768px),
+      completely eliminating the hamburger drawer and the missing-label bug!
+
+8.2 DASHBOARD: COMPACT 2-COLUMN KPI MATRIX & RESPONSIVE ORDERS
+--------------------------------------------------------------
+  - KPI Cards Grid:
+    * Switch from 1-column stack to a refined 2-Column Responsive Matrix:
+      - Card 1: Total Revenue (spans full width or featured top row)
+      - Cards 2 & 3: Total Orders & Bottles Sold (side by side, 1fr 1fr)
+      - Cards 4 & 5: Paid Orders & COD Orders (side by side, 1fr 1fr)
+    * Compact Card Sizing:
+      - Padding: reduced from 24px 20px to 14px 16px.
+      - Metric values: 22px bold (instead of 32px), clean and legible without wrapping.
+      - Accent border: 3px left indicator.
+    * Total height of KPI section drops from 750px to ~230px (saving over 500px of scrolling!).
+  - Recent Orders:
+    * Convert each recent order into a compact responsive order card on mobile,
+      or enable smooth swipeable table scrolling with a sticky Order ID column.
+
+8.3 NEW ORDER: STREAMLINED FLOW & STICKY SUMMARY ACTION DOCK
+------------------------------------------------------------
+  - Sticky Bottom Summary Action Dock:
+    * Rather than forcing Ashish to scroll 1900px to the bottom to see total price
+      and submit the order:
+    * Dock a compact floating Order Summary Bar directly above the bottom navigation:
+      - Left: `Total: X btl` | `₹XXX` (bold brand blue, tapping expands breakdown)
+      - Right: `Create Order` button (44px height, high-contrast brand yellow).
+    * Ashish can adjust bottles on the top/middle of the screen and instantly
+      see the price update in real-time, then tap "Create Order" with a single thumb!
+  - Compact Customer Information:
+    * Group inputs into an efficient mobile layout:
+      - Row 1: Customer Name (full width)
+      - Row 2: Phone Number (full width, input type="tel")
+      - Row 3: PIN Code & District (2-column: 1fr 1fr)
+      - Row 4: State (full width)
+      - Row 5: Payment Method & Order Source (2-column: 1fr 1fr - as recently perfected)
+      - Row 6: Delivery Address (compact 2-line textarea)
+      - Row 7: Order Notes (collapsible or compact textarea)
+  - Flavour Selection Grid:
+    * 2-column compact grid (`grid-template-columns: 1fr 1fr; gap: 10px;`).
+    * Bottle image: 56px (crisp thumbnail).
+    * Stepper buttons (`-` and `+`): 44 x 44px touch target.
+
+8.4 ORDERS: RESPONSIVE CARD-BASED ORDER LIST & COMPACT FILTER CHIPS
+--------------------------------------------------------------------
+  - Mobile Order Card Layout (Replacing 1326px Overflowing Table):
+    * On screens < 768px, display each order as a polished glassmorphic Order Card:
+      +-------------------------------------------------------------+
+      | #ORD0014    •   21 Nov, 06:10              [ PLACED ]       |
+      | Ragasudha                                  9080077624       |
+      | 1 bottle (Cheese)                          ₹224  •  [ Paid ]|
+      +-------------------------------------------------------------+
+    * Tapping anywhere on the card opens the Order Details modal.
+    * Zero horizontal scrolling! 100% of vital business info (ID, Customer, Phone,
+      Bottles, Price, Payment Status, Dispatch Status) is readable at a single glance.
+  - Search & Filters:
+    * Search input: Full width with clear button.
+    * Export buttons: Collapsed into a clean secondary action row or 2-button flex pair.
+    * Filters: Horizontal scrollable filter pills / chips (`All Payments`, `All Statuses`, `This Month`)
+      reducing filter height from 340px to 48px!
+
+8.5 ORDER DETAILS & EDIT ORDER: FULL-VIEW BOTTOM-SHEET MODALS
+--------------------------------------------------------------
+  - Modal Presentation:
+    * On mobile (< 768px), modals transition from floating centered boxes to
+      native-feeling Bottom Sheets:
+      - Width: 100%;
+      - Max-height: 92vh;
+      - Border-radius: 20px 20px 0 0;
+      - Bottom: 0;
+      - Smooth slide-up entrance animation.
+  - Order Details Modal:
+    * Footer Action Buttons:
+      - Replaced horizontal nowrap with a clean mobile stack:
+        * Row 1: Full-width `Toggle Dispatch Status` (Primary outline)
+        * Row 2: Flex 1:1 pair of `Edit Order` (Blue) and `Delete Order` (Red)
+      - Eliminates the left-side button blowout bug completely!
+  - Edit Order Modal:
+    * Fix Section A Form Grid:
+      - Force `grid-template-columns: 1fr;` on mobile.
+      - Override `.form-group.span-2 { grid-column: span 1 !important; }`.
+      - Pair Payment Method and Order Source in a compact `grid-template-columns: 1fr 1fr; gap: 10px;`.
+      - Eliminates the horizontal form overflow bug completely! All inputs (Name, Phone,
+        Address, Notes, PIN, District, State, Payment, Order Source) become 100% visible
+        and comfortable to edit on mobile.
+
+8.6 INVENTORY & ANALYTICS: 2-COLUMN RESPONSIVE BLOCKS
+------------------------------------------------------
+  - Inventory Stock Cards:
+    * 2-column grid (`grid-template-columns: 1fr 1fr; gap: 12px;`).
+    * Cheese & Peri Peri on row 1; Sour Cream & Tomato on row 2.
+    * Card height: ~110px. Bottle thumbnail: 48px.
+    * All 4 stock levels visible on a single screen without scrolling!
+    * Movement table: Smooth touch-scrolling container with visible horizontal scrollbar.
+  - Analytics KPI Cards:
+    * 2-column grid matching Dashboard:
+      - Row 1: Revenue (span 2 or 1fr) & Shipping Costs (1fr)
+      - Row 2: Bottles Sold (1fr) & Total Orders (1fr)
+      - Row 3: Top Flavour (span 2 full-width highlight card)
+    * Toolbar: Segmented period tabs full-width; Month & Year dropdowns side by side;
+      Export button full-width with brand hover sweep animation.
+
+================================================================================
+9. DETAILED FILE MODIFICATION PLAN (FOR PHASE 2)
+================================================================================
+When authorized for Phase 2 implementation, the following files will be modified:
+
+1. `static/css/styles.css`:
+   - Add a dedicated, isolated `@media (max-width: 767px)` block at the bottom of
+     the stylesheet containing:
+     * Mobile shell, content padding, top header adjustments.
+     * Mobile bottom navigation bar styles (`.mobile-bottom-nav`, `.bottom-nav-item`).
+     * 2-column Dashboard KPI matrix & compact card spacing.
+     * Mobile order card styles (`.orders-mobile-card-list`, `.order-card`).
+     * New Order sticky summary action dock & compact customer form.
+     * 2-column Inventory stock grid & Analytics KPI grid.
+     * Modal bottom-sheet container styles, flex-wrap footer action overrides,
+       and `.form-group.span-2` single-column overrides.
+     * Input `font-size: 16px` rule on mobile to eliminate iOS Safari zoom.
+   - Add a dedicated `@media (min-width: 768px) and (max-width: 1024px)` block for
+     tablet layout refinements.
+   - ZERO changes to desktop styles (> 1024px).
+
+2. `static/index.html`:
+   - Add semantic `<nav class="mobile-bottom-nav">` container right before `</body>`
+     (with `display: none;` on desktop via CSS).
+   - In `#view-orders`, add responsive mobile order card wrapper or semantic structure.
+   - In `#view-new-order`, add sticky bottom summary action dock structure.
+   - Update cache-buster query string (`styles.css?v=...`, `app.js?v=...`).
+
+3. `static/js/app.js`:
+   - Add event listeners linking the mobile bottom navigation tabs to the existing
+     `switchTab(tabId)` function.
+   - Support syncing the active tab highlight between desktop sidebar and mobile
+     bottom nav.
+   - Support rendering mobile order cards seamlessly alongside table rendering.
+   - Zero changes to API calls, database operations, or order processing algorithms.
+
+4. `server.py`, `database.py`, `auth.py`:
+   - ZERO MODIFICATIONS. All changes are strictly frontend UI/UX responsiveness.
+
+================================================================================
+10. DATA SAFETY & DATABASE NON-NEGOTIABLES VERIFICATION
+================================================================================
+The database and business data safety rules are strictly upheld:
+  - ZERO database schema modifications.
+  - ZERO migrations or table resets.
+  - ZERO changes to Turso connection strings, credentials, or `.env`.
+  - ZERO changes to stored order records, customer details, or historical data.
+  - ZERO alterations to pricing calculations, discount formulas, delivery fees,
+    inventory stock levels, or payment states.
+  - Full backward compatibility across all browsers and devices.
+
+================================================================================
+11. COMPREHENSIVE TESTING MATRIX & VERIFICATION CHECKLIST
+================================================================================
+During Phase 2, tests will be executed across the full testing matrix:
+
+| Device Category | Target Viewport | Target Browser / Engine | Verification Focus |
+|-----------------|-----------------|-------------------------|--------------------|
+| Small Phone     | 360 x 640       | Chrome Mobile / Android | Zero overflow, compact cards, modal fit |
+| Standard Phone  | 390 x 844       | Safari Mobile / iOS     | Bottom nav ergonomics, sticky order dock |
+| Large Phone     | 430 x 932       | Safari / Chrome Mobile  | Full-width cards, touch target heights   |
+| Tablet Portrait | 768 x 1024      | iPad Safari / Tablet    | 2-col inventory, 3-col KPIs, table scroll|
+| Tablet Landscape| 1024 x 768      | iPad / Tablet Chrome    | Sidebar collapse, multi-column layouts   |
+| Laptop Baseline | 1366 x 768      | Chrome / Edge Desktop   | 100% identical to current production     |
+| Desktop FHD     | 1920 x 1080     | Chrome / Edge / Firefox | 100% identical to current production     |
+
+Interactive Verification Checklist:
+  [ ] Login: Card fits, no keyboard clipping, 44px tap targets.
+  [ ] Navigation: Bottom nav tabs switch seamlessly; active indicator updates;
+      no hamburger menu required on mobile.
+  [ ] Dashboard: 2-column KPI matrix readable in single glance; recent orders browseable.
+  [ ] New Order: Customer info compact; flavour steppers 44px; sticky summary dock
+      updates live with total bottles and payable amount; "Create Order" easily tapped.
+  [ ] Orders: Responsive cards show ID, customer, phone, bottles, amount, payment,
+      and dispatch status with zero horizontal table panning.
+  [ ] Order Details Modal: All 3 buttons ("Mark as DISPATCHED", "Edit Order",
+      "Delete Order") fit cleanly within modal container with zero overflow.
+  [ ] Edit Order Modal: Section A customer fields (including Phone, District, and
+      Order Source) fit 100% within modal body without horizontal cutoff.
+  [ ] Inventory: 4 stock cards in 2x2 grid visible in one screen; stock movements table
+      scrollable with clear visual indicators.
+  [ ] Analytics: 2-column KPI grid; period switcher and export button full-width;
+      hover sweep animations preserved.
+  [ ] Desktop Regression: Laptop (1366x768) and Desktop (1920x1080) match current
+      production screenshots pixel-for-pixel.
+
+================================================================================
+12. LIMITATIONS, RISKS, AND OPEN ARCHITECTURAL DECISIONS
+================================================================================
+1. Mobile Bottom Nav vs. Drawer:
+   - Audit Recommendation: Implement the Mobile Bottom Nav Bar. It directly solves
+     Ashish's mobile usability needs, providing 1-tap navigation across Dashboard,
+     Orders, New Order, Inventory, and Analytics.
+   - Decision Point for User: Confirm whether Ashish prefers the Mobile Bottom
+     Navigation Bar (standard iOS/Android mobile pattern) or keeping the slide-out
+     sidebar drawer (fixed with visible labels).
+2. Orders View Presentation:
+   - Audit Recommendation: Render orders as responsive mobile cards on screens < 768px,
+     while retaining the full 10-column table on desktop (> 1024px).
+   - This completely solves the 1326px horizontal table overflow on phones.
+3. Virtual Keyboard Handling:
+   - Use CSS `dvh` units (`height: 100dvh`) and `env(safe-area-inset-bottom)` to
+     ensure sticky action bars don't conflict with iOS home indicator or Android
+     gesture bars.
+
+================================================================================
+13. PHASE 1 SIGN-OFF & NEXT STEPS
+================================================================================
+Phase 1 (Complete Audit & Architecture) is now COMPLETE.
+No application code, CSS, JavaScript, database, or configuration has been modified.
+Empirical visual evidence and metrics were captured and documented.
+
+Awaiting user review and explicit authorization:
+Reply "proceed" to authorize Phase 2 Local Implementation.
+================================================================================
